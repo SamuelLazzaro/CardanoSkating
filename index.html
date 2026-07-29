@@ -89,7 +89,7 @@
 		<section class="hero" id="home">
 			<video class="hero-video" id="hero-video" autoplay muted loop playsinline preload="metadata"
 				poster="assets/img/impianto_1.jpeg">
-				<source src="assets/video/hero.mp4" type="video/mp4">
+				<source src="assets/video/video_1.mp4" type="video/mp4">
 			</video>
 			<div class="hero-scrim"></div>
 
@@ -348,6 +348,37 @@
 						<span class="contact-value">cardanoskating</span>
 					</a>
 				</div>
+
+				<!-- Google Maps: third-party iframe, injected by cookie.js only
+				     after explicit consent. Until then only this local
+				     placeholder is shown and nothing is requested from Google. -->
+				<h3 class="contacts-map-title reveal" data-i18n="contacts.mapTitle">Dove siamo</h3>
+
+				<div class="map-embed reveal" id="map-venue">
+					<div class="map-consent">
+						<svg class="map-consent-icon" viewBox="0 0 48 48" aria-hidden="true">
+							<path d="M24 44s14-13.4 14-24a14 14 0 0 0-28 0c0 10.6 14 24 14 24z" fill="none"
+								stroke="currentColor" stroke-width="2.5" stroke-linejoin="round" />
+							<circle cx="24" cy="19" r="5" fill="none" stroke="currentColor" stroke-width="2.5" />
+						</svg>
+						<p class="map-consent-text" data-i18n="map.consentText">La mappa è fornita da Google Maps
+							(Google LLC, Stati Uniti): caricandola, Google riceve il tuo indirizzo IP e può installare
+							cookie di terze parti sul tuo dispositivo. Finché non acconsenti, nessun dato viene inviato
+							a Google.</p>
+						<button class="btn btn-primary map-consent-btn" type="button"><span
+								data-i18n="map.consentBtn">Accetta e mostra la mappa</span></button>
+						<p class="map-consent-note">
+							<span data-i18n="map.consentNote">Puoi revocare il consenso in qualsiasi momento. Tutti i
+								dettagli nella</span>
+							<a href="privacy-cookie-policy.html" data-i18n="cookie.policy">Privacy &amp; Cookie
+								Policy</a>.
+						</p>
+						<a class="map-consent-external"
+							href="https://www.google.com/maps/search/?api=1&amp;query=Pista+di+Pattinaggio+Cardano+al+Campo"
+							target="_blank" rel="noopener" data-i18n="map.externalLink">Oppure apri il pattinodromo su
+							Google Maps in una nuova finestra</a>
+					</div>
+				</div>
 			</div>
 		</section>
 	</main>
@@ -357,6 +388,12 @@
 		<div class="container footer-inner">
 			<p>© <span id="footer-year">2026</span> Cardano Skating · Cardano al Campo (VA)</p>
 			<p class="footer-tag" data-i18n="footer.tag">Pattinaggio corsa a rotelle e su ghiaccio</p>
+			<p class="footer-legal">
+				<a href="privacy-cookie-policy.html" data-i18n="cookie.policy">Privacy &amp; Cookie Policy</a>
+				<span class="footer-legal-sep" aria-hidden="true">·</span>
+				<button class="footer-cookie-prefs" id="footer-cookie-prefs" type="button"
+					data-i18n="cookie.prefs">Gestisci preferenze cookie</button>
+			</p>
 		</div>
 	</footer>
 
@@ -369,6 +406,42 @@
 
 	<!-- ======================= FAB LINGUA ======================= -->
 	<button class="fab-lang" id="fab-lang" aria-label="Switch to English">EN</button>
+
+	<!-- ======================= FAB PREFERENZE COOKIE =======================
+	     Persistent, always reachable way to withdraw consent (art. 7(3) GDPR).
+	     Shown by cookie.js as soon as the banner is dismissed. -->
+	<button class="fab-cookie" id="cookie-prefs-fab" type="button" aria-label="Gestisci preferenze cookie"
+		data-i18n-label="cookie.prefs" hidden>
+		<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2"
+			stroke-linecap="round" stroke-linejoin="round">
+			<path d="M12 2a10 10 0 1 0 10 10 4 4 0 0 1-5-5 4 4 0 0 1-5-5" />
+			<path d="M8.5 8.5v.01" stroke-width="3" />
+			<path d="M16 15.5v.01" stroke-width="3" />
+			<path d="M12 12v.01" stroke-width="3" />
+			<path d="M11 17v.01" stroke-width="3" />
+			<path d="M7 14v.01" stroke-width="3" />
+		</svg>
+	</button>
+
+	<!-- ======================= COOKIE BANNER =======================
+	     Hidden by default and shown by cookie.js only when no choice has
+	     been recorded yet, so returning visitors never see it flash. -->
+	<div class="cookie-banner" id="cookie-banner" role="dialog" aria-live="polite" aria-label="Preferenze cookie"
+		data-i18n-label="a11y.cookieBanner" hidden>
+		<div class="container cookie-banner-inner">
+			<p class="cookie-banner-text" data-i18n="cookie.text">Questo sito usa solo tecnologie tecniche necessarie al
+				suo funzionamento, salvate nel tuo browser. Nella sezione Contatti la mappa di Google Maps viene
+				caricata soltanto se accetti i cookie di terze parti.</p>
+			<div class="cookie-banner-actions">
+				<a class="cookie-policy-link" href="privacy-cookie-policy.html" data-i18n="cookie.policy">Privacy &amp;
+					Cookie Policy</a>
+				<button class="cookie-btn cookie-btn-reject" id="cookie-reject" type="button"
+					data-i18n="cookie.reject">Solo tecnici</button>
+				<button class="cookie-btn cookie-btn-accept" id="cookie-accept" type="button"
+					data-i18n="cookie.accept">Accetta tutti</button>
+			</div>
+		</div>
+	</div>
 
 	<script type="module" src="js/main.js"></script>
 </body>

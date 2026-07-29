@@ -3,6 +3,7 @@
  * language FAB. All the behaviour lives in ui.js and i18n.js.
  */
 
+import { initCookieConsent } from "./cookie.js";
 import { initI18n, toggleLanguage } from "./i18n.js";
 import {
     initFooterYear,
@@ -20,5 +21,6 @@ initScrollReveal();
 initHeroVideo();
 initLightbox();
 initFooterYear();
+initCookieConsent();
 
 document.getElementById("fab-lang").addEventListener("click", toggleLanguage);

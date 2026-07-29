@@ -54,9 +54,17 @@ function applyLanguage(lang) {
             element.setAttribute("content", content);
         }
     });
+    document.querySelectorAll("[data-i18n-title]").forEach((element) => {
+        const title = dictionary[element.dataset.i18nTitle];
+        if (title !== undefined) {
+            element.setAttribute("title", title);
+        }
+    });
 
     document.documentElement.lang = lang;
-    document.title = dictionary["meta.title"];
+    // secondary pages declare their own title key on <html data-i18n-doc-title>
+    const titleKey = document.documentElement.dataset.i18nDocTitle || "meta.title";
+    document.title = dictionary[titleKey] ?? dictionary["meta.title"];
 
     // the FAB always shows the language you would switch TO
     const fabButton = document.getElementById("fab-lang");
@@ -64,6 +72,17 @@ function applyLanguage(lang) {
     fabButton.setAttribute("aria-label", dictionary["a11y.switchLang"]);
 
     g_currentLang = lang;
+}
+
+/**
+ * Look up a single string in the language currently applied.
+ * Needed by code that builds DOM nodes at runtime (see cookie.js), which
+ * cannot rely on the data-i18n attributes being scanned at load time.
+ * @param {string} key - flat "section.key" translation key
+ * @returns {string} the translated string, or the key itself if unknown
+ */
+export function translate(key) {
+    return TRANSLATIONS[g_currentLang][key] ?? key;
 }
 
 /**

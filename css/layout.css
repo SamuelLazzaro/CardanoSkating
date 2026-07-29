@@ -130,7 +130,7 @@
 
 .hero-title-accent {
     color: var(--c-orange);
-    text-shadow: 0 0 32px rgba(243, 146, 0, 0.35);
+    /* text-shadow: 0 0 32px rgba(243, 146, 0, 0.35); */
 }
 
 .hero-sub {

@@ -1,0 +1,136 @@
+/* ==========================================================================
+   policy.css — Privacy & Cookie Policy page only.
+   Loaded on top of main.css, which provides the design tokens, the reset
+   and the shared components (top bar brand, footer, language FAB).
+   ========================================================================== */
+
+/* ==========================================================================
+   Page top bar — static (the one-page site's bar is fixed and transparent,
+   here there is no hero to sit on top of)
+   ========================================================================== */
+.policy-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    height: auto;
+    min-height: var(--topbar-h);
+    padding: 12px var(--pad-page);
+    background: var(--c-black-alt);
+    border-bottom: 1px solid var(--c-border);
+}
+
+.btn-back {
+    padding: 9px 18px;
+    border: 1px solid var(--c-border);
+    color: var(--c-orange);
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-decoration: none;
+    transition: border-color var(--t-hover), color var(--t-hover);
+}
+
+@media (pointer: fine) {
+    .btn-back:hover {
+        border-color: var(--c-orange);
+        color: var(--c-orange-bright);
+    }
+}
+
+/* ==========================================================================
+   Document body
+   ========================================================================== */
+.policy-main {
+    max-width: 840px;
+    padding-top: 56px;
+    padding-bottom: 72px;
+}
+
+.policy-title {
+    margin-bottom: 10px;
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-size: clamp(1.9rem, 5vw, 2.8rem);
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}
+
+.policy-updated {
+    margin-bottom: 44px;
+    color: var(--c-gray);
+    font-size: 0.85rem;
+}
+
+/* ==========================================================================
+   Sections — one card per numbered chapter
+   ========================================================================== */
+.policy-card {
+    margin-bottom: 20px;
+    padding: 26px 28px;
+    background: var(--c-surface);
+    border: 1px solid var(--c-border);
+    border-left: 3px solid var(--c-orange);
+}
+
+.policy-card h2 {
+    margin-bottom: 16px;
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-size: 1.2rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--c-orange);
+}
+
+.policy-card p {
+    color: var(--c-text-soft);
+    font-size: 0.95rem;
+}
+
+.policy-card a {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+.policy-card code {
+    font-family: var(--font-mono);
+    font-size: 0.85em;
+    color: var(--c-white);
+    word-break: break-all;
+}
+
+/* definition-like list: identifier on the left, description on the right */
+.policy-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 16px 0;
+}
+
+.policy-list li {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 2px;
+    padding: 12px 0;
+    border-top: 1px solid var(--c-border);
+    color: var(--c-gray);
+    font-size: 0.9rem;
+}
+
+.policy-list li:last-child {
+    border-bottom: 1px solid var(--c-border);
+}
+
+.policy-list-term {
+    color: var(--c-white);
+    font-weight: 600;
+}
+
+@media (min-width: 700px) {
+    .policy-list li {
+        grid-template-columns: 220px 1fr;
+        gap: 20px;
+    }
+}

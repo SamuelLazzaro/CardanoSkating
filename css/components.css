@@ -104,7 +104,9 @@
        otherwise overflow-y would never trigger. */
     min-height: 0;
     overflow-y: auto;
+	overflow-x: hidden;
     scrollbar-width: thin;
+	scrollbar-color: var(--c-orange);
 }
 
 .nav-link {
@@ -136,6 +138,16 @@
 }
 
 @media (pointer: fine) {
+	button:hover {
+		cursor: pointer;
+	}
+
+	.hamburger:hover {
+		background-color: var(--c-orange);
+		border-radius: 5px;
+		transition: background-color 0.25s ease, border-color 0.25s ease;
+	}
+
     .nav-close:hover {
         color: var(--c-orange);
     }
@@ -161,7 +173,7 @@
     letter-spacing: 0.1em;
     text-transform: uppercase;
     text-decoration: none;
-    transform: skewX(var(--skew));
+    /* transform: skewX(var(--skew)); */
     transition: box-shadow 0.25s ease, background-color 0.25s ease;
 }
 
@@ -467,6 +479,270 @@
         transform: translateY(-6px);
         border-color: var(--c-orange);
         box-shadow: var(--glow-orange);
+    }
+}
+
+/* ==========================================================================
+   Contatti — Google Maps embed and its consent placeholder.
+   The placeholder and the iframe share the same box, so revealing the map
+   after consent (or withdrawing it) never makes the page jump.
+   ========================================================================== */
+.contacts-map-title {
+    margin: 56px 0 20px;
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-size: 1.35rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.map-embed {
+    --map-h: 300px;
+
+    background: var(--c-surface);
+    border: 1px solid var(--c-border);
+}
+
+.map-frame {
+    display: block;
+    width: 100%;
+    height: var(--map-h);
+    border: 0;
+}
+
+.map-consent {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    min-height: var(--map-h);
+    padding: 32px 24px;
+    text-align: center;
+}
+
+/* `display: flex` above would beat the UA rule for the `hidden` attribute */
+.map-consent[hidden] {
+    display: none;
+}
+
+.map-consent-icon {
+    width: 44px;
+    height: 44px;
+    color: var(--c-orange);
+}
+
+.map-consent-text {
+    max-width: 62ch;
+    margin: 0;
+    color: var(--c-text-soft);
+    font-size: 0.95rem;
+}
+
+.map-consent-note {
+    margin: 0;
+    color: var(--c-gray);
+    font-size: 0.85rem;
+}
+
+.map-consent-external {
+    color: var(--c-gray);
+    font-size: 0.85rem;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+@media (pointer: fine) {
+    .map-consent-external:hover {
+        color: var(--c-orange);
+    }
+}
+
+@media (min-width: 700px) {
+    .map-embed {
+        --map-h: 420px;
+    }
+}
+
+/* ==========================================================================
+   Cookie banner — first-visit consent request.
+   Accept and reject are styled with the same size and weight on purpose:
+   a less prominent reject button is a dark pattern (EDPB 03/2022).
+   ========================================================================== */
+.cookie-banner {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 160;
+    padding: 18px 0;
+    background: rgba(16, 16, 16, 0.97);
+    border-top: 2px solid var(--c-orange);
+    backdrop-filter: blur(8px);
+    box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.6);
+}
+
+.cookie-banner-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+}
+
+.cookie-banner-text {
+    margin: 0;
+    color: var(--c-text-soft);
+    font-size: 0.9rem;
+}
+
+.cookie-banner-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    width: 100%;
+}
+
+.cookie-policy-link {
+    color: var(--c-orange);
+    font-size: 0.85rem;
+    text-align: center;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+.cookie-btn {
+    padding: 12px 26px;
+    background: transparent;
+    border: 2px solid var(--c-orange);
+    color: var(--c-orange);
+    font-family: var(--font-display);
+    font-size: 1rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background-color 0.25s ease, color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.cookie-btn-accept {
+    background: var(--c-orange);
+    color: var(--c-black);
+}
+
+@media (pointer: fine) {
+    .cookie-policy-link:hover {
+        color: var(--c-orange-bright);
+    }
+
+    .cookie-btn-accept:hover {
+        background: var(--c-orange-bright);
+        border-color: var(--c-orange-bright);
+        box-shadow: var(--glow-orange);
+    }
+
+    .cookie-btn-reject:hover {
+        background: rgba(243, 146, 0, 0.14);
+        color: var(--c-orange-bright);
+    }
+}
+
+@media (min-width: 760px) {
+    .cookie-banner-inner {
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+        gap: 28px;
+    }
+
+    .cookie-banner-actions {
+        flex-direction: row;
+        align-items: center;
+        width: auto;
+        flex-shrink: 0;
+    }
+
+    .cookie-policy-link {
+        white-space: nowrap;
+    }
+}
+
+/* ==========================================================================
+   Cookie preferences FAB — persistent consent-withdrawal control.
+   Mirrors the language FAB on the opposite corner; both slide above the
+   banner while it is open (--cookie-banner-h is published by cookie.js).
+   ========================================================================== */
+.fab-cookie {
+    position: fixed;
+    left: 22px;
+    bottom: 22px;
+    z-index: 130;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 46px;
+    height: 46px;
+    padding: 0;
+    border: 2px solid var(--c-border);
+    border-radius: 50%;
+    background: var(--c-black-alt);
+    color: var(--c-gray);
+    cursor: pointer;
+    box-shadow: 0 6px 22px rgba(0, 0, 0, 0.55);
+    transition: border-color 0.25s ease, color 0.25s ease;
+}
+
+.fab-cookie[hidden] {
+    display: none;
+}
+
+.fab-cookie svg {
+    width: 22px;
+    height: 22px;
+}
+
+@media (pointer: fine) {
+    .fab-cookie:hover {
+        border-color: var(--c-orange);
+        color: var(--c-orange);
+    }
+}
+
+body.cookie-banner-open .fab-lang {
+    bottom: calc(var(--cookie-banner-h, 0px) + 16px);
+}
+
+/* ==========================================================================
+   Footer legal row
+   ========================================================================== */
+.footer-legal {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.footer-legal a {
+    color: var(--c-gray);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+.footer-cookie-prefs {
+    padding: 0;
+    background: none;
+    border: none;
+    color: var(--c-gray);
+    font-family: inherit;
+    font-size: inherit;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+}
+
+@media (pointer: fine) {
+    .footer-legal a:hover,
+    .footer-cookie-prefs:hover {
+        color: var(--c-orange);
     }
 }
 
