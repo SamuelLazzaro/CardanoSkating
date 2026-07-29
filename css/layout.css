@@ -42,7 +42,10 @@
 .brand-name {
     display: flex;
     flex-direction: column;
-    font-family: var(--font-display);
+    /* monospace: CARDANO and SKATING are both 7 chars, so the two
+       lines render at exactly the same width */
+    font-family: var(--font-mono);
+    font-weight: 700;
     font-size: 1.05rem;
     letter-spacing: 0.14em;
     line-height: 1.05;
@@ -131,7 +134,7 @@
 }
 
 .hero-sub {
-    max-width: 520px;
+    max-width: 600px;
     margin: 22px 0 34px;
     color: var(--c-text-soft);
     font-size: 1.1rem;
@@ -274,7 +277,7 @@
     }
 
     .cards-grid {
-        grid-template-columns: repeat(3, 1fr);
+        grid-template-columns: repeat(2, 1fr);
     }
 
     .gallery-grid {

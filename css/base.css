@@ -33,6 +33,13 @@
     font-display: swap;
 }
 
+@font-face {
+    font-family: "JetBrains Mono";
+    src: url("../assets/fonts/jetbrains-mono-v24-latin-700.woff2") format("woff2");
+    font-weight: 700;
+    font-display: swap;
+}
+
 /* ----- Design tokens ----- */
 :root {
     /* colors */
@@ -50,6 +57,7 @@
     /* typography */
     --font-display: "Anton", "Arial Narrow", sans-serif;
     --font-body: "Inter", system-ui, sans-serif;
+    --font-mono: "JetBrains Mono", ui-monospace, Consolas, Menlo, monospace;
 
     /* layout */
     --topbar-h: 72px;
