@@ -39,6 +39,12 @@
     }
 }
 
+/* touch counterpart of the hover above (see the .is-tapped utility in base.css) */
+.btn-back.is-tapped {
+    border-color: var(--c-orange);
+    color: var(--c-orange-bright);
+}
+
 /* ==========================================================================
    Document body
    ========================================================================== */

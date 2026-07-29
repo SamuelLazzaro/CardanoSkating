@@ -55,6 +55,8 @@
 	--c-orange-bright: #ff9900;
 	/* hover / glow variant */
 	--glow-orange: 0 0 24px rgba(243, 146, 0, 0.45);
+	/* barely-there orange wash for the hover/tap state of ghost buttons */
+	--c-orange-tint: rgba(243, 146, 0, 0.14);
 
 	/* typography */
 	--font-display: "Anton", "Arial Narrow", sans-serif;
@@ -79,6 +81,7 @@
 	--t-fade: 0.35s ease;
 	--t-zoom: 0.45s ease;
 	--t-reveal: 0.65s ease;
+	--t-tap: 0.25s ease;
 
 	/* shared "speed" angle for buttons, underlines, ticks */
 	--skew: -8deg;
@@ -234,6 +237,31 @@ html {
 
 .reveal.no-anim {
 	transition: none;
+}
+
+/* ==========================================================================
+   Touch tap feedback utility
+   Touch screens have no :hover and the native tap highlight is switched off
+   above, so a tap would give no confirmation that the intended element was
+   hit. js/tap-feedback.js therefore adds .is-tapped to the tapped element,
+   waits TAP_FEEDBACK_MS and only then runs the click action. What
+   the class looks like is up to each component: the rules sit next to the
+   component's @media (pointer: fine) block, so touch shows the same accent
+   the pointer does.
+
+   The state comes in with a transition of its own (--t-tap), the same for
+   every component: `all` covers whatever properties the component's tap
+   rule touches, and !important is needed because several components declare
+   their transition on a selector more specific than a single class
+   (e.g. .footer-contact a). The class is dropped after TAP_FEEDBACK_MS,
+   while this transition is still mid-flight: the effect peaks partway
+   through and then eases back, which reads as a soft pulse rather than a
+   full state change. How far it gets is TAP_FEEDBACK_MS against --t-tap,
+   read on an ease curve — which front-loads, so 150 ms out of 250 ms is
+   already ~88% of the way. The way back is ruled by the component's own
+   transition again, the class being gone by then. */
+.is-tapped {
+	transition: all var(--t-tap) !important;
 }
 
 /* ==========================================================================

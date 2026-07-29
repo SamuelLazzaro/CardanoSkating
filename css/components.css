@@ -3,7 +3,12 @@
    section headings, timeline, cards, gallery, sponsor plates, contact cards,
    lightbox, language FAB.
    All :hover rules are wrapped in @media (pointer: fine) so they never
-   stick on touch devices.
+   stick on touch devices. Right below each of those blocks sits the touch
+   counterpart: the same look bound to .is-tapped, the class
+   js/tap-feedback.js puts on a tapped element for TAP_FEEDBACK_MS before
+   running its action (the shared part of the utility lives in base.css).
+   Values used by both states are kept in a custom property scoped to the
+   component, so the two cannot drift apart.
    ========================================================================== */
 
 /* ==========================================================================
@@ -105,6 +110,8 @@
 }
 
 .nav-link {
+    --nav-link-hover-shift: 8px;
+
     display: flex;
     align-items: baseline;
     gap: 14px;
@@ -127,6 +134,8 @@
 }
 
 .nav-social a {
+    --nav-social-hover-lift: -10px;
+
     color: var(--c-gray);
     font-weight: 600;
     text-decoration: none;
@@ -147,11 +156,11 @@
 
     .nav-link:hover {
         color: var(--c-orange);
-        transform: translateX(8px);
+        transform: translateX(var(--nav-link-hover-shift));
     }
 
     .nav-social a:hover {
-		transform: translateY(-10px);
+		transform: translateY(var(--nav-social-hover-lift));
         transition: transform 0.55s ease;
     }
 
@@ -159,6 +168,29 @@
 		color: var(--c-orange) !important;
 		transition: color 0.55s ease;
 	}
+}
+
+/* touch counterparts of the hover block above (see base.css). Nested
+   elements need to restate the tap transition: .is-tapped only changes the
+   transition of the element the class lands on, not those of its
+   descendants. */
+.hamburger.is-tapped .hamburger-bar {
+    background-color: var(--c-orange);
+    transition: all var(--t-tap);
+}
+
+.nav-link.is-tapped {
+    color: var(--c-orange);
+    transform: translateX(var(--nav-link-hover-shift));
+}
+
+.nav-social a.is-tapped {
+    transform: translateY(var(--nav-social-hover-lift));
+}
+
+.nav-social a.is-tapped svg {
+    color: var(--c-orange) !important;
+    transition: all var(--t-tap);
 }
 
 /* ==========================================================================
@@ -192,6 +224,11 @@
         background: var(--c-orange-bright);
         box-shadow: var(--glow-orange);
     }
+}
+
+.btn-primary.is-tapped {
+    background: var(--c-orange-bright);
+    box-shadow: var(--glow-orange);
 }
 
 /* ==========================================================================
@@ -390,6 +427,9 @@
 }
 
 .gallery-item img {
+    --gallery-hover-zoom: 1.06;
+    --gallery-hover-brightness: 1.12;
+
     width: 100%;
     height: 100%;
     object-fit: cover;
@@ -400,9 +440,15 @@
 
 @media (pointer: fine) {
     .gallery-item:hover img {
-        transform: scale(1.06);
-        filter: brightness(1.12);
+        transform: scale(var(--gallery-hover-zoom));
+        filter: brightness(var(--gallery-hover-brightness));
     }
+}
+
+.gallery-item.is-tapped img {
+    transform: scale(var(--gallery-hover-zoom));
+    filter: brightness(var(--gallery-hover-brightness));
+    transition: all var(--t-tap);
 }
 
 /* ==========================================================================
@@ -447,6 +493,8 @@
 }
 
 .contact-card {
+    --contact-card-hover-lift: -6px;
+
     display: flex;
     flex-direction: column;
     align-items: flex-start;
@@ -486,10 +534,16 @@
 
 @media (pointer: fine) {
     .contact-card:hover {
-        transform: translateY(-6px);
+        transform: translateY(var(--contact-card-hover-lift));
         border-color: var(--c-orange);
         box-shadow: var(--glow-orange);
     }
+}
+
+.contact-card.is-tapped {
+    transform: translateY(var(--contact-card-hover-lift));
+    border-color: var(--c-orange);
+    box-shadow: var(--glow-orange);
 }
 
 /* ==========================================================================
@@ -570,6 +624,10 @@
     }
 }
 
+.map-consent-external.is-tapped {
+    color: var(--c-orange);
+}
+
 @media (min-width: 700px) {
     .map-embed {
         --map-h: 420px;
@@ -643,10 +701,20 @@
     }
 
     .cookie-btn:hover {
-        background: rgba(243, 146, 0, 0.14);
+        background: var(--c-orange-tint);
         color: var(--c-orange-bright);
         border-color: var(--c-orange-bright);
     }
+}
+
+.cookie-policy-link.is-tapped {
+    color: var(--c-orange-bright);
+}
+
+.cookie-btn.is-tapped {
+    background: var(--c-orange-tint);
+    color: var(--c-orange-bright);
+    border-color: var(--c-orange-bright);
 }
 
 @media (min-width: 760px) {
@@ -708,6 +776,11 @@
         border-color: var(--c-orange);
         color: var(--c-orange);
     }
+}
+
+.fab-cookie.is-tapped {
+    border-color: var(--c-orange);
+    color: var(--c-orange);
 }
 
 body.cookie-banner-open .fab-lang {
@@ -774,6 +847,13 @@ body.cookie-banner-open .fab-lang {
     }
 }
 
+.footer-contact a.is-tapped,
+.footer-credit a.is-tapped,
+.footer-legal a.is-tapped,
+.footer-cookie-prefs.is-tapped {
+    color: var(--c-orange);
+}
+
 /* ==========================================================================
    Lightbox
    ========================================================================== */
@@ -821,6 +901,10 @@ body.cookie-banner-open .fab-lang {
     }
 }
 
+.lightbox-close.is-tapped {
+    color: var(--c-orange);
+}
+
 /* ==========================================================================
    Language FAB
    ========================================================================== */
@@ -849,6 +933,12 @@ body.cookie-banner-open .fab-lang {
         color: var(--c-black);
         box-shadow: var(--glow-orange);
     }
+}
+
+.fab-lang.is-tapped {
+    background: var(--c-orange);
+    color: var(--c-black);
+    box-shadow: var(--glow-orange);
 }
 
 /* ==========================================================================

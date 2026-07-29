@@ -20,6 +20,23 @@ export const NAV_OVERLAY_FADE_MS = 350;
  */
 export const SCROLLEND_FALLBACK_MS = 1500;
 
+/* ----- touch tap feedback (see tap-feedback.js) ----- */
+
+/**
+ * @type {number} how long (ms) the tap feedback stays on screen before the
+ * tapped element's own action runs
+ */
+export const TAP_FEEDBACK_MS = 150;
+
+/** @type {string} class carrying the tap feedback style (see base.css) */
+export const TAP_FEEDBACK_CLASS = "is-tapped";
+
+/**
+ * @type {string} elements whose taps deserve the feedback: everything that
+ * performs an action when activated. A tap anywhere else is left alone.
+ */
+export const TAP_FEEDBACK_SELECTOR = 'a[href], button, [role="button"]';
+
 /* ----- GDPR consent (see cookie.js) ----- */
 
 /** @type {string} localStorage key recording the banner answer ("accepted" | "rejected") */
@@ -31,7 +48,7 @@ export const MAPS_CONSENT_KEY = "cardanoskating-maps-consent";
 /** @type {string} consent value: the visitor accepted */
 export const CONSENT_ACCEPTED = "accepted";
 
-/** @type {string} consent value: the visitor chose technical-only */
+/** @type {string} conset value: the visitor chose technical-only */
 export const CONSENT_REJECTED = "rejected";
 
 /**
