@@ -60,6 +60,7 @@
     --font-mono: "JetBrains Mono", ui-monospace, Consolas, Menlo, monospace;
 
     /* layout */
+    --scrollbar-size: 8px;
     --topbar-h: 72px;
     --container-w: 1140px;
     --pad-page: 24px;
@@ -75,6 +76,9 @@
 
     /* shared "speed" angle for buttons, underlines, ticks */
     --skew: -8deg;
+
+	/* border */
+	--border-radius-common: 5px;
 }
 
 @media (min-width: 900px) {
@@ -145,6 +149,38 @@ a {
 /* Anchored sections stop below the fixed top bar */
 section[id] {
     scroll-margin-top: var(--topbar-h);
+}
+
+/* ==========================================================================
+   Scrollbars — minimal "Dark Racing" style: thin orange pill thumb on a
+   transparent track, so the bar blends into any background.
+   Standard properties (inherited by every scrollable element) cover
+   Firefox and Chromium; the ::-webkit-scrollbar rules cover Safari, and
+   Chromium ignores them when the standard properties are set.
+   ========================================================================== */
+html {
+    scrollbar-width: thin;
+    scrollbar-color: var(--c-orange) transparent;
+}
+
+::-webkit-scrollbar {
+    width: var(--scrollbar-size);
+    height: var(--scrollbar-size);
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--c-orange);
+    border-radius: 999px;
+}
+
+@media (pointer: fine) {
+    ::-webkit-scrollbar-thumb:hover {
+        background: var(--c-orange-bright);
+    }
 }
 
 /* ----- Accessibility helpers ----- */

@@ -22,14 +22,17 @@ export const SCROLLEND_FALLBACK_MS = 1500;
 
 /* ----- GDPR consent (see cookie.js) ----- */
 
-/** @type {string} localStorage key recording that the cookie banner was answered */
+/** @type {string} localStorage key recording the banner answer ("accepted" | "rejected") */
 export const COOKIE_CONSENT_KEY = "cardanoskating-cookie-consent";
 
 /** @type {string} localStorage key recording the consent to load Google Maps */
 export const MAPS_CONSENT_KEY = "cardanoskating-maps-consent";
 
-/** @type {string} value written in the consent keys once a choice is made */
+/** @type {string} consent value: the visitor accepted */
 export const CONSENT_ACCEPTED = "accepted";
+
+/** @type {string} consent value: the visitor chose technical-only */
+export const CONSENT_REJECTED = "rejected";
 
 /**
  * @type {string} Google Maps embed URL of the venue. Requested only after
@@ -51,7 +54,7 @@ export const MAPS_TITLE_KEY = "map.iframeTitle";
  */
 export const TRANSLATIONS = {
     it: {
-        "meta.title": "Cardano Skating — Pattinaggio corsa a rotelle e ghiaccio",
+        "meta.title": "Cardano Skating S.R.L. S.S.D. — Pattinaggio corsa a rotelle e ghiaccio",
         "meta.description": "Cardano Skating: società di pattinaggio corsa a rotelle e su ghiaccio a Cardano al Campo (VA). Corsi per tutte le età al pattinodromo di via Carreggia.",
 
         "a11y.skip": "Salta al contenuto",
@@ -69,7 +72,6 @@ export const TRANSLATIONS = {
         "nav.disciplines": "Discipline",
         "nav.venue": "Impianto",
         "nav.courses": "Corsi",
-        "nav.gallery": "Gallery",
         "nav.sponsors": "Sponsor",
         "nav.contacts": "Contatti",
 
@@ -80,7 +82,7 @@ export const TRANSLATIONS = {
         "hero.cta": "Scopri i corsi",
 
         "about.title": "Una storia che corre da tre generazioni",
-        "about.p1": "Cardano Skating nasce nel 2018 dalla fusione di due storiche società del territorio: il Faro Skating Club, fondato nel 1981, e Cardano Inline, nata nel 2007. Due tradizioni diverse, un'unica passione: la velocità sui pattini.",
+        "about.p1": "La Cardano Skating S.R.L. S.S.D. nasce nel 2018 dalla fusione di due storiche società del territorio: il Faro Skating Club, fondato nel 1981, e Cardano Inline, nata nel 2007. Due tradizioni diverse, un'unica passione: la velocità sui pattini.",
         "about.p2": "Oggi la società allena atleti di tutte le età al pattinodromo di via Carreggia, portando i colori di Cardano al Campo sulle piste di tutta Italia, su rotelle e su ghiaccio.",
         "about.t1981": "Nasce la prima anima del club: decenni di pattinaggio corsa a Cardano al Campo.",
         "about.t2007": "La seconda anima: una nuova generazione di pattinatori in linea cresce in città.",
@@ -98,19 +100,18 @@ export const TRANSLATIONS = {
         "venue.f2": "Circuito stradale asfaltato",
         "venue.f3": "Illuminazione per gli allenamenti serali",
         "venue.photoAlt": "L'impianto di Cardano al Campo illuminato al tramonto",
+        // gallery alts: numbers match the impianto_N.jpeg files;
+        // impianto_5 is the featured photo (venue.photoAlt), so there is no 5
+        "venue.gallery1": "Vista aerea del pattinodromo di Cardano al Campo",
+        "venue.gallery2": "L'anello di pattinaggio visto dall'alto",
+        "venue.gallery3": "Panoramica dell'impianto e del circuito stradale",
+        "venue.gallery4": "Il pattinodromo immerso nel verde",
+        "venue.gallery6": "La pista sotto i riflettori in notturna",
 
         "courses.title": "In pista si comincia da piccoli. O da grandi.",
         "courses.p1": "Dai primi passi sui pattini fino all'agonismo: i nostri corsi accompagnano bambini, ragazzi e adulti con lo staff tecnico della società. Scrivici per conoscere giorni, orari e come provare.",
         "courses.cta": "Scrivici per i corsi",
-        "courses.note": "corsi@cardanoskating.it · Flora ti risponderà",
-
-        "gallery.title": "L'impianto",
-        "gallery.alt1": "Vista aerea del pattinodromo di Cardano al Campo",
-        "gallery.alt2": "L'anello di pattinaggio visto dall'alto",
-        "gallery.alt3": "Panoramica dell'impianto e del circuito stradale",
-        "gallery.alt4": "Il pattinodromo immerso nel verde",
-        "gallery.alt5": "L'impianto illuminato al tramonto",
-        "gallery.alt6": "La pista sotto i riflettori in notturna",
+        "courses.note": "corsi@cardanoskating.it",
 
         "sponsors.title": "Chi corre con noi",
 
@@ -132,7 +133,7 @@ export const TRANSLATIONS = {
         "cookie.policy": "Privacy & Cookie Policy",
         "cookie.prefs": "Gestisci preferenze cookie",
 
-        "footer.tag": "Pattinaggio corsa a rotelle e su ghiaccio",
+        "footer.registeredOffice": "Sede legale:",
 
         "policy.metaTitle": "Privacy & Cookie Policy — Cardano Skating",
         "policy.back": "Torna al sito",
@@ -141,7 +142,7 @@ export const TRANSLATIONS = {
         "policy.updated": "Ultimo aggiornamento: luglio 2026",
 
         "policy.s1title": "1. Titolare del trattamento",
-        "policy.s1p1": "Il titolare del trattamento dei dati personali raccolti tramite questo sito è Cardano Skating S.S.D. S.R.L., con sede a Cardano al Campo (VA), Italia.",
+        "policy.s1p1": "Il titolare del trattamento dei dati personali raccolti tramite questo sito è Cardano Skating S.R.L. S.S.D., con sede in via Fabio Filzi n. 3, 21010 Cardano al Campo (VA), Italia — C.F. 91046550124, P.IVA 02304760024.",
         "policy.s1p2": "Per qualsiasi richiesta relativa alla privacy puoi scrivere a:",
 
         "policy.s2title": "2. Cosa sono cookie e localStorage",
@@ -151,7 +152,7 @@ export const TRANSLATIONS = {
         "policy.s3title": "3. Dati salvati nel tuo browser",
         "policy.s3p1": "Il sito usa esclusivamente tecnologie tecniche strettamente necessarie, esenti dall'obbligo di consenso ai sensi dell'art. 122 del D.Lgs. 196/2003:",
         "policy.s3li1": "Memorizza la lingua che hai scelto (\"it\" oppure \"en\"). Tipo: localStorage. Durata: fino alla cancellazione manuale.",
-        "policy.s3li2": "Registra che hai risposto al banner cookie, così non ti viene mostrato a ogni visita. Tipo: localStorage. Durata: fino alla cancellazione manuale.",
+        "policy.s3li2": "Registra la risposta data al banner cookie (\"accepted\" oppure \"rejected\"), così non ti viene mostrato a ogni visita. Tipo: localStorage. Durata: fino alla cancellazione manuale.",
         "policy.s3li3": "Registra il tuo consenso al caricamento di Google Maps. Tipo: localStorage. Durata: fino alla cancellazione manuale.",
         "policy.s3p2": "Nessuna di queste voci contiene dati identificativi e nessuna consente di profilarti.",
 
@@ -215,7 +216,7 @@ export const TRANSLATIONS = {
     },
 
     en: {
-        "meta.title": "Cardano Skating — Roller and ice speed skating",
+        "meta.title": "Cardano Skating S.R.L. S.S.D. — Roller and ice speed skating",
         "meta.description": "Cardano Skating: roller and ice speed skating club in Cardano al Campo (VA), Italy. Courses for all ages at the via Carreggia skating track.",
 
         "a11y.skip": "Skip to content",
@@ -233,7 +234,6 @@ export const TRANSLATIONS = {
         "nav.disciplines": "Disciplines",
         "nav.venue": "Venue",
         "nav.courses": "Courses",
-        "nav.gallery": "Gallery",
         "nav.sponsors": "Sponsors",
         "nav.contacts": "Contacts",
 
@@ -244,7 +244,7 @@ export const TRANSLATIONS = {
         "hero.cta": "Discover our courses",
 
         "about.title": "A story racing across three generations",
-        "about.p1": "Cardano Skating was born in 2018 from the merger of two historic local clubs: Faro Skating Club, founded in 1981, and Cardano Inline, founded in 2007. Two different traditions, one passion: speed on skates.",
+        "about.p1": "Cardano Skating S.R.L. S.S.D. was born in 2018 from the merger of two historic local clubs: Faro Skating Club, founded in 1981, and Cardano Inline, founded in 2007. Two different traditions, one passion: speed on skates.",
         "about.p2": "Today the club trains athletes of all ages at the via Carreggia skating track, flying the colours of Cardano al Campo on tracks all over Italy, on wheels and on ice.",
         "about.t1981": "The club's first soul is born: decades of speed skating in Cardano al Campo.",
         "about.t2007": "The second soul: a new generation of inline skaters grows up in town.",
@@ -262,19 +262,18 @@ export const TRANSLATIONS = {
         "venue.f2": "Paved road circuit",
         "venue.f3": "Floodlights for evening training",
         "venue.photoAlt": "The Cardano al Campo venue lit up at sunset",
+        // gallery alts: numbers match the impianto_N.jpeg files;
+        // impianto_5 is the featured photo (venue.photoAlt), so there is no 5
+        "venue.gallery1": "Aerial view of the Cardano al Campo skating track",
+        "venue.gallery2": "The skating ring seen from above",
+        "venue.gallery3": "Overview of the venue and the road circuit",
+        "venue.gallery4": "The skating track surrounded by greenery",
+        "venue.gallery6": "The track under the floodlights at night",
 
         "courses.title": "You can start young. Or grown up.",
         "courses.p1": "From the very first steps on skates to competitive racing: our courses support kids, teens and adults with the club's technical staff. Write to us to find out days, times and how to try.",
         "courses.cta": "Ask about courses",
-        "courses.note": "corsi@cardanoskating.it · Flora will get back to you",
-
-        "gallery.title": "The venue",
-        "gallery.alt1": "Aerial view of the Cardano al Campo skating track",
-        "gallery.alt2": "The skating ring seen from above",
-        "gallery.alt3": "Overview of the venue and the road circuit",
-        "gallery.alt4": "The skating track surrounded by greenery",
-        "gallery.alt5": "The venue lit up at sunset",
-        "gallery.alt6": "The track under the floodlights at night",
+        "courses.note": "corsi@cardanoskating.it",
 
         "sponsors.title": "Who races with us",
 
@@ -296,7 +295,7 @@ export const TRANSLATIONS = {
         "cookie.policy": "Privacy & Cookie Policy",
         "cookie.prefs": "Manage cookie preferences",
 
-        "footer.tag": "Roller and ice speed skating",
+        "footer.registeredOffice": "Registered office:",
 
         "policy.metaTitle": "Privacy & Cookie Policy — Cardano Skating",
         "policy.back": "Back to the site",
@@ -305,7 +304,7 @@ export const TRANSLATIONS = {
         "policy.updated": "Last updated: July 2026",
 
         "policy.s1title": "1. Data controller",
-        "policy.s1p1": "The controller of the personal data collected through this website is Cardano Skating S.S.D. S.R.L., based in Cardano al Campo (VA), Italy.",
+        "policy.s1p1": "The controller of the personal data collected through this website is Cardano Skating S.R.L. S.S.D., with registered office in via Fabio Filzi 3, 21010 Cardano al Campo (VA), Italy — Italian tax code 91046550124, VAT number 02304760024.",
         "policy.s1p2": "For any privacy-related request you can write to:",
 
         "policy.s2title": "2. What cookies and localStorage are",
@@ -315,7 +314,7 @@ export const TRANSLATIONS = {
         "policy.s3title": "3. Data stored in your browser",
         "policy.s3p1": "The site only uses strictly necessary technical technologies, exempt from consent under art. 122 of Italian Legislative Decree 196/2003:",
         "policy.s3li1": "Stores the language you selected (\"it\" or \"en\"). Type: localStorage. Duration: until manually deleted.",
-        "policy.s3li2": "Records that you answered the cookie banner, so it is not shown on every visit. Type: localStorage. Duration: until manually deleted.",
+        "policy.s3li2": "Records the answer you gave to the cookie banner (\"accepted\" or \"rejected\"), so it is not shown on every visit. Type: localStorage. Duration: until manually deleted.",
         "policy.s3li3": "Records your consent to load Google Maps. Type: localStorage. Duration: until manually deleted.",
         "policy.s3p2": "None of these entries contains identifying data and none allows you to be profiled.",
 

@@ -4,8 +4,9 @@
  * WHAT
  * Two independent decisions, both kept in localStorage (never in HTTP
  * cookies, so nothing is ever sent to a server):
- *   - COOKIE_CONSENT_KEY: the banner has been answered, whatever the answer.
- *     Only its presence matters: it just stops the banner from reappearing.
+ *   - COOKIE_CONSENT_KEY: the answer given to the banner ("accepted" or
+ *     "rejected"). Any recorded answer stops the banner from reappearing;
+ *     the value itself keeps an honest trace of which choice was made.
  *   - MAPS_CONSENT_KEY: Google Maps may be loaded.
  *
  * WHY
@@ -23,6 +24,7 @@
 
 import {
     CONSENT_ACCEPTED,
+    CONSENT_REJECTED,
     COOKIE_CONSENT_KEY,
     MAPS_CONSENT_KEY,
     MAPS_EMBED_SRC,
@@ -161,11 +163,13 @@ function hideBanner() {
 }
 
 /**
- * Record that the banner has been answered, whatever the answer was.
+ * Record the answer given to the banner. Any stored value stops the banner
+ * from reappearing, but the real choice is kept instead of a generic flag.
+ * @param {string} choice - CONSENT_ACCEPTED or CONSENT_REJECTED
  * @returns {void}
  */
-function markBannerAnswered() {
-    localStorage.setItem(COOKIE_CONSENT_KEY, CONSENT_ACCEPTED);
+function markBannerAnswered(choice) {
+    localStorage.setItem(COOKIE_CONSENT_KEY, choice);
 }
 
 /**
@@ -190,13 +194,13 @@ export function initCookieConsent() {
     g_cookiePrefsFab = document.getElementById("cookie-prefs-fab");
 
     document.getElementById("cookie-accept").addEventListener("click", () => {
-        markBannerAnswered();
+        markBannerAnswered(CONSENT_ACCEPTED);
         grantMapsConsent();
         hideBanner();
     });
 
     document.getElementById("cookie-reject").addEventListener("click", () => {
-        markBannerAnswered();
+        markBannerAnswered(CONSENT_REJECTED);
         hideBanner();
     });
 
@@ -206,7 +210,7 @@ export function initCookieConsent() {
     // per-map consent button: same effect as accepting from the banner
     document.querySelectorAll(".map-consent-btn").forEach((button) => {
         button.addEventListener("click", () => {
-            markBannerAnswered();
+            markBannerAnswered(CONSENT_ACCEPTED);
             grantMapsConsent();
             hideBanner();
         });
@@ -214,7 +218,8 @@ export function initCookieConsent() {
 
     refreshMaps();
 
-    if (localStorage.getItem(COOKIE_CONSENT_KEY) === CONSENT_ACCEPTED) {
+    // any recorded answer ("accepted" or "rejected") means "already asked"
+    if (localStorage.getItem(COOKIE_CONSENT_KEY) !== null) {
         hideBanner();
     } else {
         showBanner();

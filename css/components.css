@@ -104,9 +104,7 @@
        otherwise overflow-y would never trigger. */
     min-height: 0;
     overflow-y: auto;
-	overflow-x: hidden;
-    scrollbar-width: thin;
-	scrollbar-color: var(--c-orange);
+    overflow-x: hidden;
 }
 
 .nav-link {
@@ -142,9 +140,10 @@
 		cursor: pointer;
 	}
 
-	.hamburger:hover {
+	.hamburger:hover .hamburger-bar {
 		background-color: var(--c-orange);
-		border-radius: 5px;
+		border-color: var(--c-orange);
+		/* border-radius: var(--border-radius-common); */
 		transition: background-color 0.25s ease, border-color 0.25s ease;
 	}
 
@@ -175,6 +174,7 @@
     text-decoration: none;
     /* transform: skewX(var(--skew)); */
     transition: box-shadow 0.25s ease, background-color 0.25s ease;
+	border-radius: var(--border-radius-common);
 }
 
 /* children are counter-skewed so the text stays upright */
@@ -287,6 +287,7 @@
     background: var(--c-surface);
     border: 1px solid var(--c-border);
     border-top: 3px solid var(--c-orange);
+	border-radius: var(--border-radius-common);
     transition: transform var(--t-hover), box-shadow var(--t-hover), border-color var(--t-hover);
 }
 
@@ -323,8 +324,10 @@
    ========================================================================== */
 .venue-photo {
     margin: 0;
-    border: 1px solid var(--c-border);
-    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+}
+
+.night-img {
+	border-radius: var(--border-radius-common);
 }
 
 .venue-text {
@@ -392,6 +395,7 @@
     object-fit: cover;
     aspect-ratio: 16 / 9;
     transition: transform var(--t-zoom), filter var(--t-zoom);
+	border-radius: var(--border-radius-common);
 }
 
 @media (pointer: fine) {
@@ -415,6 +419,7 @@
     filter: grayscale(1);
     opacity: 0.8;
     transition: filter var(--t-hover), opacity var(--t-hover), box-shadow var(--t-hover);
+	border-radius: var(--border-radius-common);
 }
 
 .sponsor-item img {
@@ -436,7 +441,7 @@
    Contatti — intro line + big contact cards
    ========================================================================== */
 .contacts-intro {
-    margin: -36px 0 48px;
+    margin: -36px 0 28px;
     color: var(--c-gray);
     font-size: 1.05rem;
 }
@@ -449,6 +454,7 @@
     padding: 30px 26px;
     background: var(--c-surface);
     border: 1px solid var(--c-border);
+	border-radius: var(--border-radius-common);
     text-decoration: none;
     color: var(--c-white);
     transition: transform var(--t-hover), border-color var(--t-hover), box-shadow var(--t-hover);
@@ -488,7 +494,7 @@
    after consent (or withdrawing it) never makes the page jump.
    ========================================================================== */
 .contacts-map-title {
-    margin: 56px 0 20px;
+    margin: 26px 0 20px;
     font-family: var(--font-display);
     font-weight: 400;
     font-size: 1.35rem;
@@ -501,6 +507,8 @@
 
     background: var(--c-surface);
     border: 1px solid var(--c-border);
+	border-radius: var(--border-radius-common);
+	margin-bottom: 20px;
 }
 
 .map-frame {
@@ -566,8 +574,8 @@
 
 /* ==========================================================================
    Cookie banner — first-visit consent request.
-   Accept and reject are styled with the same size and weight on purpose:
-   a less prominent reject button is a dark pattern (EDPB 03/2022).
+   Accept and reject share exactly the same style on purpose: any visual
+   imbalance nudging towards "accept" is a dark pattern (EDPB 03/2022).
    ========================================================================== */
 .cookie-banner {
     position: fixed;
@@ -622,11 +630,7 @@
     text-transform: uppercase;
     cursor: pointer;
     transition: background-color 0.25s ease, color 0.25s ease, box-shadow 0.25s ease;
-}
-
-.cookie-btn-accept {
-    background: var(--c-orange);
-    color: var(--c-black);
+	border-radius: var(--border-radius-common);
 }
 
 @media (pointer: fine) {
@@ -634,15 +638,10 @@
         color: var(--c-orange-bright);
     }
 
-    .cookie-btn-accept:hover {
-        background: var(--c-orange-bright);
-        border-color: var(--c-orange-bright);
-        box-shadow: var(--glow-orange);
-    }
-
-    .cookie-btn-reject:hover {
+    .cookie-btn:hover {
         background: rgba(243, 146, 0, 0.14);
         color: var(--c-orange-bright);
+        border-color: var(--c-orange-bright);
     }
 }
 
@@ -712,15 +711,38 @@ body.cookie-banner-open .fab-lang {
 }
 
 /* ==========================================================================
-   Footer legal row
+   Footer — one item per row, centred by .footer-inner (see layout.css)
    ========================================================================== */
-.footer-legal {
+/* contact rows: email and phone with icon + text, socials as icon only */
+.footer-contact {
     display: flex;
     align-items: center;
-    gap: 8px;
+    justify-content: center;
     flex-wrap: wrap;
+    gap: 16px;
 }
 
+.footer-contact a {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--c-gray);
+    text-decoration: none;
+}
+
+.footer-icon {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+}
+
+/* icon-only social links: slightly larger to stay easy to tap */
+.footer-icon-social {
+    width: 24px;
+    height: 24px;
+}
+
+.footer-credit a,
 .footer-legal a {
     color: var(--c-gray);
     text-decoration: underline;
@@ -740,6 +762,8 @@ body.cookie-banner-open .fab-lang {
 }
 
 @media (pointer: fine) {
+    .footer-contact a:hover,
+    .footer-credit a:hover,
     .footer-legal a:hover,
     .footer-cookie-prefs:hover {
         color: var(--c-orange);
