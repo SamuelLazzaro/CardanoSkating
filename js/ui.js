@@ -102,8 +102,16 @@ function updateHamburgerState(isOpen) {
 }
 
 /**
- * Open the off-canvas panel. The hamburger morphs into the X close
- * button and stays visible above the panel, so focus remains on it.
+ * Open the off-canvas panel.
+ *
+ * Deliberately does NOT move focus, unlike the usual dialog pattern:
+ * the hamburger is itself the close button, it stays visible above the
+ * panel and comes before it in DOM order, so whoever opened the menu is
+ * already on the right control and Tab leads into it anyway. Calling
+ * focus() here would only add a spurious focus ring on iOS, where
+ * WebKit — alone among the engines — matches :focus-visible on
+ * programmatic focus. Focus is still restored on close, where the panel
+ * turning visibility:hidden would otherwise drop it onto <body>.
  * @returns {void}
  */
 function openNav() {
@@ -113,7 +121,6 @@ function openNav() {
     g_navPanel.classList.add("is-open");
     updateHamburgerState(true);
     lockPageScroll();
-    g_hamburger.focus();
 }
 
 /**

@@ -38,8 +38,15 @@
     transform: translateY(9px) rotate(45deg);
 }
 
+/* The middle bar is 28px wide while the rotated arms only span ~22px,
+   so it sticks out ~3px per side beyond the X. Fading it out alone
+   left iOS free to keep those protruding rounded caps painted as two
+   stray dots when the layer was re-rasterized (e.g. double-tap zoom):
+   collapsing the width to zero as well means any leftover has nothing
+   to draw. */
 .hamburger[aria-expanded="true"] .hamburger-bar:nth-child(2) {
     opacity: 0;
+    transform: scaleX(0);
 }
 
 .hamburger[aria-expanded="true"] .hamburger-bar:nth-child(3) {
@@ -451,6 +458,10 @@
     text-decoration: none;
     color: var(--c-white);
     transition: transform var(--t-hover), border-color var(--t-hover), box-shadow var(--t-hover);
+}
+
+.contact-card * {
+	margin: auto;
 }
 
 .contact-icon {
