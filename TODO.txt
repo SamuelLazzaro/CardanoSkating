@@ -1,0 +1,2 @@
+- Inserire mappa google maps e gestire eventuali cookie
+- Gestire cookie per google maps e per github pages

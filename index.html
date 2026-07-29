@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="it">
+
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Cardano Skating — Pattinaggio corsa a rotelle e ghiaccio</title>
+	<meta name="description" data-i18n-content="meta.description"
+		content="Cardano Skating: società di pattinaggio corsa a rotelle e su ghiaccio a Cardano al Campo (VA). Corsi per tutte le età al pattinodromo di via Carreggia.">
+
+	<link rel="icon" type="image/png" sizes="32x32" href="assets/img/favicon-32.png">
+	<link rel="icon" type="image/png" sizes="192x192" href="assets/img/favicon-192.png">
+	<link rel="apple-touch-icon" href="assets/img/apple-touch-icon.png">
+
+	<!-- Self-hosted fonts: preload the two critical ones to avoid FOUT on titles -->
+	<link rel="preload" href="assets/fonts/anton-v27-latin-regular.woff2" as="font" type="font/woff2" crossorigin>
+	<link rel="preload" href="assets/fonts/inter-v20-latin-regular.woff2" as="font" type="font/woff2" crossorigin>
+
+	<link rel="stylesheet" href="css/main.css">
+</head>
+
+<body>
+
+	<a class="skip-link" href="#chi-siamo" data-i18n="a11y.skip">Salta al contenuto</a>
+
+	<!-- ======================= TOP BAR ======================= -->
+	<header class="topbar" id="topbar">
+		<a class="brand" href="#home" aria-label="Cardano Skating — Home" data-i18n-label="a11y.brandHome">
+			<img class="brand-crest" src="assets/img/crest.png" alt="" width="69" height="85">
+			<span class="brand-name" aria-hidden="true">
+				<span class="brand-line">CARDANO</span>
+				<span class="brand-line">SKATING</span>
+			</span>
+		</a>
+
+		<button class="hamburger" id="hamburger" aria-label="Apri il menu" data-i18n-label="a11y.openMenu"
+			aria-expanded="false" aria-controls="nav-panel">
+			<span class="hamburger-bar"></span>
+			<span class="hamburger-bar"></span>
+			<span class="hamburger-bar"></span>
+		</button>
+	</header>
+
+	<!-- ======================= NAV OFF-CANVAS ======================= -->
+	<div class="nav-overlay" id="nav-overlay" hidden></div>
+
+	<nav class="nav-panel" id="nav-panel" aria-label="Navigazione principale" data-i18n-label="a11y.mainNav">
+		<button class="nav-close" id="nav-close" aria-label="Chiudi il menu"
+			data-i18n-label="a11y.closeMenu">&times;</button>
+		<ul class="nav-list">
+			<li><a class="nav-link" href="#home"><span class="nav-num">01</span><span
+						data-i18n="nav.home">Home</span></a></li>
+			<li><a class="nav-link" href="#chi-siamo"><span class="nav-num">02</span><span data-i18n="nav.about">Chi
+						siamo</span></a></li>
+			<li><a class="nav-link" href="#discipline"><span class="nav-num">03</span><span
+						data-i18n="nav.disciplines">Discipline</span></a></li>
+			<li><a class="nav-link" href="#impianto"><span class="nav-num">04</span><span
+						data-i18n="nav.venue">Impianto</span></a></li>
+			<li><a class="nav-link" href="#corsi"><span class="nav-num">05</span><span
+						data-i18n="nav.courses">Corsi</span></a></li>
+			<li><a class="nav-link" href="#gallery"><span class="nav-num">06</span><span
+						data-i18n="nav.gallery">Gallery</span></a></li>
+			<li><a class="nav-link" href="#sponsor"><span class="nav-num">07</span><span
+						data-i18n="nav.sponsors">Sponsor</span></a></li>
+			<li><a class="nav-link" href="#contatti"><span class="nav-num">08</span><span
+						data-i18n="nav.contacts">Contatti</span></a></li>
+		</ul>
+		<div class="nav-social">
+			<a href="https://www.instagram.com/cardano_skating/" target="_blank" rel="noopener">Instagram</a>
+			<a href="https://www.facebook.com/cardanoskating" target="_blank" rel="noopener">Facebook</a>
+		</div>
+	</nav>
+
+	<main>
+
+		<!-- ======================= HERO ======================= -->
+		<section class="hero" id="home">
+			<video class="hero-video" id="hero-video" autoplay muted loop playsinline preload="metadata"
+				poster="assets/img/impianto_1.jpeg">
+				<source src="assets/video/hero.mp4" type="video/mp4">
+			</video>
+			<div class="hero-scrim"></div>
+
+			<div class="hero-content">
+				<p class="hero-kicker reveal" data-i18n="hero.kicker">Cardano al Campo · Varese</p>
+				<h1 class="hero-title">
+					<span class="hero-title-line reveal" data-i18n="hero.title1">Velocità su rotelle</span>
+					<span class="hero-title-line hero-title-accent reveal" data-i18n="hero.title2">e su ghiaccio</span>
+				</h1>
+				<p class="hero-sub reveal" data-i18n="hero.sub">Pattinaggio corsa dal 1981. Rotelle, freestyle e
+					ghiaccio: entra in pista con noi.</p>
+				<a class="btn btn-primary reveal" href="#corsi" data-i18n="hero.cta">Scopri i corsi</a>
+			</div>
+
+			<a class="hero-scroll" href="#chi-siamo" aria-label="Scorri alla sezione successiva"
+				data-i18n-label="a11y.scrollDown">
+				<span class="hero-scroll-arrow"></span>
+			</a>
+		</section>
+
+		<!-- ======================= CHI SIAMO ======================= -->
+		<section class="section" id="chi-siamo">
+			<div class="container">
+				<p class="eyebrow reveal"><span class="eyebrow-num">02</span> <span data-i18n="nav.about">Chi
+						siamo</span></p>
+				<h2 class="section-title reveal" data-i18n="about.title">Una storia che corre da tre generazioni</h2>
+
+				<div class="about-grid">
+					<div class="about-text reveal">
+						<p data-i18n="about.p1">Cardano Skating nasce nel 2018 dalla fusione di due storiche società del
+							territorio: il Faro Skating Club, fondato nel 1981, e Cardano In Line, nata nel 2007. Due
+							tradizioni diverse, un'unica passione: la velocità sui pattini.</p>
+						<p data-i18n="about.p2">Oggi la società allena atleti di tutte le età al pattinodromo di via
+							Carreggia, portando i colori di Cardano al Campo sulle piste di tutta Italia, su rotelle e
+							su ghiaccio.</p>
+					</div>
+
+					<ol class="timeline">
+						<li class="timeline-item reveal">
+							<span class="timeline-year" aria-hidden="true">1981</span>
+							<h3 class="timeline-title">Faro Skating Club</h3>
+							<p data-i18n="about.t1981">Nasce la prima anima del club: decenni di pattinaggio corsa a
+								Cardano al Campo.</p>
+						</li>
+						<li class="timeline-item reveal">
+							<span class="timeline-year" aria-hidden="true">2007</span>
+							<h3 class="timeline-title">Cardano In Line</h3>
+							<p data-i18n="about.t2007">La seconda anima: una nuova generazione di pattinatori in linea
+								cresce in città.</p>
+						</li>
+						<li class="timeline-item reveal">
+							<span class="timeline-year" aria-hidden="true">2018</span>
+							<h3 class="timeline-title">Cardano Skating</h3>
+							<p data-i18n="about.t2018">Le due società si fondono: nasce Cardano Skating, un solo club
+								per rotelle e ghiaccio.</p>
+						</li>
+					</ol>
+				</div>
+			</div>
+		</section>
+
+		<!-- ======================= DISCIPLINE ======================= -->
+		<section class="section section-alt" id="discipline">
+			<div class="container">
+				<p class="eyebrow reveal"><span class="eyebrow-num">03</span> <span
+						data-i18n="nav.disciplines">Discipline</span></p>
+				<h2 class="section-title reveal" data-i18n="disciplines.title">Tre modi di andare veloce</h2>
+
+				<div class="cards-grid">
+					<article class="card reveal">
+						<svg class="card-icon" viewBox="0 0 48 48" aria-hidden="true">
+							<path d="M8 10h20l6 12H8z" fill="none" stroke="currentColor" stroke-width="2.5"
+								stroke-linejoin="round" />
+							<path d="M8 22h26" stroke="currentColor" stroke-width="2.5" />
+							<circle cx="12" cy="32" r="4" fill="none" stroke="currentColor" stroke-width="2.5" />
+							<circle cx="22" cy="32" r="4" fill="none" stroke="currentColor" stroke-width="2.5" />
+							<circle cx="32" cy="32" r="4" fill="none" stroke="currentColor" stroke-width="2.5" />
+							<path d="M36 38h6M30 42h10" stroke="currentColor" stroke-width="2.5"
+								stroke-linecap="round" />
+						</svg>
+						<h3 class="card-title" data-i18n="disciplines.rollerTitle">Corsa a rotelle</h3>
+						<p data-i18n="disciplines.rollerText">La disciplina regina del club: pattinaggio corsa in linea
+							su pista e su strada, dalle prime gare regionali ai campionati nazionali.</p>
+					</article>
+
+					<article class="card reveal">
+						<svg class="card-icon" viewBox="0 0 48 48" aria-hidden="true">
+							<path d="M14 40 20 12h2l6 28M10 40h20" fill="none" stroke="currentColor" stroke-width="2.5"
+								stroke-linecap="round" stroke-linejoin="round" />
+							<path d="M30 40 36 24h1l5 16M36 40h10" fill="none" stroke="currentColor" stroke-width="2.5"
+								stroke-linecap="round" stroke-linejoin="round" opacity="0.55" />
+						</svg>
+						<h3 class="card-title" data-i18n="disciplines.freestyleTitle">Freestyle</h3>
+						<p data-i18n="disciplines.freestyleText">Slalom tra i coni, salti e tecnica: la faccia più
+							spettacolare e creativa del pattinaggio a rotelle.</p>
+					</article>
+
+					<article class="card reveal">
+						<svg class="card-icon" viewBox="0 0 48 48" aria-hidden="true">
+							<path d="M24 6v36M10 12l28 24M38 12 10 36M14 24h20" fill="none" stroke="currentColor"
+								stroke-width="2.5" stroke-linecap="round" />
+						</svg>
+						<h3 class="card-title" data-i18n="disciplines.iceTitle">Ghiaccio pista lunga</h3>
+						<p data-i18n="disciplines.iceText">D'inverno le rotelle lasciano il posto alle lame: velocità
+							pura sull'anello di ghiaccio, nella tradizione dello speed skating.</p>
+					</article>
+				</div>
+			</div>
+		</section>
+
+		<!-- ======================= IMPIANTO ======================= -->
+		<section class="section" id="impianto">
+			<div class="container">
+				<p class="eyebrow reveal"><span class="eyebrow-num">04</span> <span
+						data-i18n="nav.venue">Impianto</span></p>
+				<h2 class="section-title reveal" data-i18n="venue.title">La nostra casa: il pattinodromo di via
+					Carreggia</h2>
+
+				<div class="venue-grid">
+					<figure class="venue-photo reveal">
+						<img src="assets/img/impianto_5.jpeg"
+							alt="L'impianto di Cardano al Campo illuminato al tramonto" data-i18n-alt="venue.photoAlt"
+							loading="lazy" width="1600" height="900">
+					</figure>
+					<div class="venue-text reveal">
+						<p data-i18n="venue.p1">Il pattinodromo comunale di via Carreggia, a Cardano al Campo, è il
+							cuore delle nostre attività: un anello dedicato alla velocità e un circuito stradale
+							asfaltato, immersi nel verde.</p>
+						<ul class="venue-list">
+							<li data-i18n="venue.f1">Anello per il pattinaggio corsa</li>
+							<li data-i18n="venue.f2">Circuito stradale asfaltato</li>
+							<li data-i18n="venue.f3">Illuminazione per gli allenamenti serali</li>
+						</ul>
+					</div>
+				</div>
+			</div>
+		</section>
+
+		<!-- ======================= CORSI ======================= -->
+		<section class="section section-alt" id="corsi">
+			<div class="container">
+				<p class="eyebrow reveal"><span class="eyebrow-num">05</span> <span data-i18n="nav.courses">Corsi</span>
+				</p>
+				<h2 class="section-title reveal" data-i18n="courses.title">In pista si comincia da piccoli. O da grandi.
+				</h2>
+
+				<div class="courses-content">
+					<p class="courses-text reveal" data-i18n="courses.p1">Dai primi passi sui pattini fino all'agonismo:
+						i nostri corsi accompagnano bambini, ragazzi e adulti con lo staff tecnico della società.
+						Scrivici per conoscere giorni, orari e come provare.</p>
+					<div class="courses-cta reveal">
+						<a class="btn btn-primary" href="mailto:corsi@cardanoskating.it"
+							data-i18n="courses.cta">Scrivici per i corsi</a>
+						<p class="courses-note" data-i18n="courses.note">corsi@cardanoskating.it · Flora ti risponderà
+						</p>
+					</div>
+				</div>
+			</div>
+		</section>
+
+		<!-- ======================= GALLERY ======================= -->
+		<section class="section" id="gallery">
+			<div class="container">
+				<p class="eyebrow reveal"><span class="eyebrow-num">06</span> <span
+						data-i18n="nav.gallery">Gallery</span></p>
+				<h2 class="section-title reveal" data-i18n="gallery.title">L'impianto visto dal drone</h2>
+			</div>
+
+			<div class="gallery-grid">
+				<button class="gallery-item reveal" data-full="assets/img/impianto_1.jpeg">
+					<img src="assets/img/impianto_1.jpeg" alt="Vista aerea del pattinodromo di Cardano al Campo"
+						data-i18n-alt="gallery.alt1" loading="lazy" width="800" height="450">
+				</button>
+				<button class="gallery-item reveal" data-full="assets/img/impianto_2.jpeg">
+					<img src="assets/img/impianto_2.jpeg" alt="L'anello di pattinaggio visto dall'alto"
+						data-i18n-alt="gallery.alt2" loading="lazy" width="800" height="450">
+				</button>
+				<button class="gallery-item reveal" data-full="assets/img/impianto_3.jpeg">
+					<img src="assets/img/impianto_3.jpeg" alt="Panoramica dell'impianto e del circuito stradale"
+						data-i18n-alt="gallery.alt3" loading="lazy" width="800" height="450">
+				</button>
+				<button class="gallery-item reveal" data-full="assets/img/impianto_4.jpeg">
+					<img src="assets/img/impianto_4.jpeg" alt="Il pattinodromo immerso nel verde"
+						data-i18n-alt="gallery.alt4" loading="lazy" width="800" height="450">
+				</button>
+				<button class="gallery-item reveal" data-full="assets/img/impianto_5.jpeg">
+					<img src="assets/img/impianto_5.jpeg" alt="L'impianto illuminato al tramonto"
+						data-i18n-alt="gallery.alt5" loading="lazy" width="800" height="450">
+				</button>
+				<button class="gallery-item reveal" data-full="assets/img/impianto_6.jpeg">
+					<img src="assets/img/impianto_6.jpeg" alt="La pista sotto i riflettori in notturna"
+						data-i18n-alt="gallery.alt6" loading="lazy" width="800" height="450">
+				</button>
+			</div>
+		</section>
+
+		<!-- ======================= SPONSOR ======================= -->
+		<section class="section section-alt" id="sponsor">
+			<div class="container">
+				<p class="eyebrow reveal"><span class="eyebrow-num">07</span> <span
+						data-i18n="nav.sponsors">Sponsor</span></p>
+				<h2 class="section-title reveal" data-i18n="sponsors.title">Chi corre con noi</h2>
+
+				<ul class="sponsor-grid">
+					<li class="sponsor-item reveal"><img src="assets/img/sponsor/satinox-acciai.png"
+							alt="Satinox Acciai" loading="lazy"></li>
+					<li class="sponsor-item reveal"><img src="assets/img/sponsor/aviometal.png" alt="Aviometal"
+							loading="lazy"></li>
+					<li class="sponsor-item reveal"><img src="assets/img/sponsor/ceramiche-serra.png"
+							alt="Ceramiche Serra" loading="lazy"></li>
+					<li class="sponsor-item reveal"><img src="assets/img/sponsor/ascot-everytile.png"
+							alt="Ascot Everytile" loading="lazy"></li>
+				</ul>
+			</div>
+		</section>
+
+		<!-- ======================= CONTATTI ======================= -->
+		<section class="section" id="contatti">
+			<div class="container">
+				<p class="eyebrow reveal"><span class="eyebrow-num">08</span> <span
+						data-i18n="nav.contacts">Contatti</span></p>
+				<h2 class="section-title reveal" data-i18n="contacts.title">Vieni a trovarci in pista</h2>
+				<p class="contacts-intro reveal" data-i18n="contacts.intro">Pattinodromo di via Carreggia, Cardano al
+					Campo (VA)</p>
+
+				<div class="contacts-grid">
+					<a class="contact-card reveal" href="mailto:corsi@cardanoskating.it">
+						<svg class="contact-icon" viewBox="0 0 48 48" aria-hidden="true">
+							<rect x="6" y="12" width="36" height="26" rx="3" fill="none" stroke="currentColor"
+								stroke-width="2.5" />
+							<path d="m8 15 16 13 16-13" fill="none" stroke="currentColor" stroke-width="2.5"
+								stroke-linejoin="round" />
+						</svg>
+						<span class="contact-label" data-i18n="contacts.email">Email</span>
+						<span class="contact-value">corsi@cardanoskating.it</span>
+					</a>
+
+					<a class="contact-card reveal" href="tel:+393332085744">
+						<svg class="contact-icon" viewBox="0 0 48 48" aria-hidden="true">
+							<path
+								d="M14 6h8l3 10-5 4a26 26 0 0 0 8 8l4-5 10 3v8a4 4 0 0 1-4 4A34 34 0 0 1 10 10a4 4 0 0 1 4-4z"
+								fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round" />
+						</svg>
+						<span class="contact-label" data-i18n="contacts.phone">Telefono</span>
+						<span class="contact-value">+39 333 208 5744</span>
+					</a>
+
+					<a class="contact-card reveal" href="https://www.instagram.com/cardano_skating/" target="_blank"
+						rel="noopener">
+						<svg class="contact-icon" viewBox="0 0 48 48" aria-hidden="true">
+							<rect x="8" y="8" width="32" height="32" rx="9" fill="none" stroke="currentColor"
+								stroke-width="2.5" />
+							<circle cx="24" cy="24" r="8" fill="none" stroke="currentColor" stroke-width="2.5" />
+							<circle cx="33.5" cy="14.5" r="2.2" fill="currentColor" />
+						</svg>
+						<span class="contact-label">Instagram</span>
+						<span class="contact-value">@cardano_skating</span>
+					</a>
+
+					<a class="contact-card reveal" href="https://www.facebook.com/cardanoskating" target="_blank"
+						rel="noopener">
+						<svg class="contact-icon" viewBox="0 0 48 48" aria-hidden="true">
+							<circle cx="24" cy="24" r="18" fill="none" stroke="currentColor" stroke-width="2.5" />
+							<path
+								d="M27 42V27h5l1-6h-6v-3.5c0-2 .8-3.5 3.5-3.5H33V8.4A32 32 0 0 0 29 8c-4.4 0-7 2.6-7 7.4V21h-5v6h5v15"
+								fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round" />
+						</svg>
+						<span class="contact-label">Facebook</span>
+						<span class="contact-value">cardanoskating</span>
+					</a>
+				</div>
+			</div>
+		</section>
+	</main>
+
+	<!-- ======================= FOOTER ======================= -->
+	<footer class="footer">
+		<div class="container footer-inner">
+			<p>© <span id="footer-year">2026</span> Cardano Skating · Cardano al Campo (VA)</p>
+			<p class="footer-tag" data-i18n="footer.tag">Pattinaggio corsa a rotelle e su ghiaccio</p>
+		</div>
+	</footer>
+
+	<!-- ======================= LIGHTBOX ======================= -->
+	<div class="lightbox" id="lightbox" hidden>
+		<button class="lightbox-close" id="lightbox-close" aria-label="Chiudi l'immagine"
+			data-i18n-label="a11y.closeImage">&times;</button>
+		<img class="lightbox-img" id="lightbox-img" src="" alt="">
+	</div>
+
+	<!-- ======================= FAB LINGUA ======================= -->
+	<button class="fab-lang" id="fab-lang" aria-label="Switch to English">EN</button>
+
+	<script type="module" src="js/main.js"></script>
+</body>
+
+</html>

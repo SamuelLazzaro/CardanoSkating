@@ -1,0 +1,312 @@
+/* ==========================================================================
+   layout.css — page structure: top bar, hero, section shells, grids, footer.
+   Mobile-first: single column by default, multi-column from 540px / 900px up.
+   ========================================================================== */
+
+/* ==========================================================================
+   Top bar
+   ========================================================================== */
+.topbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    height: var(--topbar-h);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 var(--pad-page);
+    background: transparent;
+    transition: background-color var(--t-fade), box-shadow var(--t-fade);
+}
+
+.topbar--solid {
+    background: rgba(10, 10, 10, 0.92);
+    backdrop-filter: blur(8px);
+    box-shadow: 0 1px 0 var(--c-border);
+}
+
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    text-decoration: none;
+}
+
+.brand-crest {
+    width: auto;
+    height: 40px;
+}
+
+.brand-name {
+    display: flex;
+    flex-direction: column;
+    font-family: var(--font-display);
+    font-size: 1.05rem;
+    letter-spacing: 0.14em;
+    line-height: 1.05;
+    color: var(--c-white);
+}
+
+.brand-line:last-child {
+    color: var(--c-orange);
+}
+
+@media (min-width: 540px) {
+    .brand-crest {
+        height: 46px;
+    }
+}
+
+/* ==========================================================================
+   Hero — full-screen opening: background video, dark scrim, giant title
+   ========================================================================== */
+.hero {
+    position: relative;
+    min-height: 100svh;
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+}
+
+.hero-video {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* dark scrim so the white/orange type always stays readable on the video */
+.hero-scrim {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to bottom, rgba(10, 10, 10, 0.55), rgba(10, 10, 10, 0.35) 45%, var(--c-black) 98%);
+}
+
+.hero-content {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: var(--container-w);
+    margin: 0 auto;
+    padding: 100px var(--pad-page) 80px;
+}
+
+@media (min-width: 540px) {
+    .hero-content {
+        padding-top: 120px;
+    }
+}
+
+.hero-kicker {
+    display: inline-block;
+    margin-bottom: 18px;
+    padding: 6px 14px;
+    background: rgba(243, 146, 0, 0.14);
+    border-left: 4px solid var(--c-orange);
+    color: var(--c-orange-bright);
+    font-weight: 600;
+    font-size: 0.9rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+}
+
+.hero-title {
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-size: clamp(2.6rem, 8vw, 6.2rem);
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}
+
+.hero-title-line {
+    display: block;
+}
+
+.hero-title-accent {
+    color: var(--c-orange);
+    text-shadow: 0 0 32px rgba(243, 146, 0, 0.35);
+}
+
+.hero-sub {
+    max-width: 520px;
+    margin: 22px 0 34px;
+    color: var(--c-text-soft);
+    font-size: 1.1rem;
+}
+
+/* staggered entrance for the hero elements */
+.hero-content .reveal:nth-child(2) {
+    transition-delay: 0.1s;
+}
+
+.hero-content .reveal:nth-child(3) {
+    transition-delay: 0.2s;
+}
+
+.hero-content .reveal:nth-child(4) {
+    transition-delay: 0.3s;
+}
+
+.hero-title .reveal:nth-child(2) {
+    transition-delay: 0.15s;
+}
+
+/* bouncing scroll hint */
+.hero-scroll {
+    position: absolute;
+    left: 50%;
+    bottom: 26px;
+    z-index: 1;
+    transform: translateX(-50%);
+    padding: 12px;
+}
+
+.hero-scroll-arrow {
+    display: block;
+    width: 14px;
+    height: 14px;
+    border-right: 3px solid var(--c-orange);
+    border-bottom: 3px solid var(--c-orange);
+    transform: rotate(45deg);
+    animation: scroll-bounce 1.8s infinite;
+}
+
+@keyframes scroll-bounce {
+
+    0%,
+    100% {
+        transform: rotate(45deg) translate(0, 0);
+    }
+
+    50% {
+        transform: rotate(45deg) translate(6px, 6px);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .hero-scroll-arrow {
+        animation: none;
+    }
+}
+
+/* ==========================================================================
+   Section shells
+   ========================================================================== */
+.section {
+    position: relative;
+    padding: var(--section-pad-y) 0;
+}
+
+.section-alt {
+    background: var(--c-black-alt);
+    border-top: 1px solid var(--c-border);
+    border-bottom: 1px solid var(--c-border);
+}
+
+/* ==========================================================================
+   Section grids (mobile-first: 1 column, then wider layouts)
+   ========================================================================== */
+.about-grid,
+.venue-grid,
+.courses-content {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 40px;
+}
+
+.cards-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--grid-gap);
+}
+
+.gallery-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+    padding: 0 10px;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.sponsor-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--grid-gap);
+    align-items: stretch;
+}
+
+.contacts-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 24px;
+}
+
+@media (min-width: 540px) {
+    .gallery-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .contacts-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (min-width: 900px) {
+    .about-grid {
+        grid-template-columns: 5fr 6fr;
+        gap: 64px;
+    }
+
+    .venue-grid {
+        grid-template-columns: 7fr 5fr;
+        gap: var(--grid-gap-lg);
+        align-items: center;
+    }
+
+    .courses-content {
+        grid-template-columns: 7fr 5fr;
+        gap: var(--grid-gap-lg);
+        align-items: center;
+    }
+
+    .cards-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+
+    .gallery-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+
+    .sponsor-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+
+    .contacts-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
+
+/* ==========================================================================
+   Footer
+   ========================================================================== */
+.footer {
+    padding: 36px 0;
+    border-top: 1px solid var(--c-border);
+    color: var(--c-gray);
+    font-size: 0.9rem;
+}
+
+.footer-inner {
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.footer p {
+    margin: 0;
+}
