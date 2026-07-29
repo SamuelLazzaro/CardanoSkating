@@ -11,12 +11,15 @@
     top: 0;
     left: 0;
     right: 0;
-    z-index: 100;
+    /* above the nav overlay (110) and panel (120): the hamburger, which
+       lives in the top bar, doubles as the close button of the open menu.
+       Still below the FABs (130), lightbox (150) and cookie banner (160). */
+    z-index: 125;
     height: var(--topbar-h);
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 var(--pad-page);
+    padding: 0 calc(var(--pad-page) + var(--scrollbar-comp)) 0 var(--pad-page);
     background: transparent;
     transition: background-color var(--t-fade), box-shadow var(--t-fade);
 }

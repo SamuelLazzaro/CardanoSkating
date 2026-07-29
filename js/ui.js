@@ -8,7 +8,14 @@
  * Each feature exposes an init function, wired together by main.js.
  */
 
-import { NAV_OVERLAY_FADE_MS, SCROLLEND_FALLBACK_MS, TOPBAR_SOLID_SCROLL_Y } from "./constants.js";
+import {
+    NAV_CLOSE_LABEL_KEY,
+    NAV_OPEN_LABEL_KEY,
+    NAV_OVERLAY_FADE_MS,
+    SCROLLEND_FALLBACK_MS,
+    TOPBAR_SOLID_SCROLL_Y
+} from "./constants.js";
+import { translate } from "./i18n.js";
 
 /** @type {boolean} true when the OS asks to minimise animations */
 const g_prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -30,6 +37,44 @@ export function initTopbar() {
     updateTopbar();
 }
 
+/* ================= page scroll lock ================= */
+
+/*
+ * Locking page scroll with overflow:hidden removes the classic
+ * scrollbar, so the viewport gets wider and both the in-flow content
+ * and the right-anchored fixed elements (top bar, language FAB) jump
+ * sideways. CSS scrollbar-gutter cannot solve this because the gutter
+ * is dropped as soon as overflow becomes hidden. So the scrollbar
+ * width is measured on lock and published as the --scrollbar-comp
+ * custom property, which the CSS consumes as extra right padding /
+ * offset to keep every element exactly where it was.
+ */
+
+/**
+ * Lock the page scroll, compensating for the vanishing scrollbar.
+ * The scrollbar width is derived from the root element width measured
+ * right before and after hiding the overflow: getBoundingClientRect()
+ * returns fractional pixels, while innerWidth/clientWidth are rounded
+ * integers that leave a sub-pixel shift on scaled (HiDPI) displays.
+ * @returns {void}
+ */
+function lockPageScroll() {
+    const widthWithScrollbar = document.documentElement.getBoundingClientRect().width;
+    document.body.style.overflow = "hidden";
+    const widthWithoutScrollbar = document.documentElement.getBoundingClientRect().width;
+    const scrollbarWidth = widthWithoutScrollbar - widthWithScrollbar;
+    document.documentElement.style.setProperty("--scrollbar-comp", `${scrollbarWidth}px`);
+}
+
+/**
+ * Restore page scrolling and drop the scrollbar compensation.
+ * @returns {void}
+ */
+function unlockPageScroll() {
+    document.body.style.overflow = "";
+    document.documentElement.style.removeProperty("--scrollbar-comp");
+}
+
 /* ================= off-canvas navigation ================= */
 
 /** @type {HTMLElement|null} nav panel element, set by initNav */
@@ -42,7 +87,23 @@ let g_navOverlay = null;
 let g_hamburger = null;
 
 /**
- * Open the off-canvas panel and move focus inside it.
+ * Reflect the panel state on the hamburger toggle: aria-expanded (which
+ * also drives the CSS bars-to-X morph) plus a localised aria-label.
+ * The data-i18n-label attribute is kept in sync so a later language
+ * switch re-translates the label matching the current state.
+ * @param {boolean} isOpen - true when the panel is open
+ * @returns {void}
+ */
+function updateHamburgerState(isOpen) {
+    const labelKey = isOpen ? NAV_CLOSE_LABEL_KEY : NAV_OPEN_LABEL_KEY;
+    g_hamburger.setAttribute("aria-expanded", String(isOpen));
+    g_hamburger.dataset.i18nLabel = labelKey;
+    g_hamburger.setAttribute("aria-label", translate(labelKey));
+}
+
+/**
+ * Open the off-canvas panel. The hamburger morphs into the X close
+ * button and stays visible above the panel, so focus remains on it.
  * @returns {void}
  */
 function openNav() {
@@ -50,9 +111,9 @@ function openNav() {
     // wait one frame so the overlay fade-in transition can run
     requestAnimationFrame(() => g_navOverlay.classList.add("is-open"));
     g_navPanel.classList.add("is-open");
-    g_hamburger.setAttribute("aria-expanded", "true");
-    document.body.style.overflow = "hidden";
-    document.getElementById("nav-close").focus();
+    updateHamburgerState(true);
+    lockPageScroll();
+    g_hamburger.focus();
 }
 
 /**
@@ -65,23 +126,33 @@ function closeNav() {
         g_navOverlay.hidden = true;
     }, NAV_OVERLAY_FADE_MS);
     g_navPanel.classList.remove("is-open");
-    g_hamburger.setAttribute("aria-expanded", "false");
-    document.body.style.overflow = "";
+    updateHamburgerState(false);
+    unlockPageScroll();
     g_hamburger.focus();
 }
 
 /**
- * Wire the hamburger menu: open/close, Esc, overlay click, focus trap.
+ * Open or close the panel depending on its current state.
+ * @returns {void}
+ */
+function toggleNav() {
+    if (g_navPanel.classList.contains("is-open")) {
+        closeNav();
+    } else {
+        openNav();
+    }
+}
+
+/**
+ * Wire the hamburger menu: toggle, Esc, overlay click, focus trap.
  * @returns {void}
  */
 export function initNav() {
     g_navPanel = document.getElementById("nav-panel");
     g_navOverlay = document.getElementById("nav-overlay");
     g_hamburger = document.getElementById("hamburger");
-    const navClose = document.getElementById("nav-close");
 
-    g_hamburger.addEventListener("click", openNav);
-    navClose.addEventListener("click", closeNav);
+    g_hamburger.addEventListener("click", toggleNav);
     g_navOverlay.addEventListener("click", closeNav);
 
     document.addEventListener("keydown", (event) => {
@@ -90,14 +161,22 @@ export function initNav() {
         }
     });
 
-    // basic focus trap: keep Tab cycling inside the open panel
-    g_navPanel.addEventListener("keydown", (event) => {
-        if (event.key !== "Tab") {
+    /*
+     * Basic focus trap while the panel is open. The close control is the
+     * hamburger itself, which lives in the top bar (outside the panel),
+     * so the listener sits on document and the Tab cycle is:
+     *   hamburger -> panel links -> back to the hamburger.
+     * DOM order already goes hamburger -> panel, so only the two wrap
+     * jumps (past the ends of the cycle) need to be handled by hand.
+     */
+    document.addEventListener("keydown", (event) => {
+        if (event.key !== "Tab" || !g_navPanel.classList.contains("is-open")) {
             return;
         }
-        const focusables = g_navPanel.querySelectorAll("button, a[href]");
-        const firstFocusable = focusables[0];
-        const lastFocusable = focusables[focusables.length - 1];
+        const panelFocusables = g_navPanel.querySelectorAll("button, a[href]");
+        const focusCycle = [g_hamburger, ...panelFocusables];
+        const firstFocusable = focusCycle[0];
+        const lastFocusable = focusCycle[focusCycle.length - 1];
         if (event.shiftKey && document.activeElement === firstFocusable) {
             event.preventDefault();
             lastFocusable.focus();
@@ -252,7 +331,7 @@ function openLightbox(galleryButton) {
     lightboxImg.src = galleryButton.dataset.full;
     lightboxImg.alt = thumbnail.alt;
     lightbox.hidden = false;
-    document.body.style.overflow = "hidden";
+    lockPageScroll();
     g_lightboxTrigger = galleryButton;
     document.getElementById("lightbox-close").focus();
 }
@@ -267,7 +346,7 @@ function closeLightbox() {
 
     lightbox.hidden = true;
     lightboxImg.src = "";
-    document.body.style.overflow = "";
+    unlockPageScroll();
     if (g_lightboxTrigger) {
         g_lightboxTrigger.focus();
     }

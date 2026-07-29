@@ -43,6 +43,12 @@ export const MAPS_EMBED_SRC = "https://www.google.com/maps/embed?pb=!1m18!1m12!1
 /** @type {string} translation key of the map iframe accessible title */
 export const MAPS_TITLE_KEY = "map.iframeTitle";
 
+/** @type {string} translation key of the hamburger label while the menu is closed */
+export const NAV_OPEN_LABEL_KEY = "a11y.openMenu";
+
+/** @type {string} translation key of the hamburger label while the menu is open */
+export const NAV_CLOSE_LABEL_KEY = "a11y.closeMenu";
+
 /**
  * Translation dictionaries, flat "section.key" keys.
  * The HTML elements reference them through data attributes:

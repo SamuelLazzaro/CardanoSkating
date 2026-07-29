@@ -6,149 +6,160 @@
 
 /* ----- Fonts (self-hosted, GDPR-safe: no external requests) ----- */
 @font-face {
-    font-family: "Anton";
-    src: url("../assets/fonts/anton-v27-latin-regular.woff2") format("woff2");
-    font-weight: 400;
-    font-display: swap;
+	font-family: "Anton";
+	src: url("../assets/fonts/anton-v27-latin-regular.woff2") format("woff2");
+	font-weight: 400;
+	font-display: swap;
 }
 
 @font-face {
-    font-family: "Inter";
-    src: url("../assets/fonts/inter-v20-latin-regular.woff2") format("woff2");
-    font-weight: 400;
-    font-display: swap;
+	font-family: "Inter";
+	src: url("../assets/fonts/inter-v20-latin-regular.woff2") format("woff2");
+	font-weight: 400;
+	font-display: swap;
 }
 
 @font-face {
-    font-family: "Inter";
-    src: url("../assets/fonts/inter-v20-latin-600.woff2") format("woff2");
-    font-weight: 600;
-    font-display: swap;
+	font-family: "Inter";
+	src: url("../assets/fonts/inter-v20-latin-600.woff2") format("woff2");
+	font-weight: 600;
+	font-display: swap;
 }
 
 @font-face {
-    font-family: "Inter";
-    src: url("../assets/fonts/inter-v20-latin-800.woff2") format("woff2");
-    font-weight: 800;
-    font-display: swap;
+	font-family: "Inter";
+	src: url("../assets/fonts/inter-v20-latin-800.woff2") format("woff2");
+	font-weight: 800;
+	font-display: swap;
 }
 
 @font-face {
-    font-family: "JetBrains Mono";
-    src: url("../assets/fonts/jetbrains-mono-v24-latin-700.woff2") format("woff2");
-    font-weight: 700;
-    font-display: swap;
+	font-family: "JetBrains Mono";
+	src: url("../assets/fonts/jetbrains-mono-v24-latin-700.woff2") format("woff2");
+	font-weight: 700;
+	font-display: swap;
 }
 
 /* ----- Design tokens ----- */
 :root {
-    /* colors */
-    --c-black: #0a0a0a;
-    --c-black-alt: #101010;
-    --c-surface: #161616;
-    --c-border: #262626;
-    --c-white: #f5f5f5;
-    --c-gray: #9a9a9a;
-    --c-text-soft: #d6d6d6;
-    --c-orange: #ff8800; /* sampled from the club crest */
-    --c-orange-bright: #ff9900; /* hover / glow variant */
-    --glow-orange: 0 0 24px rgba(243, 146, 0, 0.45);
+	/* colors */
+	--c-black: #0a0a0a;
+	--c-black-alt: #101010;
+	--c-surface: #161616;
+	--c-border: #262626;
+	--c-white: #f5f5f5;
+	--c-gray: #9a9a9a;
+	--c-text-soft: #d6d6d6;
+	--c-orange: #ff8800;
+	/* sampled from the club crest */
+	--c-orange-bright: #ff9900;
+	/* hover / glow variant */
+	--glow-orange: 0 0 24px rgba(243, 146, 0, 0.45);
 
-    /* typography */
-    --font-display: "Anton", "Arial Narrow", sans-serif;
-    --font-body: "Inter", system-ui, sans-serif;
-    --font-mono: "JetBrains Mono", ui-monospace, Consolas, Menlo, monospace;
+	/* typography */
+	--font-display: "Anton", "Arial Narrow", sans-serif;
+	--font-body: "Inter", system-ui, sans-serif;
+	--font-mono: "JetBrains Mono", ui-monospace, Consolas, Menlo, monospace;
 
-    /* layout */
-    --scrollbar-size: 8px;
-    --topbar-h: 72px;
-    --container-w: 1140px;
-    --pad-page: 24px;
-    --section-pad-y: 80px;
-    --grid-gap: 28px;
-    --grid-gap-lg: 48px;
+	/* layout */
+	--scrollbar-size: 8px;
+	--topbar-h: 72px;
+	--container-w: 1140px;
+	--pad-page: 24px;
+	--section-pad-y: 80px;
+	--grid-gap: 28px;
+	--grid-gap-lg: 48px;
+	/* width of the classic scrollbar while page scroll is locked
+	   (menu/lightbox open); published by ui.js so body and the
+	   right-anchored fixed elements can compensate and not shift */
+	--scrollbar-comp: 0px;
 
-    /* motion */
-    --t-hover: 0.3s ease;
-    --t-fade: 0.35s ease;
-    --t-zoom: 0.45s ease;
-    --t-reveal: 0.65s ease;
+	/* motion */
+	--t-hover: 0.3s ease;
+	--t-fade: 0.35s ease;
+	--t-zoom: 0.45s ease;
+	--t-reveal: 0.65s ease;
 
-    /* shared "speed" angle for buttons, underlines, ticks */
-    --skew: -8deg;
+	/* shared "speed" angle for buttons, underlines, ticks */
+	--skew: -8deg;
 
 	/* border */
 	--border-radius-common: 5px;
 }
 
 @media (min-width: 900px) {
-    :root {
-        --section-pad-y: 110px;
-    }
+	:root {
+		--section-pad-y: 110px;
+	}
 }
 
 /* ----- Reset / base ----- */
+* {
+	-webkit-tap-highlight-color: transparent;
+}
+
 *,
 *::before,
 *::after {
-    box-sizing: border-box;
+	box-sizing: border-box;
 }
 
 html {
-    scroll-behavior: smooth;
+	scroll-behavior: smooth;
 }
 
 body {
-    margin: 0;
-    background: var(--c-black);
-    color: var(--c-white);
-    font-family: var(--font-body);
-    font-size: 1rem;
-    line-height: 1.65;
-    -webkit-font-smoothing: antialiased;
-    overflow-x: hidden;
+	margin: 0;
+	padding-right: var(--scrollbar-comp);
+	background: var(--c-black);
+	color: var(--c-white);
+	font-family: var(--font-body);
+	font-size: 1rem;
+	line-height: 1.65;
+	-webkit-font-smoothing: antialiased;
+	overflow-x: hidden;
 }
 
 img {
-    max-width: 100%;
-    display: block;
+	max-width: 100%;
+	display: block;
 }
 
 h1,
 h2,
 h3 {
-    margin: 0;
-    line-height: 1.1;
+	margin: 0;
+	line-height: 1.1;
 }
 
 p {
-    margin: 0 0 1em;
+	margin: 0 0 1em;
 }
 
 p:last-child {
-    margin-bottom: 0;
+	margin-bottom: 0;
 }
 
 ul,
 ol {
-    margin: 0;
-    padding: 0;
-    list-style: none;
+	margin: 0;
+	padding: 0;
+	list-style: none;
 }
 
 a {
-    color: var(--c-orange);
+	color: var(--c-orange);
 }
 
 .container {
-    max-width: var(--container-w);
-    margin: 0 auto;
-    padding: 0 var(--pad-page);
+	max-width: var(--container-w);
+	margin: 0 auto;
+	padding: 0 var(--pad-page);
 }
 
 /* Anchored sections stop below the fixed top bar */
 section[id] {
-    scroll-margin-top: var(--topbar-h);
+	scroll-margin-top: var(--topbar-h);
 }
 
 /* ==========================================================================
@@ -159,50 +170,50 @@ section[id] {
    Chromium ignores them when the standard properties are set.
    ========================================================================== */
 html {
-    scrollbar-width: thin;
-    scrollbar-color: var(--c-orange) transparent;
+	scrollbar-width: thin;
+	scrollbar-color: var(--c-orange) transparent;
 }
 
 ::-webkit-scrollbar {
-    width: var(--scrollbar-size);
-    height: var(--scrollbar-size);
+	width: var(--scrollbar-size);
+	height: var(--scrollbar-size);
 }
 
 ::-webkit-scrollbar-track {
-    background: transparent;
+	background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-    background: var(--c-orange);
-    border-radius: 999px;
+	background: var(--c-orange);
+	border-radius: 999px;
 }
 
 @media (pointer: fine) {
-    ::-webkit-scrollbar-thumb:hover {
-        background: var(--c-orange-bright);
-    }
+	::-webkit-scrollbar-thumb:hover {
+		background: var(--c-orange-bright);
+	}
 }
 
 /* ----- Accessibility helpers ----- */
 .skip-link {
-    position: absolute;
-    top: -100px;
-    left: 16px;
-    z-index: 200;
-    padding: 10px 18px;
-    background: var(--c-orange);
-    color: var(--c-black);
-    font-weight: 800;
-    text-decoration: none;
+	position: absolute;
+	top: -100px;
+	left: 16px;
+	z-index: 200;
+	padding: 10px 18px;
+	background: var(--c-orange);
+	color: var(--c-black);
+	font-weight: 800;
+	text-decoration: none;
 }
 
 .skip-link:focus {
-    top: 12px;
+	top: 12px;
 }
 
 :focus-visible {
-    outline: 3px solid var(--c-orange-bright);
-    outline-offset: 3px;
+	outline: 3px solid var(--c-orange-bright);
+	outline-offset: 3px;
 }
 
 /* ==========================================================================
@@ -211,18 +222,18 @@ html {
    .no-anim reveals instantly (used when jumping to a section via the menu).
    ========================================================================== */
 .reveal {
-    opacity: 0;
-    transform: translateY(28px);
-    transition: opacity var(--t-reveal), transform var(--t-reveal);
+	opacity: 0;
+	transform: translateY(28px);
+	transition: opacity var(--t-reveal), transform var(--t-reveal);
 }
 
 .reveal.is-visible {
-    opacity: 1;
-    transform: none;
+	opacity: 1;
+	transform: none;
 }
 
 .reveal.no-anim {
-    transition: none;
+	transition: none;
 }
 
 /* ==========================================================================
@@ -230,13 +241,13 @@ html {
    simply visible. Component-specific opt-outs live in their own files.
    ========================================================================== */
 @media (prefers-reduced-motion: reduce) {
-    html {
-        scroll-behavior: auto;
-    }
+	html {
+		scroll-behavior: auto;
+	}
 
-    .reveal {
-        opacity: 1;
-        transform: none;
-        transition: none;
-    }
+	.reveal {
+		opacity: 1;
+		transform: none;
+		transition: none;
+	}
 }

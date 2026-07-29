@@ -27,7 +27,11 @@
     width: 100%;
     background: var(--c-white);
     border-radius: 2px;
-    transition: transform var(--t-hover), opacity var(--t-hover);
+    /* background-color belongs to this list so the hover recolor needs
+       no transition of its own: re-declaring the shorthand there would
+       drop transform/opacity and break the bars-to-X morph while the
+       pointer is over the button (i.e. on every desktop click). */
+    transition: transform var(--t-hover), opacity var(--t-hover), background-color var(--t-hover);
 }
 
 .hamburger[aria-expanded="true"] .hamburger-bar:nth-child(1) {
@@ -81,20 +85,6 @@
     transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.nav-close {
-    position: absolute;
-    top: 14px;
-    right: 18px;
-    width: 44px;
-    height: 44px;
-    background: none;
-    border: none;
-    color: var(--c-white);
-    font-size: 2rem;
-    line-height: 1;
-    cursor: pointer;
-}
-
 .nav-list {
     display: flex;
     flex-direction: column;
@@ -135,6 +125,10 @@
     text-decoration: none;
 }
 
+.nav-social svg {
+	color: var(--c-white) !important;
+}
+
 @media (pointer: fine) {
 	button:hover {
 		cursor: pointer;
@@ -142,14 +136,7 @@
 
 	.hamburger:hover .hamburger-bar {
 		background-color: var(--c-orange);
-		border-color: var(--c-orange);
-		/* border-radius: var(--border-radius-common); */
-		transition: background-color 0.25s ease, border-color 0.25s ease;
 	}
-
-    .nav-close:hover {
-        color: var(--c-orange);
-    }
 
     .nav-link:hover {
         color: var(--c-orange);
@@ -157,8 +144,14 @@
     }
 
     .nav-social a:hover {
-        color: var(--c-orange);
+		transform: translateY(-10px);
+        transition: transform 0.55s ease;
     }
+
+	.nav-social a:hover svg {
+		color: var(--c-orange) !important;
+		transition: color 0.55s ease;
+	}
 }
 
 /* ==========================================================================
@@ -583,7 +576,7 @@
     right: 0;
     bottom: 0;
     z-index: 160;
-    padding: 18px 0;
+    padding: 18px var(--scrollbar-comp) 18px 0;
     background: rgba(16, 16, 16, 0.97);
     border-top: 2px solid var(--c-orange);
     backdrop-filter: blur(8px);
@@ -822,7 +815,7 @@ body.cookie-banner-open .fab-lang {
    ========================================================================== */
 .fab-lang {
     position: fixed;
-    right: 22px;
+    right: calc(22px + var(--scrollbar-comp));
     bottom: 22px;
     z-index: 130;
     width: 58px;
