@@ -139,6 +139,9 @@
     color: var(--c-gray);
     font-weight: 600;
     text-decoration: none;
+
+	/* To add transition both when hover & not hover */
+	transition: transform 0.55s ease;
 }
 
 .nav-social svg {
@@ -161,7 +164,7 @@
 
     .nav-social a:hover {
 		transform: translateY(var(--nav-social-hover-lift));
-        transition: transform 0.55s ease;
+        /* transition: transform 0.55s ease; */
     }
 
 	.nav-social a:hover svg {
