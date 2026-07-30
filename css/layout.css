@@ -47,7 +47,7 @@
     flex-direction: column;
     /* monospace: CARDANO and SKATING are both 7 chars, so the two
        lines render at exactly the same width */
-    font-family: var(--font-mono);
+    font-family: var(--font-brand);
     font-weight: 700;
     font-size: 1.05rem;
     letter-spacing: 0.14em;

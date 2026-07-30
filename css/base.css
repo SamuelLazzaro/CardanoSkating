@@ -40,6 +40,15 @@
 	font-display: swap;
 }
 
+/* only the bold cut: Inconsolata is used solely by the CARDANO SKATING
+   wordmark in the top bar, which renders at weight 700 */
+@font-face {
+	font-family: "Inconsolata";
+	src: url("../assets/fonts/inconsolata-v37-latin-700.woff2") format("woff2");
+	font-weight: 700;
+	font-display: swap;
+}
+
 /* ----- Design tokens ----- */
 :root {
 	/* colors */
@@ -62,6 +71,8 @@
 	--font-display: "Anton", "Arial Narrow", sans-serif;
 	--font-body: "Inter", system-ui, sans-serif;
 	--font-mono: "JetBrains Mono", ui-monospace, Consolas, Menlo, monospace;
+	/* top-bar CARDANO SKATING wordmark only */
+	--font-brand: "Inconsolata", ui-monospace, Consolas, Menlo, monospace;
 
 	/* layout */
 	--scrollbar-size: 8px;

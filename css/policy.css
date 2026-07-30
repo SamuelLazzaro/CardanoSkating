@@ -19,11 +19,16 @@
     padding: 12px var(--pad-page);
     background: var(--c-black-alt);
     border-bottom: 1px solid var(--c-border);
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: 0;
 }
 
 .btn-back {
     padding: 9px 18px;
     border: 1px solid var(--c-border);
+	border-radius: 5px;
     color: var(--c-orange);
     font-size: 0.85rem;
     font-weight: 600;
