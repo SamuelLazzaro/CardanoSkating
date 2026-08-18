@@ -129,17 +129,25 @@ describe('prenotazione diretta', () => {
     const cookieAmm = await cookieAdmin();
     // La società 1 è Cardano Skating S.R.L. S.S.D. (seed della migrazione iniziale).
     const risposta = await postJson('/api/admin/prenotazioni', cookieAmm, {
-      societa_id: 1, data: dataFutura, ora_inizio: '10:00', ora_fine: '11:30', note: 'corso interno',
+      societa_id: 1, titolo: 'Pattinaggio libero', data: dataFutura, ora_inizio: '10:00', ora_fine: '11:30', note: 'corso interno',
     });
     expect(risposta.status).toBe(201);
     const corpo = (await risposta.json()) as { richiesta_id: number; slot_inseriti: number };
     expect(corpo.slot_inseriti).toBe(3);
     expect((await slotDiRichiesta(corpo.richiesta_id)).length).toBe(3);
     const richiesta = await env.DB
-      .prepare('SELECT stato FROM richieste WHERE id = ?1')
+      .prepare('SELECT stato, titolo FROM richieste WHERE id = ?1')
       .bind(corpo.richiesta_id)
-      .first<{ stato: string }>();
+      .first<{ stato: string; titolo: string }>();
     expect(richiesta?.stato).toBe('approvata');
+    expect(richiesta?.titolo).toBe('Pattinaggio libero');
+
+    // Il calendario admin espone il titolo attività di ogni slot prenotato.
+    const calendario = await getConCookie(`/api/admin/calendario?settimana=${dataFutura}`, cookieAmm);
+    expect(calendario.status).toBe(200);
+    const corpoCalendario = (await calendario.json()) as { prenotazioni: { titolo: string }[] };
+    expect(corpoCalendario.prenotazioni.length).toBe(3);
+    expect(corpoCalendario.prenotazioni.every((p) => p.titolo === 'Pattinaggio libero')).toBe(true);
 
     const conflitto = await postJson('/api/admin/prenotazioni', cookieAmm, {
       societa_id: 1, data: dataFutura, ora_inizio: '11:00', ora_fine: '12:00',

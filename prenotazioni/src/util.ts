@@ -25,6 +25,21 @@ export function testo(valore: unknown, maxLunghezza: number): string | null {
   return ripulito;
 }
 
+/** Titolo attività usato quando chi prenota non ne indica uno (o lo svuota). */
+export const TITOLO_PREDEFINITO = 'Allenamento';
+
+/** Lunghezza massima del titolo attività (condivisa da società e admin). */
+export const MAX_TITOLO = 100;
+
+/**
+ * Valida il titolo attività dal corpo della richiesta: assente o vuoto →
+ * TITOLO_PREDEFINITO; oltre la lunghezza massima → null (→ 400 nel chiamante).
+ */
+export function titoloAttivita(valore: unknown): string | null {
+  if (typeof valore !== 'string' || valore.trim() === '') return TITOLO_PREDEFINITO;
+  return testo(valore, MAX_TITOLO);
+}
+
 export function emailValida(valore: string): boolean {
   return valore.length <= 200 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(valore);
 }

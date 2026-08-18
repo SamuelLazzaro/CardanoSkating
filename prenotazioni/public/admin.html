@@ -51,14 +51,26 @@
       </section>
 
       <section class="pannello">
-        <h2>Calendario settimanale</h2>
+        <div class="pannello-testata">
+          <h2>Calendario settimanale</h2>
+          <button type="button" class="btn btn-primario" id="bottone-nuova-prenotazione">Nuova prenotazione</button>
+        </div>
+        <p id="esito-diretta" class="stato" role="status" hidden></p>
         <div class="toolbar" aria-label="Navigazione tra le settimane">
-          <button id="cal-precedente" class="btn btn-freccia" type="button" aria-label="Settimana precedente">‹</button>
+          <button id="cal-precedente" class="btn btn-freccia" type="button" aria-label="Settimana precedente">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <polyline points="15 6 9 12 15 18"></polyline>
+            </svg>
+          </button>
           <div class="toolbar-centro">
             <h3 id="cal-titolo" class="titolo-settimana">&nbsp;</h3>
             <button id="cal-oggi" class="btn btn-testo" type="button">Torna a oggi</button>
           </div>
-          <button id="cal-successiva" class="btn btn-freccia" type="button" aria-label="Settimana successiva">›</button>
+          <button id="cal-successiva" class="btn btn-freccia" type="button" aria-label="Settimana successiva">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <polyline points="9 6 15 12 9 18"></polyline>
+            </svg>
+          </button>
         </div>
         <p id="cal-stato" class="stato" role="status" hidden></p>
         <div class="scorri-griglia">
@@ -68,38 +80,6 @@
         <p id="esito-cal" class="stato" role="status" hidden></p>
         <ul id="lista-prenotazioni" class="lista"></ul>
         <p id="vuoto-prenotazioni" class="vuoto" hidden>Nessuna prenotazione in questa settimana.</p>
-      </section>
-
-      <section class="pannello">
-        <h2>Prenotazione diretta</h2>
-        <form id="form-diretta" class="modulo">
-          <div class="campo">
-            <label for="dir-societa">Società</label>
-            <select id="dir-societa"></select>
-          </div>
-          <div class="campo">
-            <label for="dir-data">Data</label>
-            <input type="date" id="dir-data" required>
-          </div>
-          <div class="campo-riga">
-            <div class="campo">
-              <label for="dir-inizio">Dalle</label>
-              <select id="dir-inizio"></select>
-            </div>
-            <div class="campo">
-              <label for="dir-fine">Alle</label>
-              <select id="dir-fine"></select>
-            </div>
-          </div>
-          <div class="campo">
-            <label for="dir-note">Note (facoltative)</label>
-            <textarea id="dir-note" maxlength="500" rows="2"></textarea>
-          </div>
-          <div>
-            <button type="submit" class="btn btn-primario" id="bottone-diretta">Prenota</button>
-          </div>
-        </form>
-        <p id="esito-diretta" class="stato" role="status" hidden></p>
       </section>
 
       <section class="pannello">
@@ -136,6 +116,47 @@
         </form>
       </section>
     </div>
+
+    <dialog id="dialogo-diretta" class="dialogo" aria-labelledby="titolo-dialogo-diretta">
+      <div class="dialogo-contenuto">
+        <div class="dialogo-testata">
+          <h2 id="titolo-dialogo-diretta">Nuova prenotazione diretta</h2>
+          <button type="button" class="btn btn-testo" id="bottone-chiudi-dialogo" aria-label="Chiudi">✕</button>
+        </div>
+        <form id="form-diretta" class="modulo">
+          <div class="campo">
+            <label for="dir-societa">Società</label>
+            <select id="dir-societa"></select>
+          </div>
+          <div class="campo">
+            <label for="dir-titolo">Attività</label>
+            <input type="text" id="dir-titolo" maxlength="100" value="Allenamento">
+          </div>
+          <div class="campo">
+            <label for="dir-data">Data</label>
+            <input type="date" id="dir-data" required>
+          </div>
+          <div class="campo-riga">
+            <div class="campo">
+              <label for="dir-inizio">Dalle</label>
+              <select id="dir-inizio"></select>
+            </div>
+            <div class="campo">
+              <label for="dir-fine">Alle</label>
+              <select id="dir-fine"></select>
+            </div>
+          </div>
+          <div class="campo">
+            <label for="dir-note">Note (facoltative)</label>
+            <textarea id="dir-note" maxlength="500" rows="2"></textarea>
+          </div>
+          <div>
+            <button type="submit" class="btn btn-primario" id="bottone-diretta">Prenota</button>
+          </div>
+        </form>
+        <p id="esito-form" class="stato" role="status" hidden></p>
+      </div>
+    </dialog>
   </main>
 </body>
 </html>

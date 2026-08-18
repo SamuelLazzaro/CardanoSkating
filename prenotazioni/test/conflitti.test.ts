@@ -72,17 +72,19 @@ describe('materializzazione ricorrenza', () => {
   it('crea una richiesta approvata e le prenotazioni per ogni occorrenza settimanale', async () => {
     const cookie = await cookieAdmin();
     const societaId = await creaSocieta();
-    const ricorrenzaId = await creaRicorrenza(societaId, 0, '18:00', '19:00', '2030-01-07', '2030-01-28');
+    const ricorrenzaId = await creaRicorrenza(societaId, 0, '18:00', '19:00', '2030-01-07', '2030-01-28', 'Corso avanzato');
 
     const risposta = await postAdmin(`/api/admin/ricorrenze/${ricorrenzaId}/approva`, cookie);
     expect(risposta.status).toBe(200);
 
     const richieste = await env.DB
-      .prepare('SELECT id, data, stato FROM richieste WHERE ricorrenza_id = ?1 ORDER BY data')
+      .prepare('SELECT id, data, stato, titolo FROM richieste WHERE ricorrenza_id = ?1 ORDER BY data')
       .bind(ricorrenzaId)
-      .all<{ id: number; data: string; stato: string }>();
+      .all<{ id: number; data: string; stato: string; titolo: string }>();
     expect(richieste.results.map((r) => r.data)).toEqual(['2030-01-07', '2030-01-14', '2030-01-21', '2030-01-28']);
     expect(richieste.results.every((r) => r.stato === 'approvata')).toBe(true);
+    // Il titolo attività della ricorrenza viene copiato in ogni richiesta materializzata.
+    expect(richieste.results.every((r) => r.titolo === 'Corso avanzato')).toBe(true);
 
     // 4 occorrenze x 2 slot (18:00 e 18:30) = 8 prenotazioni
     const totale = await env.DB.prepare('SELECT COUNT(*) AS n FROM prenotazioni').first<{ n: number }>();

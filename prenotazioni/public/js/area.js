@@ -10,6 +10,7 @@ import {
   MAX_SETTIMANE_RICORRENZA,
   NOMI_GIORNI,
   PASSO_MIN,
+  TITOLO_PREDEFINITO,
 } from './constants.js';
 import {
   adessoRoma,
@@ -32,7 +33,7 @@ import {
   ottieniProfiloSocieta,
   ottieniRichiesteSocieta,
 } from './api.js';
-import { costruisciGriglia, creaBadge, mostraMessaggio } from './ui.js';
+import { costruisciGriglia, creaBadge, mostraMessaggio, preparaDialogo } from './ui.js';
 
 // First thing on every page: its capture listener must precede all others.
 avviaTapFeedback();
@@ -114,6 +115,14 @@ function preparaForm() {
     aggiornaLimitiRipetizione();
   });
 
+  preparaDialogo(
+    elemento('dialogo-richiesta'),
+    elemento('bottone-nuova-prenotazione'),
+    elemento('bottone-chiudi-dialogo'),
+  );
+  // A stale error from a previous attempt must not greet the reopened dialog.
+  elemento('bottone-nuova-prenotazione').addEventListener('click', () => mostraMessaggio(elemento('esito-form'), ''));
+
   elemento('form-richiesta').addEventListener('submit', inviaForm);
   elemento('bottone-esci').addEventListener('click', esci);
   elemento('bottone-copia').addEventListener('click', copiaLinkIcs);
@@ -145,6 +154,7 @@ async function inviaForm(evento) {
   evento.preventDefault();
   const esitoForm = elemento('esito-form');
   const corpo = {
+    titolo: elemento('campo-titolo').value.trim(),
     data: elemento('campo-data').value,
     ora_inizio: elemento('campo-inizio').value,
     ora_fine: elemento('campo-fine').value,
@@ -167,12 +177,17 @@ async function inviaForm(evento) {
   bottone.disabled = true;
   try {
     const esito = await inviaRichiestaPrenotazione(corpo);
+    // Success closes the popup: the confirmation goes to the page-level
+    // status next to the calendar, where it stays readable.
+    elemento('dialogo-richiesta').close();
+    const esitoPagina = elemento('esito-richiesta');
     if (esito.tipo === 'ricorrenza') {
       const dateLeggibili = esito.occorrenze.map(dataEstesa).join(', ');
-      mostraMessaggio(esitoForm, `Richiesta ricorrente inviata (${esito.occorrenze.length} date: ${dateLeggibili}). In attesa di approvazione.`, 'ok');
+      mostraMessaggio(esitoPagina, `Richiesta ricorrente inviata (${esito.occorrenze.length} date: ${dateLeggibili}). In attesa di approvazione.`, 'ok');
     } else {
-      mostraMessaggio(esitoForm, 'Richiesta inviata: in attesa di approvazione.', 'ok');
+      mostraMessaggio(esitoPagina, 'Richiesta inviata: in attesa di approvazione.', 'ok');
     }
+    elemento('campo-titolo').value = TITOLO_PREDEFINITO;
     elemento('campo-note').value = '';
     elemento('campo-ripeti').checked = false;
     elemento('blocco-fino-al').hidden = true;

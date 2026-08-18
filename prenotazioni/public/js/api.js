@@ -47,7 +47,7 @@ export function ottieniRichiesteSocieta() {
 }
 
 /**
- * @param {{data: string, ora_inizio: string, ora_fine: string, note?: string, ripeti_fino_al?: string}} corpo
+ * @param {{titolo?: string, data: string, ora_inizio: string, ora_fine: string, note?: string, ripeti_fino_al?: string}} corpo
  * @returns {Promise<{tipo: 'richiesta'|'ricorrenza', id: number, occorrenze?: string[]}>}
  */
 export function inviaRichiestaPrenotazione(corpo) {
@@ -195,14 +195,14 @@ export function rigeneraTokenSocieta(idSocieta) {
 
 /**
  * @param {string} lunedi - Monday of the requested week
- * @returns {Promise<{settimana: string, prenotazioni: {slot_key: string, societa_id: number, societa: string, richiesta_id: number}[]}>}
+ * @returns {Promise<{settimana: string, prenotazioni: {slot_key: string, societa_id: number, societa: string, richiesta_id: number, titolo: string}[]}>}
  */
 export function ottieniCalendarioAdmin(lunedi) {
   return richiestaJson(`/api/admin/calendario?settimana=${lunedi}`);
 }
 
 /**
- * @param {{societa_id: number, data: string, ora_inizio: string, ora_fine: string, note?: string}} corpo
+ * @param {{societa_id: number, titolo?: string, data: string, ora_inizio: string, ora_fine: string, note?: string}} corpo
  * @returns {Promise<{ok: boolean, richiesta_id: number, slot_inseriti: number}>}
  */
 export function creaPrenotazioneDiretta(corpo) {

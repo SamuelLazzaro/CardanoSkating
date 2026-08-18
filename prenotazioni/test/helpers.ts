@@ -60,13 +60,14 @@ export async function creaRicorrenza(
   oraFine: string,
   validaDal: string,
   validaAl: string,
+  titolo = 'Allenamento',
 ): Promise<number> {
   const esito = await env.DB
     .prepare(
-      `INSERT INTO ricorrenze (societa_id, giorno_settimana, ora_inizio, ora_fine, valida_dal, valida_al)
-       VALUES (?1, ?2, ?3, ?4, ?5, ?6)`,
+      `INSERT INTO ricorrenze (societa_id, giorno_settimana, ora_inizio, ora_fine, valida_dal, valida_al, titolo)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)`,
     )
-    .bind(societaId, giornoSettimana, oraInizio, oraFine, validaDal, validaAl)
+    .bind(societaId, giornoSettimana, oraInizio, oraFine, validaDal, validaAl, titolo)
     .run();
   return esito.meta.last_row_id;
 }

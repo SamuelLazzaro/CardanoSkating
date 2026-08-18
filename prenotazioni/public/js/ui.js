@@ -70,6 +70,24 @@ export function mostraMessaggio(elemento, testo, tipo = '') {
 }
 
 /**
+ * Wires a modal dialog to its open/close buttons. The dialog also closes on
+ * Esc (native <dialog> behaviour) and on a click landing on the backdrop:
+ * clicks inside the content target an inner element, so a target equal to
+ * the dialog itself can only come from the backdrop area.
+ * @param {HTMLDialogElement} dialogo
+ * @param {HTMLElement} bottoneApri
+ * @param {HTMLElement} bottoneChiudi
+ * @returns {void}
+ */
+export function preparaDialogo(dialogo, bottoneApri, bottoneChiudi) {
+  bottoneApri.addEventListener('click', () => dialogo.showModal());
+  bottoneChiudi.addEventListener('click', () => dialogo.close());
+  dialogo.addEventListener('click', (evento) => {
+    if (evento.target === dialogo) dialogo.close();
+  });
+}
+
+/**
  * @param {string} stato - richiesta/ricorrenza state
  * @returns {HTMLSpanElement} a .badge element with the state label
  */

@@ -6,7 +6,7 @@
  * suspend/reactivate, personal-link regeneration).
  */
 import { avviaTapFeedback } from './tap-feedback.js';
-import { NOMI_GIORNI, PASSO_MIN } from './constants.js';
+import { NOMI_GIORNI, PASSO_MIN, TITOLO_PREDEFINITO } from './constants.js';
 import {
   adessoRoma,
   aggiungiGiorni,
@@ -39,7 +39,7 @@ import {
   rigeneraTokenSocieta,
   sospendiSocieta,
 } from './api.js';
-import { costruisciGriglia, creaBadge, mostraMessaggio, preparaSelectOrari } from './ui.js';
+import { costruisciGriglia, creaBadge, mostraMessaggio, preparaDialogo, preparaSelectOrari } from './ui.js';
 
 // First thing on every page: its capture listener must precede all others.
 avviaTapFeedback();
@@ -83,6 +83,14 @@ function preparaEventi() {
   campoData.min = oggi;
   campoData.max = aggiungiGiorni(oggi, 365);
   campoData.value = aggiungiGiorni(oggi, 1);
+
+  preparaDialogo(
+    elemento('dialogo-diretta'),
+    elemento('bottone-nuova-prenotazione'),
+    elemento('bottone-chiudi-dialogo'),
+  );
+  // A stale error from a previous attempt must not greet the reopened dialog.
+  elemento('bottone-nuova-prenotazione').addEventListener('click', () => mostraMessaggio(elemento('esito-form'), ''));
 
   elemento('form-login').addEventListener('submit', accedi);
   elemento('bottone-esci').addEventListener('click', esci);
@@ -171,9 +179,12 @@ function renderRichiesteAttesa(richieste) {
     info.className = 'riga-info';
     const nome = document.createElement('strong');
     nome.textContent = richiesta.societa;
+    const attivita = document.createElement('span');
+    attivita.className = 'testo-tenue';
+    attivita.textContent = richiesta.titolo;
     const quando = document.createElement('span');
     quando.textContent = `${dataEstesa(richiesta.data)} · ${richiesta.ora_inizio}–${richiesta.ora_fine}`;
-    info.append(nome, quando);
+    info.append(nome, attivita, quando);
     riga.append(info);
     if (richiesta.note) {
       const nota = document.createElement('p');
@@ -250,12 +261,15 @@ function renderRicorrenzeAttesa(ricorrenze) {
     info.className = 'riga-info';
     const nome = document.createElement('strong');
     nome.textContent = ricorrenza.societa;
+    const attivita = document.createElement('span');
+    attivita.className = 'testo-tenue';
+    attivita.textContent = ricorrenza.titolo;
     const quando = document.createElement('span');
     quando.textContent = `ogni ${NOMI_GIORNI[ricorrenza.giorno_settimana]} · ${ricorrenza.ora_inizio}–${ricorrenza.ora_fine}`;
     const periodo = document.createElement('span');
     periodo.className = 'testo-tenue';
     periodo.textContent = `dal ${dataEstesa(ricorrenza.valida_dal)} al ${dataEstesa(ricorrenza.valida_al)}`;
-    info.append(nome, quando, periodo);
+    info.append(nome, attivita, quando, periodo);
     riga.append(info);
     if (ricorrenza.note) {
       const nota = document.createElement('p');
@@ -326,11 +340,11 @@ async function caricaCalendario() {
 }
 
 /**
- * @param {{slot_key: string, societa: string, richiesta_id: number}[]} prenotazioni
+ * @param {{slot_key: string, societa: string, richiesta_id: number, titolo: string}[]} prenotazioni
  * @returns {void}
  */
 function renderCalendario(prenotazioni) {
-  /** @type {Map<string, {societa: string, richiesta_id: number}>} */
+  /** @type {Map<string, {societa: string, richiesta_id: number, titolo: string}>} */
   const perChiave = new Map(prenotazioni.map((p) => [p.slot_key, p]));
   const adesso = adessoRoma();
   const chiaveAdesso = chiaveSlot(adesso.data, Math.floor(adesso.minuti / PASSO_MIN) * PASSO_MIN);
@@ -345,16 +359,39 @@ function renderCalendario(prenotazioni) {
       let descrizione = 'libero';
       if (prenotazione) {
         cella.classList.add('occupato');
-        descrizione = prenotazione.societa;
-        // The società name is written only in the first slot of each booked
-        // block, so a 3-slot training shows one readable label, not three.
+        descrizione = `${prenotazione.societa} · ${prenotazione.titolo}`;
+        /*
+         * Block label: società name plus activity title, written only in the
+         * first slot of each booked block. To keep every grid row at its
+         * fixed height, the label is an absolutely positioned overlay sized
+         * on the number of consecutive slots of the same richiesta (CSS var
+         * --slot-del-blocco, see .blocco-etichetta): the second text line
+         * lives over the following cell of the SAME block instead of
+         * stretching the first row. On single-slot blocks there is no second
+         * cell, so only the name is shown and the title stays in the tooltip.
+         */
         const chiavePrecedente = chiaveSlot(giorno, minuti - PASSO_MIN);
         const inizioBlocco = perChiave.get(chiavePrecedente)?.richiesta_id !== prenotazione.richiesta_id;
         if (inizioBlocco) {
+          let slotDelBlocco = 1;
+          while (perChiave.get(chiaveSlot(giorno, minuti + slotDelBlocco * PASSO_MIN))?.richiesta_id === prenotazione.richiesta_id) {
+            slotDelBlocco += 1;
+          }
+          const etichettaBlocco = document.createElement('span');
+          etichettaBlocco.className = 'blocco-etichetta';
+          etichettaBlocco.style.setProperty('--slot-del-blocco', String(slotDelBlocco));
           const nome = document.createElement('span');
           nome.className = 'slot-nome';
           nome.textContent = prenotazione.societa;
-          cella.append(nome);
+          etichettaBlocco.append(nome);
+          if (slotDelBlocco >= 2) {
+            const attivita = document.createElement('span');
+            attivita.className = 'slot-attivita';
+            attivita.textContent = prenotazione.titolo;
+            etichettaBlocco.append(attivita);
+          }
+          cella.classList.add('con-etichetta');
+          cella.append(etichettaBlocco);
         }
       }
       if (chiave < chiaveAdesso) cella.classList.add('passato');
@@ -370,14 +407,15 @@ function renderCalendario(prenotazioni) {
 /**
  * Groups the week's slots by richiesta (one richiesta = one date) and renders
  * the list with the per-date cancel action.
- * @param {{slot_key: string, societa: string, richiesta_id: number}[]} prenotazioni
+ * @param {{slot_key: string, societa: string, richiesta_id: number, titolo: string}[]} prenotazioni
  * @returns {void}
  */
 function renderPrenotazioniSettimana(prenotazioni) {
-  /** @type {Map<number, {societa: string, chiavi: string[]}>} */
+  /** @type {Map<number, {societa: string, titolo: string, chiavi: string[]}>} */
   const gruppi = new Map();
   for (const prenotazione of prenotazioni) {
-    const gruppo = gruppi.get(prenotazione.richiesta_id) ?? { societa: prenotazione.societa, chiavi: [] };
+    const gruppo = gruppi.get(prenotazione.richiesta_id)
+      ?? { societa: prenotazione.societa, titolo: prenotazione.titolo, chiavi: [] };
     gruppo.chiavi.push(prenotazione.slot_key);
     gruppi.set(prenotazione.richiesta_id, gruppo);
   }
@@ -398,9 +436,12 @@ function renderPrenotazioniSettimana(prenotazioni) {
     info.className = 'riga-info';
     const nome = document.createElement('strong');
     nome.textContent = gruppo.societa;
+    const attivita = document.createElement('span');
+    attivita.className = 'testo-tenue';
+    attivita.textContent = gruppo.titolo;
     const quando = document.createElement('span');
     quando.textContent = `${dataEstesa(data)} · ${oraInizio}–${oraFine}`;
-    info.append(nome, quando);
+    info.append(nome, attivita, quando);
     riga.append(info);
 
     if (data >= oggi) {
@@ -445,22 +486,28 @@ async function annullaData(richiestaId, societa, data, oraInizio, oraFine) {
  */
 async function prenotaDiretta(evento) {
   evento.preventDefault();
-  const esito = elemento('esito-diretta');
   const bottone = elemento('bottone-diretta');
   bottone.disabled = true;
   try {
     const risposta = await creaPrenotazioneDiretta({
       societa_id: Number(elemento('dir-societa').value),
+      titolo: elemento('dir-titolo').value.trim(),
       data: elemento('dir-data').value,
       ora_inizio: elemento('dir-inizio').value,
       ora_fine: elemento('dir-fine').value,
       note: elemento('dir-note').value.trim(),
     });
-    mostraMessaggio(esito, `Prenotazione registrata (${risposta.slot_inseriti} slot).`, 'ok');
+    // Success closes the popup: the confirmation goes to the page-level
+    // status next to the calendar, where it stays readable.
+    elemento('dialogo-diretta').close();
+    mostraMessaggio(elemento('esito-diretta'), `Prenotazione registrata (${risposta.slot_inseriti} slot).`, 'ok');
+    elemento('dir-titolo').value = TITOLO_PREDEFINITO;
     elemento('dir-note').value = '';
     await caricaCalendario();
   } catch (errore) {
-    mostraMessaggio(esito, messaggioConflitti(errore), 'errore');
+    // Errors (e.g. slot conflicts) stay inside the popup, so the admin can
+    // adjust date or time without reopening it.
+    mostraMessaggio(elemento('esito-form'), messaggioConflitti(errore), 'errore');
   } finally {
     bottone.disabled = false;
   }

@@ -48,6 +48,14 @@
     padding: 0.45rem 0.85rem;
 }
 
+.btn-freccia svg {
+    /* the inline SVG uses stroke="currentColor": the arrow inherits the
+       button text color (--testo) and its color transition from .btn */
+    display: block;
+    width: 1em;
+    height: 1em;
+}
+
 .btn-testo {
     --btn-fondo-attivo: transparent;
     --btn-bordo-attivo: transparent;
@@ -174,10 +182,26 @@
     margin-bottom: 1.25rem;
 }
 
-.pannello > h2 {
+.pannello > h2,
+.pannello-testata h2,
+.dialogo-testata h2 {
     margin: 0 0 0.75rem;
     font-size: 1.05rem;
     font-weight: 650;
+}
+
+/* panel header row: title on the left, action button top-right */
+.pannello-testata {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.75rem;
+}
+
+.pannello-testata h2 {
+    margin: 0;
 }
 
 .pannello h3 {
@@ -284,6 +308,46 @@ fieldset.campo {
     background: var(--fondo);
 }
 
+/* --------------------------------------------------------------- dialogo */
+
+/* The <dialog> itself has no padding: the content padding lives on
+   .dialogo-contenuto, so a click whose target is the dialog element can
+   only come from the ::backdrop — that is how preparaDialogo() (js/ui.js)
+   closes the popup on an outside click. */
+.dialogo {
+    border: 1px solid var(--bordo);
+    border-radius: var(--raggio);
+    padding: 0;
+    width: min(36rem, calc(100vw - 2rem));
+    background: var(--superficie);
+    color: var(--testo);
+}
+
+.dialogo::backdrop {
+    background: rgba(34, 48, 60, 0.5);
+}
+
+.dialogo-contenuto {
+    padding: 1rem 1.1rem 1.2rem;
+}
+
+.dialogo-testata {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+
+.dialogo-testata h2 {
+    margin: 0;
+}
+
+.dialogo-testata .btn-testo {
+    font-size: 1rem;
+    text-decoration: none;
+}
+
 /* ----------------------------------------------------------------- badge */
 
 .badge {
@@ -381,6 +445,9 @@ fieldset.campo {
 }
 
 .calendario {
+    /* fixed height of every 30-minute row, shared by .slot and the block
+       label overlay (.blocco-etichetta) so the two never drift apart */
+    --altezza-slot: 22px;
     display: grid;
     grid-template-columns: 3.4rem repeat(7, minmax(64px, 1fr));
     min-width: 580px;
@@ -435,7 +502,7 @@ fieldset.campo {
 }
 
 .slot {
-    min-height: 22px;
+    min-height: var(--altezza-slot);
     background: var(--superficie);
     border-left: 1px solid var(--bordo);
     border-top: 1px dotted var(--bordo);
@@ -470,17 +537,49 @@ fieldset.campo {
     background: var(--mio-passato);
 }
 
-/* società name shown in the first slot of each booked block (admin view) */
-.slot-nome {
+/* first slot of a booked block: anchor for the block label overlay */
+.slot.con-etichetta {
+    position: relative;
+}
+
+/*
+ * Label overlay of a booked block (admin view): società name plus activity
+ * title. Its height spans the --slot-del-blocco consecutive slots of the
+ * same booking (set inline by admin.js), so the second text line lies over
+ * the next cell of the block instead of stretching the first grid row.
+ * pointer-events: none keeps the per-slot tooltips underneath working.
+ */
+.blocco-etichetta {
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: calc(var(--slot-del-blocco, 1) * var(--altezza-slot));
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.slot-nome,
+.slot-attivita {
     display: block;
     max-width: 100%;
-    font-size: 0.62rem;
-    line-height: 22px;
     color: #fff;
     padding: 0 0.2rem;
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
+}
+
+/* società name, first line of the block label */
+.slot-nome {
+    font-size: 0.62rem;
+    font-weight: 600;
+    line-height: var(--altezza-slot);
+}
+
+/* activity title, second line (only on blocks of 2+ slots) */
+.slot-attivita {
+    font-size: 0.6rem;
+    line-height: 1.25;
+    opacity: 0.85;
 }
 
 @media (max-width: 640px) {

@@ -9,7 +9,7 @@ import {
   validaIntervallo,
 } from '../slots';
 import { cancellaCookieSessione, COOKIE_SOCIETA, richiedeSocieta } from '../auth';
-import { intero, leggiJson, scriviAudit, stmtAudit, testo } from '../util';
+import { intero, leggiJson, MAX_TITOLO, scriviAudit, stmtAudit, testo, titoloAttivita } from '../util';
 
 const MAX_NOTE = 500;
 const MAX_GIORNI_FUTURO = 365;
@@ -37,14 +37,14 @@ societa.get('/richieste', async (c) => {
   const soc = c.get('societa');
   const richieste = await c.env.DB
     .prepare(
-      `SELECT id, data, ora_inizio, ora_fine, stato, note, ricorrenza_id, created_at, decisa_at, annullata_at
+      `SELECT id, data, ora_inizio, ora_fine, stato, titolo, note, ricorrenza_id, created_at, decisa_at, annullata_at
        FROM richieste WHERE societa_id = ?1 ORDER BY data DESC, ora_inizio DESC LIMIT 200`,
     )
     .bind(soc.id)
     .all<RichiestaRow>();
   const ricorrenze = await c.env.DB
     .prepare(
-      `SELECT id, giorno_settimana, ora_inizio, ora_fine, valida_dal, valida_al, stato, note, created_at
+      `SELECT id, giorno_settimana, ora_inizio, ora_fine, valida_dal, valida_al, stato, titolo, note, created_at
        FROM ricorrenze WHERE societa_id = ?1 ORDER BY created_at DESC LIMIT 50`,
     )
     .bind(soc.id)
@@ -67,6 +67,9 @@ societa.post('/richieste', async (c) => {
   const oraFine = typeof corpo.ora_fine === 'string' ? corpo.ora_fine.trim() : '';
   const erroreIntervallo = validaIntervallo(data, oraInizio, oraFine);
   if (erroreIntervallo) return c.json({ errore: erroreIntervallo }, 400);
+
+  const titolo = titoloAttivita(corpo.titolo);
+  if (titolo === null) return c.json({ errore: `Titolo attività troppo lungo (max ${MAX_TITOLO} caratteri)` }, 400);
 
   let note: string | null = null;
   if (typeof corpo.note === 'string' && corpo.note.trim() !== '') {
@@ -99,10 +102,10 @@ societa.post('/richieste', async (c) => {
     const esiti = await c.env.DB.batch([
       c.env.DB
         .prepare(
-          `INSERT INTO ricorrenze (societa_id, giorno_settimana, ora_inizio, ora_fine, valida_dal, valida_al, note)
-           VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)`,
+          `INSERT INTO ricorrenze (societa_id, giorno_settimana, ora_inizio, ora_fine, valida_dal, valida_al, titolo, note)
+           VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)`,
         )
-        .bind(soc.id, giorno, oraInizio, oraFine, data, ripetiFinoAl, note),
+        .bind(soc.id, giorno, oraInizio, oraFine, data, ripetiFinoAl, titolo, note),
       stmtAudit(c.env.DB, 'ricorrenza_creata', `${data} → ${ripetiFinoAl} ${oraInizio}-${oraFine}`, `societa:${soc.id}`),
     ]);
     return c.json(
@@ -113,8 +116,8 @@ societa.post('/richieste', async (c) => {
 
   const esiti = await c.env.DB.batch([
     c.env.DB
-      .prepare('INSERT INTO richieste (societa_id, data, ora_inizio, ora_fine, note) VALUES (?1, ?2, ?3, ?4, ?5)')
-      .bind(soc.id, data, oraInizio, oraFine, note),
+      .prepare('INSERT INTO richieste (societa_id, data, ora_inizio, ora_fine, titolo, note) VALUES (?1, ?2, ?3, ?4, ?5, ?6)')
+      .bind(soc.id, data, oraInizio, oraFine, titolo, note),
     stmtAudit(c.env.DB, 'richiesta_creata', `${data} ${oraInizio}-${oraFine}`, `societa:${soc.id}`),
   ]);
   return c.json({ tipo: 'richiesta', id: esiti[0].meta.last_row_id }, 201);

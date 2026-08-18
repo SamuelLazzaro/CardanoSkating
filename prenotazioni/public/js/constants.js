@@ -12,6 +12,9 @@ export const PASSO_MIN = 30;
 /** @type {number} max weekly occurrences of a recurring request (mirrors the server cap) */
 export const MAX_SETTIMANE_RICORRENZA = 4;
 
+/** @type {string} default activity title of a booking (mirrors the server default) */
+export const TITOLO_PREDEFINITO = 'Allenamento';
+
 /** @type {string[]} weekday names, index 0 = lunedì (project-wide convention) */
 export const NOMI_GIORNI = ['lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato', 'domenica'];
 

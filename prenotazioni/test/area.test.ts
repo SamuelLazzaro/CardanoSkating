@@ -50,9 +50,44 @@ describe('invio richieste dalla società', () => {
     expect(risposta.status).toBe(201);
     const corpo = (await risposta.json()) as { tipo: string; id: number };
     expect(corpo.tipo).toBe('richiesta');
-    const riga = await env.DB.prepare('SELECT stato, note FROM richieste WHERE id = ?1').bind(corpo.id).first<{ stato: string; note: string }>();
+    const riga = await env.DB
+      .prepare('SELECT stato, titolo, note FROM richieste WHERE id = ?1')
+      .bind(corpo.id)
+      .first<{ stato: string; titolo: string; note: string }>();
     expect(riga?.stato).toBe('in_attesa');
+    expect(riga?.titolo).toBe('Allenamento'); // default quando il titolo non viene inviato
     expect(riga?.note).toBe('allenamento di prova');
+  });
+
+  it('salva un titolo attività personalizzato, sia sulla richiesta sia sulla ricorrenza', async () => {
+    const { token } = await creaSocietaConToken();
+    const cookie = await cookieSocieta(token);
+
+    const singola = await postJson('/api/societa/richieste', cookie, {
+      titolo: 'Corso principianti', data: dataFutura, ora_inizio: '17:00', ora_fine: '18:00',
+    });
+    expect(singola.status).toBe(201);
+    const { id } = (await singola.json()) as { id: number };
+    const richiesta = await env.DB.prepare('SELECT titolo FROM richieste WHERE id = ?1').bind(id).first<{ titolo: string }>();
+    expect(richiesta?.titolo).toBe('Corso principianti');
+
+    const ricorrente = await postJson('/api/societa/richieste', cookie, {
+      titolo: 'Gara sociale', data: dataFutura, ora_inizio: '20:00', ora_fine: '21:00',
+      ripeti_fino_al: aggiungiGiorni(dataFutura, 14),
+    });
+    expect(ricorrente.status).toBe(201);
+    const { id: idRicorrenza } = (await ricorrente.json()) as { id: number };
+    const ricorrenza = await env.DB.prepare('SELECT titolo FROM ricorrenze WHERE id = ?1').bind(idRicorrenza).first<{ titolo: string }>();
+    expect(ricorrenza?.titolo).toBe('Gara sociale');
+  });
+
+  it('rifiuta un titolo attività oltre i 100 caratteri', async () => {
+    const { token } = await creaSocietaConToken();
+    const cookie = await cookieSocieta(token);
+    const risposta = await postJson('/api/societa/richieste', cookie, {
+      titolo: 'x'.repeat(101), data: dataFutura, ora_inizio: '18:00', ora_fine: '19:00',
+    });
+    expect(risposta.status).toBe(400);
   });
 
   it('rifiuta orari non a passi di 30 minuti', async () => {

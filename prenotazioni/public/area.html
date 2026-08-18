@@ -34,54 +34,26 @@
 
     <div id="vista-area" hidden>
       <section class="pannello">
-        <h2>Nuova richiesta di prenotazione</h2>
-        <form id="form-richiesta" class="modulo" novalidate>
-          <div class="campo">
-            <label for="campo-data">Data</label>
-            <input type="date" id="campo-data" required>
-          </div>
-          <div class="campo-riga">
-            <div class="campo">
-              <label for="campo-inizio">Dalle</label>
-              <select id="campo-inizio"></select>
-            </div>
-            <div class="campo">
-              <label for="campo-fine">Alle</label>
-              <select id="campo-fine"></select>
-            </div>
-          </div>
-          <div class="campo">
-            <label for="campo-note">Note (facoltative)</label>
-            <textarea id="campo-note" maxlength="500" rows="2" placeholder="Es. allenamento under 14"></textarea>
-          </div>
-          <fieldset class="campo">
-            <legend>Ripetizione</legend>
-            <label class="etichetta-check">
-              <input type="checkbox" id="campo-ripeti">
-              Ripeti ogni settimana
-            </label>
-            <div class="campo" id="blocco-fino-al" hidden>
-              <label for="campo-fino-al">fino al (incluso)</label>
-              <input type="date" id="campo-fino-al">
-              <p class="suggerimento">Una richiesta ricorrente può coprire al massimo 4 settimane.</p>
-            </div>
-          </fieldset>
-          <div>
-            <button type="submit" class="btn btn-primario" id="bottone-invia">Invia richiesta</button>
-          </div>
-        </form>
-        <p id="esito-form" class="stato" role="status" hidden></p>
-      </section>
-
-      <section class="pannello">
-        <h2>Calendario</h2>
+        <div class="pannello-testata">
+          <h2>Calendario</h2>
+          <button type="button" class="btn btn-primario" id="bottone-nuova-prenotazione">Nuova prenotazione</button>
+        </div>
+        <p id="esito-richiesta" class="stato" role="status" hidden></p>
         <div class="toolbar" aria-label="Navigazione tra le settimane">
-          <button id="cal-precedente" class="btn btn-freccia" type="button" aria-label="Settimana precedente">‹</button>
+          <button id="cal-precedente" class="btn btn-freccia" type="button" aria-label="Settimana precedente">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <polyline points="15 6 9 12 15 18"></polyline>
+            </svg>
+          </button>
           <div class="toolbar-centro">
             <h3 id="cal-titolo" class="titolo-settimana">&nbsp;</h3>
             <button id="cal-oggi" class="btn btn-testo" type="button">Torna a oggi</button>
           </div>
-          <button id="cal-successiva" class="btn btn-freccia" type="button" aria-label="Settimana successiva">›</button>
+          <button id="cal-successiva" class="btn btn-freccia" type="button" aria-label="Settimana successiva">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <polyline points="9 6 15 12 9 18"></polyline>
+            </svg>
+          </button>
         </div>
         <div class="legenda" aria-hidden="true">
           <span class="chip"><span class="quadretto quadretto-mio"></span> Le tue prenotazioni</span>
@@ -124,6 +96,55 @@
         </div>
       </section>
     </div>
+
+    <dialog id="dialogo-richiesta" class="dialogo" aria-labelledby="titolo-dialogo-richiesta">
+      <div class="dialogo-contenuto">
+        <div class="dialogo-testata">
+          <h2 id="titolo-dialogo-richiesta">Nuova richiesta di prenotazione</h2>
+          <button type="button" class="btn btn-testo" id="bottone-chiudi-dialogo" aria-label="Chiudi">✕</button>
+        </div>
+        <form id="form-richiesta" class="modulo" novalidate>
+          <div class="campo">
+            <label for="campo-titolo">Attività</label>
+            <input type="text" id="campo-titolo" maxlength="100" value="Allenamento">
+          </div>
+          <div class="campo">
+            <label for="campo-data">Data</label>
+            <input type="date" id="campo-data" required>
+          </div>
+          <div class="campo-riga">
+            <div class="campo">
+              <label for="campo-inizio">Dalle</label>
+              <select id="campo-inizio"></select>
+            </div>
+            <div class="campo">
+              <label for="campo-fine">Alle</label>
+              <select id="campo-fine"></select>
+            </div>
+          </div>
+          <div class="campo">
+            <label for="campo-note">Note (facoltative)</label>
+            <textarea id="campo-note" maxlength="500" rows="2" placeholder="Es. allenamento under 14"></textarea>
+          </div>
+          <fieldset class="campo">
+            <legend>Ripetizione</legend>
+            <label class="etichetta-check">
+              <input type="checkbox" id="campo-ripeti">
+              Ripeti ogni settimana
+            </label>
+            <div class="campo" id="blocco-fino-al" hidden>
+              <label for="campo-fino-al">fino al (incluso)</label>
+              <input type="date" id="campo-fino-al">
+              <p class="suggerimento">Una richiesta ricorrente può coprire al massimo 4 settimane.</p>
+            </div>
+          </fieldset>
+          <div>
+            <button type="submit" class="btn btn-primario" id="bottone-invia">Invia richiesta</button>
+          </div>
+        </form>
+        <p id="esito-form" class="stato" role="status" hidden></p>
+      </div>
+    </dialog>
   </main>
 </body>
 </html>

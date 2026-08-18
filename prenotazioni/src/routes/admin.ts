@@ -22,7 +22,7 @@ import {
 } from '../auth';
 import { tentativoConsentito } from '../ratelimit';
 import { eConflittoSlot, trovaConflitti } from '../conflitti';
-import { emailValida, intero, leggiJson, scriviAudit, testo } from '../util';
+import { emailValida, intero, leggiJson, MAX_TITOLO, scriviAudit, testo, titoloAttivita } from '../util';
 
 const STATI_RICHIESTA: StatoRichiesta[] = ['in_attesa', 'approvata', 'rifiutata', 'annullata'];
 const MAX_TENTATIVI_LOGIN = 10;
@@ -69,7 +69,7 @@ admin.get('/richieste', async (c) => {
   if (!STATI_RICHIESTA.includes(stato)) return c.json({ errore: 'Stato non valido' }, 400);
   const { results } = await c.env.DB
     .prepare(
-      `SELECT r.id, r.societa_id, s.nome AS societa, r.data, r.ora_inizio, r.ora_fine, r.stato, r.note,
+      `SELECT r.id, r.societa_id, s.nome AS societa, r.data, r.ora_inizio, r.ora_fine, r.stato, r.titolo, r.note,
               r.ricorrenza_id, r.created_at, r.decisa_at, r.annullata_at
        FROM richieste r JOIN societa s ON s.id = r.societa_id
        WHERE r.stato = ?1 ORDER BY r.data, r.ora_inizio LIMIT 300`,
@@ -194,7 +194,7 @@ admin.get('/ricorrenze', async (c) => {
   const { results } = await c.env.DB
     .prepare(
       `SELECT r.id, r.societa_id, s.nome AS societa, r.giorno_settimana, r.ora_inizio, r.ora_fine,
-              r.valida_dal, r.valida_al, r.stato, r.note, r.created_at
+              r.valida_dal, r.valida_al, r.stato, r.titolo, r.note, r.created_at
        FROM ricorrenze r JOIN societa s ON s.id = r.societa_id
        WHERE r.stato = ?1 ORDER BY r.valida_dal LIMIT 100`,
     )
@@ -252,8 +252,8 @@ admin.post('/ricorrenze/:id/approva', async (c) => {
     c.env.DB
       .prepare(
         `WITH giorno(data) AS (VALUES ${segnapostoGiorni})
-         INSERT INTO richieste (societa_id, data, ora_inizio, ora_fine, stato, note, ricorrenza_id, decisa_at)
-         SELECT ric.societa_id, giorno.data, ric.ora_inizio, ric.ora_fine, 'approvata', ric.note, ric.id, datetime('now')
+         INSERT INTO richieste (societa_id, data, ora_inizio, ora_fine, stato, titolo, note, ricorrenza_id, decisa_at)
+         SELECT ric.societa_id, giorno.data, ric.ora_inizio, ric.ora_fine, 'approvata', ric.titolo, ric.note, ric.id, datetime('now')
          FROM giorno, ricorrenze ric WHERE ric.id = ? AND ric.stato = 'approvata'`,
       )
       .bind(...date, id),
@@ -478,8 +478,10 @@ admin.get('/calendario', async (c) => {
   const lunediSuccessivo = aggiungiGiorni(lunedi, 7);
   const { results } = await c.env.DB
     .prepare(
-      `SELECT p.slot_key, p.societa_id, s.nome AS societa, p.richiesta_id
-       FROM prenotazioni p JOIN societa s ON s.id = p.societa_id
+      `SELECT p.slot_key, p.societa_id, s.nome AS societa, p.richiesta_id, r.titolo
+       FROM prenotazioni p
+       JOIN societa s ON s.id = p.societa_id
+       JOIN richieste r ON r.id = p.richiesta_id
        WHERE p.slot_key >= ?1 AND p.slot_key < ?2 ORDER BY p.slot_key`,
     )
     .bind(`${lunedi}_0000`, `${lunediSuccessivo}_0000`)
@@ -505,6 +507,8 @@ admin.post('/prenotazioni', async (c) => {
   const erroreIntervallo = validaIntervallo(data, oraInizio, oraFine);
   if (erroreIntervallo) return c.json({ errore: erroreIntervallo }, 400);
   if (data < oraRoma(new Date()).data) return c.json({ errore: 'La data è già passata' }, 400);
+  const titolo = titoloAttivita(corpo.titolo);
+  if (titolo === null) return c.json({ errore: `Titolo attività troppo lungo (max ${MAX_TITOLO} caratteri)` }, 400);
   let note: string | null = null;
   if (typeof corpo.note === 'string' && corpo.note.trim() !== '') {
     note = testo(corpo.note, 500);
@@ -522,10 +526,10 @@ admin.post('/prenotazioni', async (c) => {
     esiti = await c.env.DB.batch([
       c.env.DB
         .prepare(
-          `INSERT INTO richieste (societa_id, data, ora_inizio, ora_fine, stato, note, decisa_at)
-           VALUES (?1, ?2, ?3, ?4, 'approvata', ?5, datetime('now'))`,
+          `INSERT INTO richieste (societa_id, data, ora_inizio, ora_fine, stato, titolo, note, decisa_at)
+           VALUES (?1, ?2, ?3, ?4, 'approvata', ?5, ?6, datetime('now'))`,
         )
-        .bind(societaId, data, oraInizio, oraFine, note),
+        .bind(societaId, data, oraInizio, oraFine, titolo, note),
       c.env.DB
         .prepare(
           `WITH slot(chiave) AS (VALUES ${segnaposto})

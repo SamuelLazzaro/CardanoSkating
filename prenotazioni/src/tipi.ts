@@ -26,6 +26,7 @@ export type RichiestaRow = {
   ora_inizio: string;
   ora_fine: string;
   stato: StatoRichiesta;
+  titolo: string;
   note: string | null;
   ricorrenza_id: number | null;
   created_at: string;
@@ -42,6 +43,7 @@ export type RicorrenzaRow = {
   valida_dal: string;
   valida_al: string;
   stato: StatoRichiesta;
+  titolo: string;
   note: string | null;
   created_at: string;
 };
