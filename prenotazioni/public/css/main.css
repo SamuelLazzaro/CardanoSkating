@@ -1,0 +1,4 @@
+/* main.css — entry point: only @imports, no direct styles here. */
+@import url("base.css");
+@import url("layout.css");
+@import url("components.css");

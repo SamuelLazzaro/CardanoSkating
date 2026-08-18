@@ -1,0 +1,182 @@
+# Prenotazioni palazzetto — Cardano Skating S.R.L. S.S.D.
+
+Sistema di prenotazione delle fasce orarie del palazzetto dello sport per le
+società sportive esterne autorizzate. Le società richiedono slot da 30 minuti
+(08:00–24:00, 7 giorni su 7), l'amministratore approva o rifiuta; il vincolo
+`UNIQUE` sul database garantisce che uno slot non possa mai essere prenotato
+due volte.
+
+**Stack**: Cloudflare Workers + [Hono](https://hono.dev) (TypeScript),
+database Cloudflare D1, frontend statico vanilla (HTML/CSS/JS) servito dallo
+stesso Worker. Progettato per stare nei limiti del piano gratuito di Workers.
+
+## Struttura
+
+```
+prenotazioni/
+├── wrangler.jsonc        # configurazione Worker, asset statici, binding D1
+├── migrations/           # migrazioni SQL del database
+├── src/
+│   ├── index.ts          # entry point Hono (security header, mount rotte)
+│   ├── slots.ts          # logica pura date/slot (Europe/Rome)
+│   ├── auth.ts           # sessioni con cookie firmati HMAC-SHA256
+│   ├── ratelimit.ts      # rate limit del login su D1
+│   ├── conflitti.ts      # riconoscimento e diagnostica dei conflitti slot
+│   ├── ics.ts            # generazione calendario iCalendar
+│   └── routes/           # pubblico.ts, societa.ts, admin.ts
+├── public/               # frontend statico
+│   ├── index.html        # calendario pubblico (slot occupati, senza nomi)
+│   ├── area.html         # area riservata delle società
+│   ├── admin.html        # pannello amministrazione
+│   ├── css/              # base / layout / components / main (@import)
+│   └── js/               # constants / utils / api / ui / tap-feedback + entry per pagina
+└── test/                 # vitest + @cloudflare/vitest-pool-workers (D1 reale)
+```
+
+## Prerequisiti
+
+- Node.js ≥ 20 e npm
+- Un account Cloudflare (per deploy e DB remoto): `npx wrangler login`
+
+## Sviluppo locale
+
+```bash
+npm install
+
+# secret locali: copia l'esempio e imposta i valori (il file è ignorato da git)
+cp .dev.vars.example .dev.vars
+
+# crea/aggiorna il database locale (file sqlite in .wrangler/)
+npm run migrate:local
+
+# avvia il dev server su http://localhost:8787
+npm run dev
+```
+
+Pagine: `/` calendario pubblico · `/area` area società · `/admin` pannello
+amministrazione (password = `ADMIN_PASSWORD` di `.dev.vars`).
+
+Per provare l'area società: crea una società dal pannello admin e visita il
+link personale mostrato (`/accesso/<token>`).
+
+Per ripartire da un database locale vuoto: cancella la cartella `.wrangler/`
+e rilancia `npm run migrate:local`.
+
+## Test e controlli
+
+```bash
+npm test              # suite completa (unit + integrazione su D1 reale)
+npm run typecheck     # tsc --noEmit
+```
+
+I test applicano automaticamente le migrazioni a un D1 isolato: non toccano
+il database di sviluppo.
+
+## Migrazioni
+
+Le migrazioni vivono in `migrations/` e vengono applicate in ordine di nome.
+
+```bash
+# creare una nuova migrazione (genera migrations/000N_nome.sql da compilare)
+npx wrangler d1 migrations create cardanoskating-prenotazioni nome_migrazione
+
+# applicare le migrazioni
+npm run migrate:local     # al database locale
+npm run migrate:remote    # al database di produzione (chiede conferma)
+```
+
+## Primo deploy (una tantum)
+
+1. **Crea il database D1** e copia l'id nel campo `database_id` di
+   [wrangler.jsonc](wrangler.jsonc):
+
+   ```bash
+   npx wrangler d1 create cardanoskating-prenotazioni
+   ```
+
+2. **Crea i secret** (mai nel codice, mai in git):
+
+   ```bash
+   # chiave HMAC per la firma dei cookie: una stringa casuale lunga, es.
+   #   openssl rand -hex 32
+   #   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+   npx wrangler secret put ADMIN_SECRET
+
+   # password del pannello admin (robusta: lunga e non riutilizzata)
+   npx wrangler secret put ADMIN_PASSWORD
+   ```
+
+3. **Applica le migrazioni al database remoto**:
+
+   ```bash
+   npm run migrate:remote
+   ```
+
+4. **Pubblica il Worker**:
+
+   ```bash
+   npm run deploy
+   ```
+
+Dopo il primo deploy: entra in `/admin` e aggiorna email/referente della
+società "Cardano Skating S.R.L. S.S.D." (il seed contiene un'email segnaposto).
+
+Per i deploy successivi basta `npm run deploy` (e `npm run migrate:remote` se
+ci sono nuove migrazioni: applicale **prima** del deploy).
+
+## Backup e ripristino del database
+
+```bash
+# backup completo del DB di produzione in un file SQL
+npx wrangler d1 export cardanoskating-prenotazioni --remote --output backup-$(date +%Y%m%d).sql
+
+# backup del DB locale
+npx wrangler d1 export cardanoskating-prenotazioni --local --output backup-locale.sql
+
+# ripristino (su un DB vuoto appena creato)
+npx wrangler d1 execute cardanoskating-prenotazioni --remote --file backup-YYYYMMDD.sql
+```
+
+Consiglio: fai un backup prima di ogni `migrate:remote`.
+
+## Come funziona (in breve)
+
+- **Slot**: ogni prenotazione occupa slot da 30 minuti identificati da
+  `slot_key` (`YYYY-MM-DD_HHMM`, ora civile italiana). Il vincolo `UNIQUE`
+  su `prenotazioni.slot_key` è la garanzia anti-doppia-prenotazione: le
+  approvazioni avvengono in un `db.batch()` atomico e, se anche un solo slot
+  è occupato, l'intera operazione viene annullata e l'admin vede quali slot
+  confliggono e con chi.
+- **Società**: non si registrano da sole. L'admin le crea dal pannello e
+  consegna il link personale `/accesso/<token>`; visitarlo imposta un cookie
+  di sessione firmato (HMAC-SHA256 con `ADMIN_SECRET`). Rigenerare il link o
+  sospendere la società invalida immediatamente ogni sessione già emessa.
+- **Sospensione**: cancella anche tutte le prenotazioni future della società
+  e annulla le sue richieste in attesa (operazione atomica, tracciata in
+  `audit_log`). La riattivazione non ripristina nulla.
+- **Ricorrenze**: una richiesta può ripetersi ogni settimana per massimo
+  4 settimane. All'approvazione le occorrenze vengono materializzate come
+  richieste indipendenti, così una singola data si può annullare senza
+  rompere la serie.
+- **Annullamenti**: le richieste annullate restano nel database con stato
+  `annullata` e timestamp `annullata_at`, per poter verificare quando una
+  società ha rinunciato a uno slot.
+- **Calendario ICS**: ogni società ha un URL `/api/ics/<token>` da importare
+  in Google Calendar (Impostazioni → Aggiungi calendario → Da URL) con le
+  proprie prenotazioni approvate, fuso `Europe/Rome`.
+
+## Note operative
+
+- **Fuso orario**: tutte le date/orari di dominio sono ora civile
+  `Europe/Rome`; i timestamp tecnici (`*_at`) sono UTC.
+- **Limiti piano gratuito**: nessuna query in loop (batch e query aggregate),
+  batch di materializzazione ≤ ~7 statement, niente hashing password pesante
+  (confronto in tempo costante su digest SHA-256).
+- **Versioni**: `wrangler` è bloccato a `~4.35.0` per compatibilità con
+  `@cloudflare/vitest-pool-workers`; `compatibility_date` in `wrangler.jsonc`
+  è vincolata alla versione di workerd inclusa — non alzarla senza aggiornare
+  entrambi.
+- **Rate limit login**: 10 tentativi per IP ogni 15 minuti (tabella
+  `rate_limit` su D1).
+- **Audit**: le azioni rilevanti (accessi, approvazioni, annullamenti,
+  sospensioni, login falliti) sono registrate nella tabella `audit_log`.

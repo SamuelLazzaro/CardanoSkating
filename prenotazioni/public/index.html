@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Calendario di disponibilità del palazzetto dello sport gestito da Cardano Skating S.R.L. S.S.D.">
+  <title>Calendario palazzetto — Cardano Skating S.R.L. S.S.D.</title>
+  <link rel="stylesheet" href="/css/main.css">
+  <script type="module" src="/js/calendario.js"></script>
+</head>
+<body>
+  <header class="testata">
+    <div class="testata-interno">
+      <div>
+        <h1>Palazzetto dello Sport</h1>
+        <p class="sottotitolo">Cardano Skating S.R.L. S.S.D. · calendario disponibilità</p>
+      </div>
+      <nav class="testata-nav">
+        <a href="/area">Area società</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="contenitore">
+    <section class="toolbar" aria-label="Navigazione tra le settimane">
+      <button id="settimana-precedente" class="btn btn-freccia" type="button" aria-label="Settimana precedente">‹</button>
+      <div class="toolbar-centro">
+        <h2 id="titolo-settimana" class="titolo-settimana">&nbsp;</h2>
+        <button id="vai-oggi" class="btn btn-testo" type="button">Torna a oggi</button>
+      </div>
+      <button id="settimana-successiva" class="btn btn-freccia" type="button" aria-label="Settimana successiva">›</button>
+    </section>
+
+    <div class="legenda" aria-hidden="true">
+      <span class="chip"><span class="quadretto quadretto-libero"></span> Libero</span>
+      <span class="chip"><span class="quadretto quadretto-occupato"></span> Occupato</span>
+      <span class="chip"><span class="quadretto quadretto-passato"></span> Passato</span>
+    </div>
+
+    <p id="stato" class="stato" role="status" hidden></p>
+
+    <div class="scorri-griglia">
+      <div id="griglia" class="calendario" aria-label="Calendario settimanale degli slot da 30 minuti"></div>
+    </div>
+  </main>
+
+  <footer class="pie">
+    <p>Slot da 30 minuti, tutti i giorni dalle 08:00 alle 24:00.
+       Le società sportive autorizzate possono richiedere le fasce orarie dalla propria area riservata.</p>
+  </footer>
+</body>
+</html>

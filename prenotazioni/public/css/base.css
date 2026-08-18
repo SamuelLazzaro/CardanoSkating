@@ -1,0 +1,66 @@
+/* ===========================================================================
+   base.css — reset, design tokens, global typography, shared utilities.
+   =========================================================================== */
+
+:root {
+    /* palette */
+    --fondo: #f5f6f8;
+    --superficie: #ffffff;
+    --testo: #22303c;
+    --testo-tenue: #5f6b76;
+    --bordo: #dde2e8;
+    --bordo-forte: #c3ccd6;
+    --accento: #2c5f8a;
+    --accento-scuro: #1f4463;
+    --occupato: #46617e;
+    --occupato-passato: #9aa9ba;
+    --mio-passato: #8fb0c9;
+    --passato: #edf0f3;
+    --oggi: #f3f8fd;
+    --ok: #2e7d54;
+    --errore: #a8442f;
+
+    /* shape & motion */
+    --raggio: 8px;
+    --t-veloce: 0.15s ease; /* hover micro-interactions */
+    --t-tap: 0.25s ease;    /* tap feedback ramp-in (see .is-tapped below) */
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html {
+    -webkit-text-size-adjust: 100%;
+    /* Tap feedback is handled by .is-tapped: the browser's native tap
+       highlight would stack on top of it, so it is switched off. */
+    -webkit-tap-highlight-color: transparent;
+}
+
+body {
+    margin: 0;
+    background: var(--fondo);
+    color: var(--testo);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 16px;
+    line-height: 1.5;
+}
+
+/*
+ * Tap feedback utility. js/tap-feedback.js puts this class on the tapped
+ * element for TAP_FEEDBACK_MS, during which the element shows the same style
+ * as its desktop :hover (see the .componente.is-tapped twin rules next to
+ * each hover). `all` because every component animates different properties;
+ * `!important` so this ramp-in wins over transitions declared by selectors
+ * more specific than a single class. The class outlives only part of the
+ * transition (150ms of 250ms ≈ 88%), so the effect reads as a "pulse".
+ */
+.is-tapped {
+    transition: all var(--t-tap) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    * {
+        transition: none !important;
+    }
+}

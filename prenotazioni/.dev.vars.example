@@ -1,0 +1,4 @@
+# Copiare questo file in .dev.vars (ignorato da git) e valorizzarlo
+# per lo sviluppo locale. In produzione usare `wrangler secret put`.
+ADMIN_SECRET=stringa-casuale-lunga-almeno-32-caratteri
+ADMIN_PASSWORD=password-robusta-per-il-pannello-admin

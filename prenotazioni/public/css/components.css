@@ -1,0 +1,490 @@
+/* ===========================================================================
+   components.css — reusable components: buttons, legend, status messages,
+   panels, forms, badges, lists, weekly calendar grid.
+   =========================================================================== */
+
+/* -------------------------------------------------------------- bottoni */
+
+.btn {
+    /* shared between :hover, :focus-visible and .is-tapped; the variants
+       below override these two properties instead of redeclaring rules */
+    --btn-fondo-attivo: #eef2f6;
+    --btn-bordo-attivo: var(--accento);
+    font: inherit;
+    color: var(--testo);
+    background: var(--superficie);
+    border: 1px solid var(--bordo-forte);
+    border-radius: var(--raggio);
+    padding: 0.45rem 0.9rem;
+    cursor: pointer;
+    transition: background-color var(--t-veloce), border-color var(--t-veloce), color var(--t-veloce);
+}
+
+@media (pointer: fine) {
+    .btn:hover:not(:disabled) {
+        background: var(--btn-fondo-attivo);
+        border-color: var(--btn-bordo-attivo);
+    }
+}
+
+.btn.is-tapped {
+    background: var(--btn-fondo-attivo);
+    border-color: var(--btn-bordo-attivo);
+}
+
+.btn:focus-visible {
+    background: var(--btn-fondo-attivo);
+    border-color: var(--btn-bordo-attivo);
+}
+
+.btn:disabled {
+    opacity: 0.45;
+    cursor: default;
+}
+
+.btn-freccia {
+    font-size: 1.15rem;
+    line-height: 1;
+    padding: 0.45rem 0.85rem;
+}
+
+.btn-testo {
+    --btn-fondo-attivo: transparent;
+    --btn-bordo-attivo: transparent;
+    --btn-testo-colore-attivo: var(--accento-scuro);
+    border: none;
+    background: none;
+    padding: 0.1rem 0.3rem;
+    font-size: 0.82rem;
+    color: var(--accento);
+    text-decoration: underline;
+}
+
+@media (pointer: fine) {
+    .btn-testo:hover:not(:disabled) {
+        color: var(--btn-testo-colore-attivo);
+    }
+}
+
+.btn-testo.is-tapped {
+    color: var(--btn-testo-colore-attivo);
+}
+
+.btn-testo:focus-visible {
+    color: var(--btn-testo-colore-attivo);
+}
+
+.btn-primario {
+    --btn-fondo-attivo: var(--accento-scuro);
+    --btn-bordo-attivo: var(--accento-scuro);
+    background: var(--accento);
+    border-color: var(--accento);
+    color: #fff;
+}
+
+.btn-pericolo {
+    --btn-fondo-attivo: #faf0ed;
+    --btn-bordo-attivo: var(--errore);
+    color: var(--errore);
+    border-color: #dcc0b8;
+}
+
+.btn-piccolo {
+    padding: 0.25rem 0.6rem;
+    font-size: 0.8rem;
+}
+
+.riga-azioni {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+}
+
+/* -------------------------------------------------------------- legenda */
+
+.legenda {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.75rem;
+    font-size: 0.82rem;
+    color: var(--testo-tenue);
+}
+
+.chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.quadretto {
+    width: 0.85rem;
+    height: 0.85rem;
+    border-radius: 3px;
+    border: 1px solid var(--bordo-forte);
+    display: inline-block;
+}
+
+.quadretto-libero {
+    background: var(--superficie);
+}
+
+.quadretto-occupato {
+    background: var(--occupato);
+    border-color: var(--occupato);
+}
+
+.quadretto-passato {
+    background: var(--passato);
+}
+
+.quadretto-mio {
+    background: var(--accento);
+    border-color: var(--accento);
+}
+
+/* ------------------------------------------------------- messaggi stato */
+
+.stato {
+    margin: 0.5rem 0;
+    padding: 0.6rem 0.9rem;
+    border-radius: var(--raggio);
+    background: var(--superficie);
+    border: 1px solid var(--bordo);
+    font-size: 0.9rem;
+}
+
+.stato.errore {
+    border-color: var(--errore);
+    color: var(--errore);
+}
+
+.stato.ok {
+    border-color: var(--ok);
+    color: var(--ok);
+}
+
+/* ------------------------------------------------------------- pannelli */
+
+.pannello {
+    background: var(--superficie);
+    border: 1px solid var(--bordo);
+    border-radius: var(--raggio);
+    padding: 1rem 1.1rem 1.2rem;
+    margin-bottom: 1.25rem;
+}
+
+.pannello > h2 {
+    margin: 0 0 0.75rem;
+    font-size: 1.05rem;
+    font-weight: 650;
+}
+
+.pannello h3 {
+    margin: 1.25rem 0 0.5rem;
+    font-size: 0.95rem;
+    font-weight: 650;
+}
+
+.testo-tenue {
+    color: var(--testo-tenue);
+    font-size: 0.85rem;
+}
+
+/* ---------------------------------------------------------------- moduli */
+
+.modulo {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    max-width: 34rem;
+}
+
+.campo {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.campo-riga {
+    display: flex;
+    gap: 0.85rem;
+    flex-wrap: wrap;
+}
+
+.campo-riga .campo {
+    flex: 1 1 8rem;
+}
+
+.campo label,
+.campo legend {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--testo);
+}
+
+.campo input,
+.campo select,
+.campo textarea {
+    font: inherit;
+    color: var(--testo);
+    background: var(--superficie);
+    border: 1px solid var(--bordo-forte);
+    border-radius: var(--raggio);
+    padding: 0.45rem 0.6rem;
+}
+
+.campo input:focus-visible,
+.campo select:focus-visible,
+.campo textarea:focus-visible {
+    outline: 2px solid var(--accento);
+    outline-offset: 1px;
+}
+
+.campo textarea {
+    resize: vertical;
+}
+
+fieldset.campo {
+    border: 1px dashed var(--bordo-forte);
+    border-radius: var(--raggio);
+    padding: 0.6rem 0.8rem 0.8rem;
+    margin: 0;
+}
+
+.etichetta-check {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+
+.suggerimento {
+    margin: 0.25rem 0 0;
+    font-size: 0.78rem;
+    color: var(--testo-tenue);
+}
+
+.campo-copia {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.campo-copia input {
+    flex: 1 1 14rem;
+    font: inherit;
+    font-size: 0.82rem;
+    color: var(--testo-tenue);
+    border: 1px solid var(--bordo);
+    border-radius: var(--raggio);
+    padding: 0.4rem 0.6rem;
+    background: var(--fondo);
+}
+
+/* ----------------------------------------------------------------- badge */
+
+.badge {
+    display: inline-block;
+    border-radius: 999px;
+    padding: 0.1rem 0.6rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.badge-in_attesa {
+    background: #fdf3dd;
+    color: #8a6116;
+}
+
+.badge-approvata {
+    background: #e2f2e9;
+    color: #2e7d54;
+}
+
+.badge-rifiutata {
+    background: #f9e5e0;
+    color: #a8442f;
+}
+
+.badge-annullata {
+    background: #e9edf1;
+    color: #5f6b76;
+}
+
+.badge-attiva {
+    background: #e2f2e9;
+    color: #2e7d54;
+}
+
+.badge-sospesa {
+    background: #e9edf1;
+    color: #5f6b76;
+}
+
+/* ----------------------------------------------------------------- liste */
+
+.lista {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.lista li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    padding: 0.55rem 0.2rem;
+    border-top: 1px solid var(--bordo);
+}
+
+.lista li:first-child {
+    border-top: none;
+}
+
+.riga-info {
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+}
+
+.riga-info strong {
+    font-size: 0.92rem;
+}
+
+.riga-nota {
+    flex-basis: 100%;
+    margin: 0;
+    font-size: 0.82rem;
+    color: var(--testo-tenue);
+}
+
+.vuoto {
+    margin: 0.25rem 0;
+    font-size: 0.88rem;
+    color: var(--testo-tenue);
+}
+
+/* --------------------------------------------------------------- griglia */
+
+.scorri-griglia {
+    overflow-x: auto;
+    background: var(--superficie);
+    border: 1px solid var(--bordo);
+    border-radius: var(--raggio);
+}
+
+.calendario {
+    display: grid;
+    grid-template-columns: 3.4rem repeat(7, minmax(64px, 1fr));
+    min-width: 580px;
+}
+
+.cal-angolo {
+    border-bottom: 2px solid var(--bordo-forte);
+    position: sticky;
+    left: 0;
+    background: var(--superficie);
+    z-index: 1;
+}
+
+.cal-giorno {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0.45rem 0.2rem;
+    font-size: 0.8rem;
+    font-weight: 650;
+    border-bottom: 2px solid var(--bordo-forte);
+    border-left: 1px solid var(--bordo);
+    text-transform: capitalize;
+}
+
+.cal-giorno-data {
+    font-weight: 400;
+    color: var(--testo-tenue);
+    font-size: 0.75rem;
+}
+
+.cal-giorno.oggi {
+    color: var(--accento);
+}
+
+.cal-giorno.oggi .cal-giorno-data {
+    color: var(--accento);
+    font-weight: 600;
+}
+
+.cal-ora {
+    grid-row: span 2; /* the label covers both the :00 and the :30 slot */
+    font-size: 0.72rem;
+    color: var(--testo-tenue);
+    text-align: right;
+    padding: 0.1rem 0.45rem 0 0;
+    border-top: 1px solid var(--bordo);
+    position: sticky;
+    left: 0;
+    background: var(--superficie);
+    z-index: 1;
+}
+
+.slot {
+    min-height: 22px;
+    background: var(--superficie);
+    border-left: 1px solid var(--bordo);
+    border-top: 1px dotted var(--bordo);
+}
+
+.slot.inizio-ora {
+    border-top: 1px solid var(--bordo);
+}
+
+.slot.colonna-oggi {
+    background: var(--oggi);
+}
+
+.slot.passato {
+    background: var(--passato);
+}
+
+.slot.occupato {
+    background: var(--occupato);
+}
+
+.slot.occupato.passato {
+    background: var(--occupato-passato);
+}
+
+/* slots belonging to the logged-in società (area) or highlighted (admin) */
+.slot.mio {
+    background: var(--accento);
+}
+
+.slot.mio.passato {
+    background: var(--mio-passato);
+}
+
+/* società name shown in the first slot of each booked block (admin view) */
+.slot-nome {
+    display: block;
+    max-width: 100%;
+    font-size: 0.62rem;
+    line-height: 22px;
+    color: #fff;
+    padding: 0 0.2rem;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+@media (max-width: 640px) {
+    .calendario {
+        grid-template-columns: 3rem repeat(7, minmax(56px, 1fr));
+    }
+}

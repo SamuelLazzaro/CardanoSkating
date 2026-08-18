@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex">
+  <title>Area società — Palazzetto Cardano Skating S.R.L. S.S.D.</title>
+  <link rel="stylesheet" href="/css/main.css">
+  <script type="module" src="/js/area.js"></script>
+</head>
+<body>
+  <header class="testata">
+    <div class="testata-interno">
+      <div>
+        <h1>Area società</h1>
+        <p class="sottotitolo" id="sottotitolo-societa">Palazzetto dello Sport · Cardano Skating S.R.L. S.S.D.</p>
+      </div>
+      <nav class="testata-nav">
+        <a href="/">Calendario pubblico</a>
+        <button id="bottone-esci" type="button" hidden>Esci</button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="contenitore">
+    <p id="vista-caricamento" class="stato" role="status">Caricamento…</p>
+
+    <section id="vista-negato" class="pannello" hidden>
+      <h2>Accesso riservato</h2>
+      <p>Questa pagina è riservata alle società sportive autorizzate.
+         Per entrare usa il <strong>link personale</strong> che ti è stato fornito da Cardano Skating S.R.L. S.S.D.</p>
+      <p class="testo-tenue">Se non hai più il link, o se non funziona, contatta la società per fartene inviare uno nuovo.</p>
+    </section>
+
+    <div id="vista-area" hidden>
+      <section class="pannello">
+        <h2>Nuova richiesta di prenotazione</h2>
+        <form id="form-richiesta" class="modulo" novalidate>
+          <div class="campo">
+            <label for="campo-data">Data</label>
+            <input type="date" id="campo-data" required>
+          </div>
+          <div class="campo-riga">
+            <div class="campo">
+              <label for="campo-inizio">Dalle</label>
+              <select id="campo-inizio"></select>
+            </div>
+            <div class="campo">
+              <label for="campo-fine">Alle</label>
+              <select id="campo-fine"></select>
+            </div>
+          </div>
+          <div class="campo">
+            <label for="campo-note">Note (facoltative)</label>
+            <textarea id="campo-note" maxlength="500" rows="2" placeholder="Es. allenamento under 14"></textarea>
+          </div>
+          <fieldset class="campo">
+            <legend>Ripetizione</legend>
+            <label class="etichetta-check">
+              <input type="checkbox" id="campo-ripeti">
+              Ripeti ogni settimana
+            </label>
+            <div class="campo" id="blocco-fino-al" hidden>
+              <label for="campo-fino-al">fino al (incluso)</label>
+              <input type="date" id="campo-fino-al">
+              <p class="suggerimento">Una richiesta ricorrente può coprire al massimo 4 settimane.</p>
+            </div>
+          </fieldset>
+          <div>
+            <button type="submit" class="btn btn-primario" id="bottone-invia">Invia richiesta</button>
+          </div>
+        </form>
+        <p id="esito-form" class="stato" role="status" hidden></p>
+      </section>
+
+      <section class="pannello">
+        <h2>Calendario</h2>
+        <div class="toolbar" aria-label="Navigazione tra le settimane">
+          <button id="cal-precedente" class="btn btn-freccia" type="button" aria-label="Settimana precedente">‹</button>
+          <div class="toolbar-centro">
+            <h3 id="cal-titolo" class="titolo-settimana">&nbsp;</h3>
+            <button id="cal-oggi" class="btn btn-testo" type="button">Torna a oggi</button>
+          </div>
+          <button id="cal-successiva" class="btn btn-freccia" type="button" aria-label="Settimana successiva">›</button>
+        </div>
+        <div class="legenda" aria-hidden="true">
+          <span class="chip"><span class="quadretto quadretto-mio"></span> Le tue prenotazioni</span>
+          <span class="chip"><span class="quadretto quadretto-occupato"></span> Occupato</span>
+          <span class="chip"><span class="quadretto quadretto-libero"></span> Libero</span>
+          <span class="chip"><span class="quadretto quadretto-passato"></span> Passato</span>
+        </div>
+        <p id="cal-stato" class="stato" role="status" hidden></p>
+        <div class="scorri-griglia">
+          <div id="cal-griglia" class="calendario" aria-label="Calendario settimanale degli slot da 30 minuti"></div>
+        </div>
+      </section>
+
+      <section class="pannello">
+        <h2>Le tue richieste in programma</h2>
+        <p id="esito-azioni" class="stato" role="status" hidden></p>
+        <ul id="lista-programma" class="lista"></ul>
+        <p id="vuoto-programma" class="vuoto" hidden>Nessuna richiesta in programma.</p>
+      </section>
+
+      <section class="pannello">
+        <h2>Richieste ricorrenti</h2>
+        <ul id="lista-ricorrenze" class="lista"></ul>
+        <p id="vuoto-ricorrenze" class="vuoto" hidden>Nessuna richiesta ricorrente.</p>
+      </section>
+
+      <section class="pannello">
+        <h2>Storico</h2>
+        <ul id="lista-storico" class="lista"></ul>
+        <p id="vuoto-storico" class="vuoto" hidden>Ancora nessuna richiesta passata.</p>
+      </section>
+
+      <section class="pannello">
+        <h2>Calendario per Google Calendar</h2>
+        <p class="testo-tenue">Importa questo indirizzo in Google Calendar (o in un'altra app di calendario)
+           per vedere le tue prenotazioni approvate, sempre aggiornate.</p>
+        <div class="campo-copia">
+          <input type="text" id="campo-link-ics" readonly>
+          <button type="button" class="btn" id="bottone-copia">Copia</button>
+        </div>
+      </section>
+    </div>
+  </main>
+</body>
+</html>

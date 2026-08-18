@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex">
+  <title>Pannello amministrazione — Palazzetto Cardano Skating S.R.L. S.S.D.</title>
+  <link rel="stylesheet" href="/css/main.css">
+  <script type="module" src="/js/admin.js"></script>
+</head>
+<body>
+  <header class="testata">
+    <div class="testata-interno">
+      <div>
+        <h1>Pannello amministrazione</h1>
+        <p class="sottotitolo">Palazzetto dello Sport · Cardano Skating S.R.L. S.S.D.</p>
+      </div>
+      <nav class="testata-nav">
+        <a href="/">Calendario pubblico</a>
+        <button id="bottone-esci" type="button" hidden>Esci</button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="contenitore">
+    <p id="vista-caricamento" class="stato" role="status">Caricamento…</p>
+
+    <section id="vista-login" class="pannello" hidden>
+      <h2>Accesso amministratore</h2>
+      <form id="form-login" class="modulo">
+        <div class="campo">
+          <label for="campo-password">Password</label>
+          <input type="password" id="campo-password" autocomplete="current-password" required>
+        </div>
+        <div>
+          <button type="submit" class="btn btn-primario" id="bottone-entra">Entra</button>
+        </div>
+      </form>
+      <p id="esito-login" class="stato" role="status" hidden></p>
+    </section>
+
+    <div id="vista-admin" hidden>
+      <section class="pannello">
+        <h2>Richieste in attesa</h2>
+        <p id="esito-attesa" class="stato" role="status" hidden></p>
+        <ul id="lista-richieste-attesa" class="lista"></ul>
+        <p id="vuoto-richieste-attesa" class="vuoto" hidden>Nessuna richiesta in attesa.</p>
+        <h3>Richieste ricorrenti in attesa</h3>
+        <ul id="lista-ricorrenze-attesa" class="lista"></ul>
+        <p id="vuoto-ricorrenze-attesa" class="vuoto" hidden>Nessuna richiesta ricorrente in attesa.</p>
+      </section>
+
+      <section class="pannello">
+        <h2>Calendario settimanale</h2>
+        <div class="toolbar" aria-label="Navigazione tra le settimane">
+          <button id="cal-precedente" class="btn btn-freccia" type="button" aria-label="Settimana precedente">‹</button>
+          <div class="toolbar-centro">
+            <h3 id="cal-titolo" class="titolo-settimana">&nbsp;</h3>
+            <button id="cal-oggi" class="btn btn-testo" type="button">Torna a oggi</button>
+          </div>
+          <button id="cal-successiva" class="btn btn-freccia" type="button" aria-label="Settimana successiva">›</button>
+        </div>
+        <p id="cal-stato" class="stato" role="status" hidden></p>
+        <div class="scorri-griglia">
+          <div id="cal-griglia" class="calendario" aria-label="Calendario settimanale con i nomi delle società"></div>
+        </div>
+        <h3>Prenotazioni della settimana</h3>
+        <p id="esito-cal" class="stato" role="status" hidden></p>
+        <ul id="lista-prenotazioni" class="lista"></ul>
+        <p id="vuoto-prenotazioni" class="vuoto" hidden>Nessuna prenotazione in questa settimana.</p>
+      </section>
+
+      <section class="pannello">
+        <h2>Prenotazione diretta</h2>
+        <form id="form-diretta" class="modulo">
+          <div class="campo">
+            <label for="dir-societa">Società</label>
+            <select id="dir-societa"></select>
+          </div>
+          <div class="campo">
+            <label for="dir-data">Data</label>
+            <input type="date" id="dir-data" required>
+          </div>
+          <div class="campo-riga">
+            <div class="campo">
+              <label for="dir-inizio">Dalle</label>
+              <select id="dir-inizio"></select>
+            </div>
+            <div class="campo">
+              <label for="dir-fine">Alle</label>
+              <select id="dir-fine"></select>
+            </div>
+          </div>
+          <div class="campo">
+            <label for="dir-note">Note (facoltative)</label>
+            <textarea id="dir-note" maxlength="500" rows="2"></textarea>
+          </div>
+          <div>
+            <button type="submit" class="btn btn-primario" id="bottone-diretta">Prenota</button>
+          </div>
+        </form>
+        <p id="esito-diretta" class="stato" role="status" hidden></p>
+      </section>
+
+      <section class="pannello">
+        <h2>Società</h2>
+        <p id="esito-societa" class="stato" role="status" hidden></p>
+        <ul id="lista-societa" class="lista"></ul>
+        <p id="vuoto-societa" class="vuoto" hidden>Nessuna società registrata.</p>
+        <h3 id="titolo-form-societa">Nuova società</h3>
+        <form id="form-societa" class="modulo">
+          <div class="campo-riga">
+            <div class="campo">
+              <label for="soc-nome">Nome</label>
+              <input type="text" id="soc-nome" maxlength="100" required>
+            </div>
+            <div class="campo">
+              <label for="soc-referente">Referente</label>
+              <input type="text" id="soc-referente" maxlength="100" required>
+            </div>
+          </div>
+          <div class="campo-riga">
+            <div class="campo">
+              <label for="soc-email">Email</label>
+              <input type="email" id="soc-email" maxlength="200" required>
+            </div>
+            <div class="campo">
+              <label for="soc-telefono">Telefono (facoltativo)</label>
+              <input type="tel" id="soc-telefono" maxlength="30">
+            </div>
+          </div>
+          <div class="riga-azioni">
+            <button type="submit" class="btn btn-primario" id="bottone-societa">Crea società</button>
+            <button type="button" class="btn" id="bottone-annulla-modifica" hidden>Annulla modifica</button>
+          </div>
+        </form>
+      </section>
+    </div>
+  </main>
+</body>
+</html>

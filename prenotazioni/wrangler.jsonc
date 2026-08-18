@@ -1,0 +1,32 @@
+/**
+ * Configurazione Cloudflare Workers — sistema prenotazioni palazzetto.
+ *
+ * Secret richiesti (mai in questo file, mai in git):
+ *   wrangler secret put ADMIN_SECRET    # chiave HMAC per la firma dei cookie di sessione
+ *   wrangler secret put ADMIN_PASSWORD  # password del pannello admin
+ * Per lo sviluppo locale: copiare .dev.vars.example in .dev.vars e valorizzarlo.
+ */
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "cardanoskating-prenotazioni",
+	"main": "src/index.ts",
+	// Allineata alla versione di workerd inclusa in wrangler ~4.35 (usata anche
+	// dalla pool di test): non alzarla oltre senza aggiornare wrangler.
+	"compatibility_date": "2025-09-01",
+	// Gli asset statici vengono serviti PRIMA del Worker (zero CPU consumata):
+	// gli header di sicurezza per queste risposte stanno in public/_headers.
+	"assets": {
+		"directory": "./public",
+		"binding": "ASSETS"
+	},
+	"d1_databases": [
+		{
+			// "binding" è il nome della variabile con cui il codice vede il DB
+			// (c.env.DB): non deve coincidere col nome del database.
+			"binding": "DB",
+			"database_name": "cardanoskating-prenotazioni",
+			"database_id": "367d3aa4-3be5-4b49-8ce9-98c2425f96b5",
+			"migrations_dir": "./migrations"
+		}
+	]
+}

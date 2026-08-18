@@ -1,0 +1,125 @@
+/* ===========================================================================
+   layout.css — page structure: header, main container, toolbar, footer.
+   =========================================================================== */
+
+/* --------------------------------------------------------------- testata */
+
+.testata {
+    background: var(--accento-scuro);
+    color: #fff;
+}
+
+.testata-interno {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 1.1rem 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.testata h1 {
+    margin: 0;
+    font-size: 1.3rem;
+    font-weight: 650;
+    letter-spacing: 0.01em;
+}
+
+.sottotitolo {
+    margin: 0.1rem 0 0;
+    font-size: 0.85rem;
+    color: #cdd9e4;
+}
+
+.testata-nav {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.testata-nav a,
+.testata-nav button {
+    /* shared between :hover, :focus-visible and .is-tapped */
+    --nav-fondo-attivo: rgba(255, 255, 255, 0.14);
+    font: inherit;
+    color: #fff;
+    background: none;
+    font-size: 0.9rem;
+    text-decoration: none;
+    border: 1px solid rgba(255, 255, 255, 0.45);
+    border-radius: var(--raggio);
+    padding: 0.4rem 0.8rem;
+    cursor: pointer;
+    transition: background-color var(--t-veloce);
+}
+
+@media (pointer: fine) {
+    .testata-nav a:hover,
+    .testata-nav button:hover {
+        background: var(--nav-fondo-attivo);
+    }
+}
+
+.testata-nav a.is-tapped,
+.testata-nav button.is-tapped {
+    background: var(--nav-fondo-attivo);
+}
+
+.testata-nav a:focus-visible,
+.testata-nav button:focus-visible {
+    background: var(--nav-fondo-attivo);
+}
+
+/* ------------------------------------------------------------ struttura */
+
+.contenitore {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 1.25rem 1rem 2rem;
+}
+
+.pie {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 0 1rem 2rem;
+    color: var(--testo-tenue);
+    font-size: 0.85rem;
+}
+
+/* -------------------------------------------------------------- toolbar */
+
+.toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+
+.toolbar-centro {
+    text-align: center;
+}
+
+.titolo-settimana {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 650;
+}
+
+/* ------------------------------------------------------------ responsive */
+
+@media (max-width: 640px) {
+    .testata-interno {
+        padding: 0.9rem 0.8rem;
+    }
+
+    .contenitore {
+        padding: 1rem 0.6rem 1.5rem;
+    }
+
+    .titolo-settimana {
+        font-size: 0.95rem;
+    }
+}
