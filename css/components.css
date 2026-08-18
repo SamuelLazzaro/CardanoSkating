@@ -419,6 +419,22 @@
 }
 
 /* ==========================================================================
+   Prenotazione palazzetto — intro text + contact line for requesting the
+   personal booking link by email. The photo buttons reuse .gallery-item
+   (lightbox, hover and .is-tapped included) and the mailto link inherits
+   the global link color, so no new hover styles here.
+   ========================================================================== */
+.booking-text,
+.booking-contact {
+    color: var(--c-text-soft);
+    font-size: 1.1rem;
+}
+
+.booking-text p:last-child {
+	margin-bottom: 1em;
+}
+
+/* ==========================================================================
    Gallery items
    ========================================================================== */
 .gallery-item {

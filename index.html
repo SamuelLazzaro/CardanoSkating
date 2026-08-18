@@ -6,7 +6,29 @@
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>Cardano Skating S.R.L. S.S.D. — Pattinaggio corsa a rotelle e ghiaccio</title>
 	<meta name="description" data-i18n-content="meta.description"
-		content="Cardano Skating: società di pattinaggio corsa a rotelle e su ghiaccio a Cardano al Campo (VA). Corsi per tutte le età al pattinodromo di via Carreggia.">
+		content="Cardano Skating: società di pattinaggio corsa a rotelle e su ghiaccio a Cardano al Campo (VA). Corsi per tutte le età al pattinodromo di via Carreggia. Palazzetto prenotabile dalle società esterne per gli allenamenti.">
+	<meta name="robots" content="index, follow">
+	<link rel="canonical" href="https://www.cardanoskating.it/">
+
+	<!-- Open Graph (social previews always show the Italian version: scrapers do not run JS) -->
+	<meta property="og:type" content="website">
+	<meta property="og:site_name" content="Cardano Skating">
+	<meta property="og:locale" content="it_IT">
+	<meta property="og:title" content="Cardano Skating — Pattinaggio corsa a rotelle e ghiaccio">
+	<meta property="og:description"
+		content="Società di pattinaggio corsa a rotelle e su ghiaccio a Cardano al Campo (VA). Corsi per tutte le età al pattinodromo di via Carreggia.">
+	<meta property="og:url" content="https://www.cardanoskating.it/">
+	<meta property="og:image" content="https://www.cardanoskating.it/assets/img/og-image.jpg">
+	<meta property="og:image:width" content="1200">
+	<meta property="og:image:height" content="630">
+	<meta property="og:image:alt" content="Vista aerea del pattinodromo di Cardano al Campo">
+
+	<!-- Twitter Card -->
+	<meta name="twitter:card" content="summary_large_image">
+	<meta name="twitter:title" content="Cardano Skating — Pattinaggio corsa a rotelle e ghiaccio">
+	<meta name="twitter:description"
+		content="Società di pattinaggio corsa a rotelle e su ghiaccio a Cardano al Campo (VA). Corsi per tutte le età al pattinodromo di via Carreggia.">
+	<meta name="twitter:image" content="https://www.cardanoskating.it/assets/img/og-image.jpg">
 
 	<link rel="icon" type="image/png" sizes="32x32" href="assets/img/favicon-32.png">
 	<link rel="icon" type="image/png" sizes="192x192" href="assets/img/favicon-192.png">
@@ -17,6 +39,35 @@
 	<link rel="preload" href="assets/fonts/inter-v20-latin-regular.woff2" as="font" type="font/woff2" crossorigin>
 
 	<link rel="stylesheet" href="css/main.css">
+
+	<!-- Structured data for search engines (JSON-LD is data, not executable JS,
+	     and must live inline: Google does not fetch external ld+json files) -->
+	<script type="application/ld+json">
+	{
+		"@context": "https://schema.org",
+		"@type": "SportsClub",
+		"name": "Cardano Skating S.R.L. S.S.D.",
+		"alternateName": "Cardano Skating",
+		"url": "https://www.cardanoskating.it/",
+		"logo": "https://www.cardanoskating.it/assets/img/crest.png",
+		"image": "https://www.cardanoskating.it/assets/img/og-image.jpg",
+		"description": "Società di pattinaggio corsa a rotelle e su ghiaccio a Cardano al Campo (VA). Corsi per tutte le età al pattinodromo di via Carreggia.",
+		"email": "info@cardanoskating.it",
+		"sport": ["Roller speed skating", "Ice speed skating"],
+		"address": {
+			"@type": "PostalAddress",
+			"streetAddress": "Via Carreggia",
+			"addressLocality": "Cardano al Campo",
+			"addressRegion": "VA",
+			"postalCode": "21010",
+			"addressCountry": "IT"
+		},
+		"sameAs": [
+			"https://www.instagram.com/cardano_skating/",
+			"https://www.facebook.com/cardanoskating"
+		]
+	}
+	</script>
 </head>
 
 <body>
@@ -54,6 +105,8 @@
 						data-i18n="nav.disciplines">Discipline</span></a></li>
 			<li><a class="nav-link" href="#impianto"><span
 						data-i18n="nav.venue">Impianto</span></a></li>
+			<li><a class="nav-link" href="#palazzetto"><span
+						data-i18n="nav.booking">Prenotazione Palazzetto</span></a></li>
 			<li><a class="nav-link" href="#corsi"><span
 						data-i18n="nav.courses">Corsi</span></a></li>
 			<li><a class="nav-link" href="#sponsor"><span
@@ -241,8 +294,46 @@
 			</div>
 		</section>
 
+		<!-- ======================= PRENOTAZIONE PALAZZETTO ======================= -->
+		<section class="section section-alt" id="palazzetto">
+			<div class="container">
+				<p class="eyebrow reveal"><span data-i18n="nav.booking">Prenotazione Palazzetto</span></p>
+				<h2 class="section-title reveal" data-i18n="booking.title">Il palazzetto: si corre anche al coperto</h2>
+
+				<div class="booking-content">
+					<div class="booking-text reveal">
+						<p data-i18n="booking.p1">Oltre al pattinodromo all'aperto, le nostre attività passano anche dal
+							palazzetto: uno spazio coperto dove allenarsi tutto l'anno, in ogni condizione meteo.</p>
+						<p data-i18n="booking.p2">Il palazzetto è disponibile anche per le società esterne, che possono
+							prenotarlo per i propri allenamenti.</p>
+					</div>
+					<div class="booking-contact reveal">
+						<p><span data-i18n="booking.contact">Per richiedere il link personale con cui prenotare il palazzetto, scrivi a</span>
+							<a href="mailto:info@cardanoskating.it">info@cardanoskating.it</a>.</p>
+					</div>
+				</div>
+
+				<!-- palazzetto photos: the palazzetto_N.jpeg files are not in the
+				     repo yet, the buttons already point to their final names -->
+				<div class="booking-photos">
+					<button class="gallery-item reveal" data-full="assets/img/palazzetto_1.jpeg">
+						<img src="assets/img/palazzetto_1.jpeg" alt="L'interno del palazzetto"
+							data-i18n-alt="booking.photo1" loading="lazy" width="800" height="450">
+					</button>
+					<button class="gallery-item reveal" data-full="assets/img/palazzetto_2.jpeg">
+						<img src="assets/img/palazzetto_2.jpeg" alt="Il campo di gioco del palazzetto"
+							data-i18n-alt="booking.photo2" loading="lazy" width="800" height="450">
+					</button>
+					<button class="gallery-item reveal" data-full="assets/img/palazzetto_3.jpeg">
+						<img src="assets/img/palazzetto_3.jpeg" alt="Gli spazi del palazzetto"
+							data-i18n-alt="booking.photo3" loading="lazy" width="800" height="450">
+					</button>
+				</div>
+			</div>
+		</section>
+
 		<!-- ======================= CORSI ======================= -->
-		<section class="section section-alt" id="corsi">
+		<section class="section" id="corsi">
 			<div class="container">
 				<p class="eyebrow reveal"><span data-i18n="nav.courses">Corsi</span>
 				</p>
@@ -263,7 +354,7 @@
 		</section>
 
 		<!-- ======================= SPONSOR ======================= -->
-		<section class="section" id="sponsor">
+		<section class="section section-alt" id="sponsor">
 			<div class="container">
 				<p class="eyebrow reveal"><span
 						data-i18n="nav.sponsors">Sponsor</span></p>
@@ -283,7 +374,7 @@
 		</section>
 
 		<!-- ======================= CONTATTI ======================= -->
-		<section class="section section-alt" id="contatti">
+		<section class="section" id="contatti">
 			<div class="container">
 				<p class="eyebrow reveal"><span
 						data-i18n="nav.contacts">Contatti</span></p>

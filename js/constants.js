@@ -78,7 +78,7 @@ export const NAV_CLOSE_LABEL_KEY = "a11y.closeMenu";
 export const TRANSLATIONS = {
     it: {
         "meta.title": "Cardano Skating S.R.L. S.S.D. — Pattinaggio corsa a rotelle e ghiaccio",
-        "meta.description": "Cardano Skating: società di pattinaggio corsa a rotelle e su ghiaccio a Cardano al Campo (VA). Corsi per tutte le età al pattinodromo di via Carreggia.",
+        "meta.description": "Cardano Skating: società di pattinaggio corsa a rotelle e su ghiaccio a Cardano al Campo (VA). Corsi per tutte le età al pattinodromo di via Carreggia. Palazzetto prenotabile dalle società esterne per gli allenamenti.",
 
         "a11y.skip": "Salta al contenuto",
         "a11y.brandHome": "Cardano Skating — Home",
@@ -94,6 +94,7 @@ export const TRANSLATIONS = {
         "nav.about": "Chi siamo",
         "nav.disciplines": "Discipline",
         "nav.venue": "Impianto",
+        "nav.booking": "Prenotazione Palazzetto",
         "nav.courses": "Corsi",
         "nav.sponsors": "Sponsor",
         "nav.contacts": "Contatti",
@@ -130,6 +131,14 @@ export const TRANSLATIONS = {
         "venue.gallery3": "Panoramica dell'impianto e del circuito stradale",
         "venue.gallery4": "Il pattinodromo immerso nel verde",
         "venue.gallery6": "La pista sotto i riflettori in notturna",
+
+        "booking.title": "Il palazzetto: si corre anche al coperto",
+        "booking.p1": "Oltre al pattinodromo all'aperto, le nostre attività passano anche dal palazzetto: uno spazio coperto dove allenarsi tutto l'anno, in ogni condizione meteo.",
+        "booking.p2": "Il palazzetto è disponibile anche per le società esterne, che possono prenotarlo per i propri allenamenti.",
+        "booking.contact": "Per richiedere il link personale con cui prenotare il palazzetto, scrivi a",
+        "booking.photo1": "L'interno del palazzetto",
+        "booking.photo2": "Il campo di gioco del palazzetto",
+        "booking.photo3": "Gli spazi del palazzetto",
 
         "courses.title": "In pista si comincia da piccoli. O da grandi.",
         "courses.p1": "Dai primi passi sui pattini fino all'agonismo: i nostri corsi accompagnano bambini, ragazzi e adulti con lo staff tecnico della società. Scrivici per conoscere giorni, orari e come provare.",
@@ -240,7 +249,7 @@ export const TRANSLATIONS = {
 
     en: {
         "meta.title": "Cardano Skating S.R.L. S.S.D. — Roller and ice speed skating",
-        "meta.description": "Cardano Skating: roller and ice speed skating club in Cardano al Campo (VA), Italy. Courses for all ages at the via Carreggia skating track.",
+        "meta.description": "Cardano Skating: roller and ice speed skating club in Cardano al Campo (VA), Italy. Courses for all ages at the via Carreggia skating track. Sports hall available for external clubs to book for training.",
 
         "a11y.skip": "Skip to content",
         "a11y.brandHome": "Cardano Skating — Home",
@@ -256,6 +265,7 @@ export const TRANSLATIONS = {
         "nav.about": "About us",
         "nav.disciplines": "Disciplines",
         "nav.venue": "Venue",
+        "nav.booking": "Sports Hall Booking",
         "nav.courses": "Courses",
         "nav.sponsors": "Sponsors",
         "nav.contacts": "Contacts",
@@ -292,6 +302,14 @@ export const TRANSLATIONS = {
         "venue.gallery3": "Overview of the venue and the road circuit",
         "venue.gallery4": "The skating track surrounded by greenery",
         "venue.gallery6": "The track under the floodlights at night",
+
+        "booking.title": "The sports hall: racing indoors too",
+        "booking.p1": "Alongside the outdoor skating track, our activities also run through the sports hall: an indoor space to train all year round, whatever the weather.",
+        "booking.p2": "The hall is also available to external clubs, which can book it for their own training sessions.",
+        "booking.contact": "To request the personal link to book the hall, write to",
+        "booking.photo1": "Inside the sports hall",
+        "booking.photo2": "The sports hall floor",
+        "booking.photo3": "The sports hall spaces",
 
         "courses.title": "You can start young. Or grown up.",
         "courses.p1": "From the very first steps on skates to competitive racing: our courses support kids, teens and adults with the club's technical staff. Write to us to find out days, times and how to try.",
