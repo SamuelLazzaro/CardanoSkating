@@ -69,11 +69,13 @@ pubblico.get('/api/ics/:token', async (c) => {
     .first<{ id: number; nome: string }>();
   if (!societa) return c.text('Non trovato', 404);
 
+  // Solo le prenotazioni vere e proprie: una richiesta di annullamento
+  // approvata ha stato 'approvata' ma non è un evento in calendario.
   const da = aggiungiGiorni(oraRoma(new Date()).data, -60);
   const { results } = await c.env.DB
     .prepare(
       `SELECT id, data, ora_inizio, ora_fine, note FROM richieste
-       WHERE societa_id = ?1 AND stato = 'approvata' AND data >= ?2
+       WHERE societa_id = ?1 AND stato = 'approvata' AND tipo = 'nuova' AND data >= ?2
        ORDER BY data, ora_inizio LIMIT 500`,
     )
     .bind(societa.id, da)

@@ -17,6 +17,7 @@ import {
   aggiungiGiorni,
   chiaveSlot,
   dataEstesa,
+  eColoreEsadecimale,
   espandiSlot,
   etichettaGiorno,
   giorniSettimana,
@@ -32,6 +33,7 @@ import {
   ottieniCalendario,
   ottieniProfiloSocieta,
   ottieniRichiesteSocieta,
+  richiediAnnullamento,
 } from './api.js';
 import { costruisciGriglia, creaBadge, mostraMessaggio, preparaDialogo } from './ui.js';
 
@@ -71,6 +73,15 @@ async function avvia() {
   elemento('sottotitolo-societa').textContent = profilo.societa.nome;
   elemento('campo-link-ics').value = profilo.link_ics;
   elemento('bottone-esci').hidden = false;
+
+  // Società color on the whole area view: the .con-colore rules recolor the
+  // own slots in the grid AND the matching legend square (defence in depth:
+  // the value is re-validated before touching the inline style).
+  if (eColoreEsadecimale(profilo.societa.colore)) {
+    const vistaArea = elemento('vista-area');
+    vistaArea.classList.add('con-colore');
+    vistaArea.style.setProperty('--colore-societa', profilo.societa.colore);
+  }
 
   preparaForm();
   await caricaRichieste();
@@ -212,11 +223,44 @@ async function caricaRichieste() {
 }
 
 /**
+ * Admin decision motivation shown next to the state badge (always via
+ * textContent: it is free text typed by the admin).
+ * @param {string} motivazione - decision motivation from the API
+ * @returns {HTMLSpanElement}
+ */
+function creaTestoMotivazione(motivazione) {
+  const testo = document.createElement('span');
+  testo.className = 'testo-tenue';
+  testo.textContent = `Motivazione: ${motivazione}`;
+  return testo;
+}
+
+/**
+ * @param {string} testo - button label
+ * @param {() => void} azione - click handler
+ * @returns {HTMLButtonElement}
+ */
+function bottoneRiga(testo, azione) {
+  const bottone = document.createElement('button');
+  bottone.type = 'button';
+  bottone.className = 'btn btn-pericolo';
+  bottone.textContent = testo;
+  bottone.addEventListener('click', azione);
+  return bottone;
+}
+
+/**
+ * Builds one row of the programma/storico lists. The available action depends
+ * on the richiesta: a pending one can be withdrawn directly ("Annulla", or
+ * "Ritira" for a pending annullamento request); an approved booking can only
+ * be cancelled by asking the admin ("Richiedi annullamento"), unless such a
+ * request is already pending.
  * @param {object} richiesta - richiesta row from the API
- * @param {boolean} conAnnulla - whether to show the cancel button
+ * @param {boolean} inProgramma - whether the row is in the upcoming list (with actions)
+ * @param {Set<number>} conAnnullamentoPendente - ids of bookings with a pending annullamento request
  * @returns {HTMLLIElement}
  */
-function creaRigaRichiesta(richiesta, conAnnulla) {
+function creaRigaRichiesta(richiesta, inProgramma, conAnnullamentoPendente) {
   const riga = document.createElement('li');
   const info = document.createElement('div');
   info.className = 'riga-info';
@@ -226,6 +270,8 @@ function creaRigaRichiesta(richiesta, conAnnulla) {
   const orario = document.createElement('span');
   orario.textContent = `${richiesta.ora_inizio}–${richiesta.ora_fine}`;
   info.append(dataForte, orario, creaBadge(richiesta.stato));
+  if (richiesta.tipo === 'annullamento') info.append(creaBadge('annullamento'));
+  if (richiesta.motivazione) info.append(creaTestoMotivazione(richiesta.motivazione));
 
   if (richiesta.ricorrenza_id !== null) {
     const settimanale = document.createElement('span');
@@ -242,13 +288,19 @@ function creaRigaRichiesta(richiesta, conAnnulla) {
     riga.append(nota);
   }
 
-  if (conAnnulla) {
-    const bottone = document.createElement('button');
-    bottone.type = 'button';
-    bottone.className = 'btn btn-pericolo';
-    bottone.textContent = 'Annulla';
-    bottone.addEventListener('click', () => annulla(richiesta));
-    riga.append(bottone);
+  if (inProgramma) {
+    if (richiesta.stato === 'in_attesa') {
+      riga.append(bottoneRiga(richiesta.tipo === 'annullamento' ? 'Ritira' : 'Annulla', () => annulla(richiesta)));
+    } else if (richiesta.stato === 'approvata') {
+      if (conAnnullamentoPendente.has(richiesta.id)) {
+        const avviso = document.createElement('span');
+        avviso.className = 'testo-tenue';
+        avviso.textContent = 'Annullamento richiesto, in attesa di conferma';
+        riga.append(avviso);
+      } else {
+        riga.append(bottoneRiga('Richiedi annullamento', () => richiediAnnullamentoPrenotazione(richiesta)));
+      }
+    }
   }
   return riga;
 }
@@ -261,8 +313,23 @@ function renderRichieste(richieste) {
   const adesso = adessoRoma();
   const eFutura = (richiesta) =>
     richiesta.data > adesso.data || (richiesta.data === adesso.data && richiesta.ora_inizio > adesso.ora);
+  // In programma: bookings still alive (pending or approved) plus pending
+  // annullamento requests; an APPROVED annullamento request is a closed act
+  // and belongs to the storico.
   const eAttiva = (richiesta) =>
-    (richiesta.stato === 'in_attesa' || richiesta.stato === 'approvata') && eFutura(richiesta);
+    eFutura(richiesta) && (
+      richiesta.tipo === 'annullamento'
+        ? richiesta.stato === 'in_attesa'
+        : richiesta.stato === 'in_attesa' || richiesta.stato === 'approvata'
+    );
+
+  // Bookings that already have a pending annullamento request: their row
+  // shows a notice instead of the "Richiedi annullamento" button.
+  const conAnnullamentoPendente = new Set(
+    richieste
+      .filter((richiesta) => richiesta.tipo === 'annullamento' && richiesta.stato === 'in_attesa')
+      .map((richiesta) => richiesta.richiesta_riferimento_id),
+  );
 
   const inProgramma = richieste.filter(eAttiva)
     .sort((a, b) => (a.data + a.ora_inizio).localeCompare(b.data + b.ora_inizio));
@@ -272,12 +339,12 @@ function renderRichieste(richieste) {
 
   const listaProgramma = elemento('lista-programma');
   listaProgramma.textContent = '';
-  for (const richiesta of inProgramma) listaProgramma.append(creaRigaRichiesta(richiesta, true));
+  for (const richiesta of inProgramma) listaProgramma.append(creaRigaRichiesta(richiesta, true, conAnnullamentoPendente));
   elemento('vuoto-programma').hidden = inProgramma.length > 0;
 
   const listaStorico = elemento('lista-storico');
   listaStorico.textContent = '';
-  for (const richiesta of storico) listaStorico.append(creaRigaRichiesta(richiesta, false));
+  for (const richiesta of storico) listaStorico.append(creaRigaRichiesta(richiesta, false, conAnnullamentoPendente));
   elemento('vuoto-storico').hidden = storico.length > 0;
 }
 
@@ -301,6 +368,7 @@ function renderRicorrenze(ricorrenze) {
     periodo.className = 'testo-tenue';
     periodo.textContent = `dal ${dataEstesa(ricorrenza.valida_dal)} al ${dataEstesa(ricorrenza.valida_al)}`;
     info.append(giornoForte, orario, periodo, creaBadge(ricorrenza.stato));
+    if (ricorrenza.motivazione) info.append(creaTestoMotivazione(ricorrenza.motivazione));
     riga.append(info);
 
     if (ricorrenza.note) {
@@ -324,17 +392,47 @@ function renderRicorrenze(ricorrenze) {
 }
 
 /**
- * @param {object} richiesta - richiesta to cancel
+ * Withdraws a pending richiesta (nuova or annullamento request).
+ * @param {object} richiesta - pending richiesta to withdraw
  * @returns {Promise<void>}
  */
 async function annulla(richiesta) {
-  const conferma = confirm(`Annullare la richiesta di ${dataEstesa(richiesta.data)} ${richiesta.ora_inizio}–${richiesta.ora_fine}?`);
+  const descrizione = `${dataEstesa(richiesta.data)} ${richiesta.ora_inizio}–${richiesta.ora_fine}`;
+  const conferma = confirm(
+    richiesta.tipo === 'annullamento'
+      ? `Ritirare la richiesta di annullamento per ${descrizione}? La prenotazione resterà valida.`
+      : `Annullare la richiesta di ${descrizione}?`,
+  );
   if (!conferma) return;
   try {
     await annullaRichiesta(richiesta.id);
-    mostraMessaggio(elemento('esito-azioni'), 'Richiesta annullata.', 'ok');
+    mostraMessaggio(
+      elemento('esito-azioni'),
+      richiesta.tipo === 'annullamento' ? 'Richiesta di annullamento ritirata.' : 'Richiesta annullata.',
+      'ok',
+    );
     await caricaRichieste();
     await caricaCalendario();
+  } catch (errore) {
+    mostraMessaggio(elemento('esito-azioni'), errore.message, 'errore');
+  }
+}
+
+/**
+ * Sends the annullamento request for an approved booking: nothing is freed
+ * until the admin approves it.
+ * @param {object} richiesta - approved future richiesta to cancel
+ * @returns {Promise<void>}
+ */
+async function richiediAnnullamentoPrenotazione(richiesta) {
+  const conferma = confirm(
+    `Chiedere l'annullamento della prenotazione di ${dataEstesa(richiesta.data)} ${richiesta.ora_inizio}–${richiesta.ora_fine}?\n\nGli slot restano prenotati finché l'amministratore non approva la richiesta.`,
+  );
+  if (!conferma) return;
+  try {
+    await richiediAnnullamento(richiesta.id);
+    mostraMessaggio(elemento('esito-azioni'), "Richiesta di annullamento inviata: in attesa dell'amministratore.", 'ok');
+    await caricaRichieste();
   } catch (errore) {
     mostraMessaggio(elemento('esito-azioni'), errore.message, 'errore');
   }
@@ -367,12 +465,14 @@ function spostaSettimana(giorni) {
   caricaCalendario();
 }
 
-/** @returns {Set<string>} slot keys of the società's approved richieste in the shown week */
+/** @returns {Set<string>} slot keys of the società's approved bookings in the shown week */
 function mieiSlotSettimana() {
   const fineSettimana = aggiungiGiorni(g_lunediArea, 7);
   const chiavi = new Set();
   for (const richiesta of g_richieste) {
-    if (richiesta.stato !== 'approvata') continue;
+    // Only real bookings hold slots: an approved annullamento request is the
+    // opposite (its referenced booking has just been freed).
+    if (richiesta.tipo !== 'nuova' || richiesta.stato !== 'approvata') continue;
     if (richiesta.data < g_lunediArea || richiesta.data >= fineSettimana) continue;
     for (const chiave of espandiSlot(richiesta.data, richiesta.ora_inizio, richiesta.ora_fine)) {
       chiavi.add(chiave);

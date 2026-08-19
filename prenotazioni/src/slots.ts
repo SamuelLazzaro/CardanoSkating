@@ -109,6 +109,18 @@ export function occorrenzeRicorrenza(validaDal: string, validaAl: string, giorno
   return date;
 }
 
+/** 'YYYY-MM' con mese 01-12 (parametro del report mensile). */
+export function isMeseValido(valore: string): boolean {
+  return /^\d{4}-(0[1-9]|1[0-2])$/.test(valore);
+}
+
+/** Mese successivo: '2026-12' → '2027-01' (per i range lessicografici sul mese). */
+export function meseSuccessivo(mese: string): string {
+  const [anno, numeroMese] = mese.split('-').map(Number);
+  if (numeroMese === 12) return `${anno + 1}-01`;
+  return `${anno}-${String(numeroMese + 1).padStart(2, '0')}`;
+}
+
 /** Converte un istante assoluto in data e ora civili italiane. */
 export function oraRoma(istante: Date): { data: string; ora: string } {
   const parti = new Intl.DateTimeFormat('it-IT', {

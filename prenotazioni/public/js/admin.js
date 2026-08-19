@@ -6,17 +6,19 @@
  * suspend/reactivate, personal-link regeneration).
  */
 import { avviaTapFeedback } from './tap-feedback.js';
-import { NOMI_GIORNI, PASSO_MIN, TITOLO_PREDEFINITO } from './constants.js';
+import { COLORE_PREDEFINITO, MIN_MOTIVAZIONE, NOMI_GIORNI, PASSO_MIN, TITOLO_PREDEFINITO } from './constants.js';
 import {
   adessoRoma,
   aggiungiGiorni,
   chiaveSlot,
   dataEstesa,
+  eColoreEsadecimale,
   etichettaGiorno,
   formattaSlotKey,
   giorniSettimana,
   lunediDellaSettimana,
   minutiDaOra,
+  numeroItaliano,
   oraTesto,
   titoloSettimana,
 } from './utils.js';
@@ -31,6 +33,7 @@ import {
   esciAdmin,
   ottieniCalendarioAdmin,
   ottieniElencoSocieta,
+  ottieniReport,
   ottieniRichiesteAdmin,
   ottieniRicorrenzeAdmin,
   riattivaSocieta,
@@ -103,6 +106,9 @@ function preparaEventi() {
     g_lunediAdmin = lunediDellaSettimana(adessoRoma().data);
     caricaCalendario();
   });
+
+  elemento('report-mese').value = oggi.slice(0, 7);
+  elemento('report-mese').addEventListener('change', caricaReport);
 }
 
 /**
@@ -134,6 +140,7 @@ async function caricaPannello() {
   elemento('bottone-esci').hidden = false;
   elemento('vista-admin').hidden = false;
   await caricaCalendario();
+  await caricaReport();
 }
 
 /** @returns {Promise<void>} */
@@ -185,6 +192,9 @@ function renderRichiesteAttesa(richieste) {
     const quando = document.createElement('span');
     quando.textContent = `${dataEstesa(richiesta.data)} · ${richiesta.ora_inizio}–${richiesta.ora_fine}`;
     info.append(nome, attivita, quando);
+    // Annullamento requests share the pending list but must stand out:
+    // approving one FREES the referenced booking instead of adding slots.
+    if (richiesta.tipo === 'annullamento') info.append(creaBadge('annullamento'));
     riga.append(info);
     if (richiesta.note) {
       const nota = document.createElement('p');
@@ -224,20 +234,43 @@ function azioniDecisione(suApprova, suRifiuta) {
 }
 
 /**
+ * Asks the admin for the mandatory decision motivation via prompt().
+ * @param {boolean} approvare - true for approval (prefilled "Ok"), false for rejection
+ * @param {HTMLElement} esito - where to show the too-short error message
+ * @returns {string|null} trimmed motivation, or null if cancelled or too short
+ */
+function chiediMotivazione(approvare, esito) {
+  const messaggio = approvare
+    ? "Motivazione dell'approvazione (obbligatoria):"
+    : 'Motivazione del rifiuto (obbligatoria):';
+  const inserito = prompt(messaggio, approvare ? 'Ok' : '');
+  if (inserito === null) return null; // cancelled by the admin
+  const motivazione = inserito.trim();
+  if (motivazione.length < MIN_MOTIVAZIONE) {
+    mostraMessaggio(esito, `La motivazione è obbligatoria (minimo ${MIN_MOTIVAZIONE} caratteri).`, 'errore');
+    return null;
+  }
+  return motivazione;
+}
+
+/**
  * @param {object} richiesta - pending richiesta
  * @param {boolean} approvare - true to approve, false to reject
  * @returns {Promise<void>}
  */
 async function decidiRichiesta(richiesta, approvare) {
   const esito = elemento('esito-attesa');
+  const motivazione = chiediMotivazione(approvare, esito);
+  if (motivazione === null) return;
   try {
     if (approvare) {
-      const risposta = await approvaRichiesta(richiesta.id);
-      mostraMessaggio(esito, `Richiesta di ${richiesta.societa} approvata (${risposta.slot_inseriti} slot).`, 'ok');
+      const risposta = await approvaRichiesta(richiesta.id, motivazione);
+      const dettaglio = richiesta.tipo === 'annullamento'
+        ? `annullamento approvato (${risposta.slot_liberati} slot liberati)`
+        : `richiesta approvata (${risposta.slot_inseriti} slot)`;
+      mostraMessaggio(esito, `${richiesta.societa}: ${dettaglio}.`, 'ok');
     } else {
-      const motivo = prompt('Motivo del rifiuto (facoltativo):');
-      if (motivo === null) return; // annullato dall'admin
-      await rifiutaRichiesta(richiesta.id, motivo);
+      await rifiutaRichiesta(richiesta.id, motivazione);
       mostraMessaggio(esito, `Richiesta di ${richiesta.societa} rifiutata.`, 'ok');
     }
     await caricaInAttesa();
@@ -293,12 +326,14 @@ function renderRicorrenzeAttesa(ricorrenze) {
  */
 async function decidiRicorrenza(ricorrenza, approvare) {
   const esito = elemento('esito-attesa');
+  const motivazione = chiediMotivazione(approvare, esito);
+  if (motivazione === null) return;
   try {
     if (approvare) {
-      const risposta = await approvaRicorrenza(ricorrenza.id);
+      const risposta = await approvaRicorrenza(ricorrenza.id, motivazione);
       mostraMessaggio(esito, `Ricorrenza di ${ricorrenza.societa} approvata: ${risposta.occorrenze.length} date prenotate (${risposta.occorrenze.map(dataEstesa).join(', ')}).`, 'ok');
     } else {
-      await rifiutaRicorrenza(ricorrenza.id);
+      await rifiutaRicorrenza(ricorrenza.id, motivazione);
       mostraMessaggio(esito, `Ricorrenza di ${ricorrenza.societa} rifiutata.`, 'ok');
     }
     await caricaInAttesa();
@@ -340,15 +375,56 @@ async function caricaCalendario() {
 }
 
 /**
- * @param {{slot_key: string, societa: string, richiesta_id: number, titolo: string}[]} prenotazioni
+ * Small colored square used in the legend and in the società list. The color
+ * is re-validated before touching the inline style (defence in depth: it is
+ * data coming from the DB).
+ * @param {string} colore - '#RRGGBB' società color from the API
+ * @returns {HTMLSpanElement}
+ */
+function creaQuadrettoColore(colore) {
+  const quadretto = document.createElement('span');
+  quadretto.className = 'quadretto';
+  if (eColoreEsadecimale(colore)) {
+    quadretto.style.background = colore;
+    quadretto.style.borderColor = colore;
+  }
+  return quadretto;
+}
+
+/**
+ * Renders the società↔color legend of the shown week (one chip per società
+ * with at least one booking).
+ * @param {{societa_id: number, societa: string, colore: string}[]} prenotazioni
+ * @returns {void}
+ */
+function renderLegendaCalendario(prenotazioni) {
+  /** @type {Map<number, {societa: string, colore: string}>} */
+  const perSocieta = new Map(prenotazioni.map((p) => [p.societa_id, p]));
+  const legenda = elemento('cal-legenda');
+  legenda.textContent = '';
+  const ordinate = [...perSocieta.values()].sort((a, b) => a.societa.localeCompare(b.societa));
+  for (const voce of ordinate) {
+    const chip = document.createElement('span');
+    chip.className = 'chip';
+    const nome = document.createElement('span');
+    nome.textContent = voce.societa;
+    chip.append(creaQuadrettoColore(voce.colore), nome);
+    legenda.append(chip);
+  }
+  legenda.hidden = ordinate.length === 0;
+}
+
+/**
+ * @param {{slot_key: string, societa: string, colore: string, richiesta_id: number, titolo: string}[]} prenotazioni
  * @returns {void}
  */
 function renderCalendario(prenotazioni) {
-  /** @type {Map<string, {societa: string, richiesta_id: number, titolo: string}>} */
+  /** @type {Map<string, {societa: string, colore: string, richiesta_id: number, titolo: string}>} */
   const perChiave = new Map(prenotazioni.map((p) => [p.slot_key, p]));
   const adesso = adessoRoma();
   const chiaveAdesso = chiaveSlot(adesso.data, Math.floor(adesso.minuti / PASSO_MIN) * PASSO_MIN);
 
+  renderLegendaCalendario(prenotazioni);
   costruisciGriglia(
     elemento('cal-griglia'),
     giorniSettimana(g_lunediAdmin),
@@ -359,16 +435,19 @@ function renderCalendario(prenotazioni) {
       let descrizione = 'libero';
       if (prenotazione) {
         cella.classList.add('occupato');
+        if (eColoreEsadecimale(prenotazione.colore)) {
+          cella.classList.add('colorato');
+          cella.style.setProperty('--colore-societa', prenotazione.colore);
+        }
         descrizione = `${prenotazione.societa} · ${prenotazione.titolo}`;
         /*
          * Block label: società name plus activity title, written only in the
          * first slot of each booked block. To keep every grid row at its
          * fixed height, the label is an absolutely positioned overlay sized
          * on the number of consecutive slots of the same richiesta (CSS var
-         * --slot-del-blocco, see .blocco-etichetta): the second text line
-         * lives over the following cell of the SAME block instead of
-         * stretching the first row. On single-slot blocks there is no second
-         * cell, so only the name is shown and the title stays in the tooltip.
+         * --slot-del-blocco, see .blocco-etichetta): the slot height fits
+         * both text lines, the overlay height only clips overflowing text at
+         * the block boundary so it never covers a different booking.
          */
         const chiavePrecedente = chiaveSlot(giorno, minuti - PASSO_MIN);
         const inizioBlocco = perChiave.get(chiavePrecedente)?.richiesta_id !== prenotazione.richiesta_id;
@@ -383,13 +462,10 @@ function renderCalendario(prenotazioni) {
           const nome = document.createElement('span');
           nome.className = 'slot-nome';
           nome.textContent = prenotazione.societa;
-          etichettaBlocco.append(nome);
-          if (slotDelBlocco >= 2) {
-            const attivita = document.createElement('span');
-            attivita.className = 'slot-attivita';
-            attivita.textContent = prenotazione.titolo;
-            etichettaBlocco.append(attivita);
-          }
+          const attivita = document.createElement('span');
+          attivita.className = 'slot-attivita';
+          attivita.textContent = prenotazione.titolo;
+          etichettaBlocco.append(nome, attivita);
           cella.classList.add('con-etichetta');
           cella.append(etichettaBlocco);
         }
@@ -513,6 +589,70 @@ async function prenotaDiretta(evento) {
   }
 }
 
+/* ------------------------------------------------------------------ report */
+
+/**
+ * @param {string} tag - 'td' or 'th'
+ * @param {string} testo - cell text
+ * @param {boolean} [numerica] - right-aligned numeric cell
+ * @returns {HTMLTableCellElement}
+ */
+function cellaReport(tag, testo, numerica = false) {
+  const cella = document.createElement(tag);
+  if (numerica) cella.className = 'cella-numero';
+  cella.textContent = testo;
+  return cella;
+}
+
+/** @returns {Promise<void>} loads and renders the monthly report */
+async function caricaReport() {
+  const mese = elemento('report-mese').value;
+  if (!mese) return;
+  const esito = elemento('esito-report');
+  try {
+    const dati = await ottieniReport(mese);
+    renderReport(dati);
+    mostraMessaggio(esito, '');
+  } catch (errore) {
+    mostraMessaggio(esito, errore.message, 'errore');
+  }
+}
+
+/**
+ * @param {{mese: string, righe: {societa: string, tariffa_oraria: number, ore: number, importo: number}[], totale: {ore: number, importo: number}}} dati
+ * @returns {void}
+ */
+function renderReport(dati) {
+  const corpoTabella = elemento('report-righe');
+  corpoTabella.textContent = '';
+  for (const riga of dati.righe) {
+    const tr = document.createElement('tr');
+    tr.append(
+      cellaReport('td', riga.societa),
+      cellaReport('td', numeroItaliano(riga.ore, 1), true),
+      cellaReport('td', numeroItaliano(riga.tariffa_oraria, 2), true),
+      cellaReport('td', numeroItaliano(riga.importo, 2), true),
+    );
+    corpoTabella.append(tr);
+  }
+
+  const rigaTotale = elemento('report-totale');
+  rigaTotale.textContent = '';
+  rigaTotale.append(
+    cellaReport('th', 'Totale'),
+    cellaReport('th', numeroItaliano(dati.totale.ore, 1), true),
+    cellaReport('th', ''),
+    cellaReport('th', numeroItaliano(dati.totale.importo, 2), true),
+  );
+
+  const conDati = dati.righe.length > 0;
+  elemento('tabella-report').hidden = !conDati;
+  elemento('vuoto-report').hidden = conDati;
+  const linkCsv = elemento('report-csv');
+  linkCsv.href = `/api/admin/report.csv?mese=${dati.mese}`;
+  linkCsv.hidden = !conDati;
+}
+
 /* ----------------------------------------------------------------- società */
 
 /**
@@ -554,12 +694,17 @@ function renderSocieta(societa) {
     info.className = 'riga-info';
     const nome = document.createElement('strong');
     nome.textContent = soc.nome;
-    info.append(nome, creaBadge(soc.stato));
+    info.append(creaQuadrettoColore(soc.colore), nome, creaBadge(soc.stato));
     riga.append(info);
 
     const dettagli = document.createElement('p');
     dettagli.className = 'riga-nota';
-    dettagli.textContent = [soc.referente, soc.email, soc.telefono].filter(Boolean).join(' · ');
+    dettagli.textContent = [
+      soc.referente,
+      soc.email,
+      soc.telefono,
+      `tariffa ${numeroItaliano(soc.tariffa_oraria, 2)} €/h`,
+    ].filter(Boolean).join(' · ');
     riga.append(dettagli);
 
     const azioni = document.createElement('div');
@@ -567,6 +712,7 @@ function renderSocieta(societa) {
     azioni.append(
       bottoneAzione('Copia link', 'btn', (bottone) => copiaLink(soc, bottone)),
       bottoneAzione('Modifica', 'btn', () => impostaModifica(soc)),
+      bottoneAzione('Tariffa', 'btn', () => modificaTariffa(soc)),
       bottoneAzione('Rigenera link', 'btn', () => rigenera(soc)),
       soc.stato === 'attiva'
         ? bottoneAzione('Sospendi', 'btn btn-pericolo', () => sospendi(soc))
@@ -623,6 +769,7 @@ function impostaModifica(soc) {
   elemento('soc-referente').value = soc?.referente ?? '';
   elemento('soc-email').value = soc?.email ?? '';
   elemento('soc-telefono').value = soc?.telefono ?? '';
+  elemento('soc-colore').value = eColoreEsadecimale(soc?.colore) ? soc.colore : COLORE_PREDEFINITO;
   if (soc) elemento('soc-nome').focus();
 }
 
@@ -638,6 +785,7 @@ async function salvaSocieta(evento) {
     referente: elemento('soc-referente').value.trim(),
     email: elemento('soc-email').value.trim(),
     telefono: elemento('soc-telefono').value.trim(),
+    colore: elemento('soc-colore').value,
   };
   try {
     if (g_societaInModifica) {
@@ -649,6 +797,30 @@ async function salvaSocieta(evento) {
     }
     impostaModifica(null);
     await caricaSocieta();
+  } catch (errore) {
+    mostraMessaggio(esito, errore.message, 'errore');
+  }
+}
+
+/**
+ * Updates the società hourly rate via prompt() (accepts the decimal comma).
+ * @param {object} soc - società whose tariffa is edited
+ * @returns {Promise<void>}
+ */
+async function modificaTariffa(soc) {
+  const esito = elemento('esito-societa');
+  const inserito = prompt(`Tariffa oraria di ${soc.nome} (€/h):`, numeroItaliano(soc.tariffa_oraria, 2));
+  if (inserito === null) return; // cancelled by the admin
+  const tariffa = Number(inserito.trim().replace(',', '.'));
+  if (!Number.isFinite(tariffa) || tariffa < 0) {
+    mostraMessaggio(esito, 'Tariffa non valida: inserisci un numero maggiore o uguale a 0.', 'errore');
+    return;
+  }
+  try {
+    await aggiornaSocietaAdmin(soc.id, { tariffa_oraria: tariffa });
+    mostraMessaggio(esito, `Tariffa di ${soc.nome} aggiornata a ${numeroItaliano(tariffa, 2)} €/h.`, 'ok');
+    await caricaSocieta();
+    await caricaReport(); // the report importi depend on the tariffa
   } catch (errore) {
     mostraMessaggio(esito, errore.message, 'errore');
   }

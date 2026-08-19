@@ -15,6 +15,20 @@ export function eConflittoSlot(errore: unknown): boolean {
   );
 }
 
+/**
+ * Riconosce la violazione dell'indice UNIQUE parziale della migrazione 0005:
+ * esiste già una richiesta di annullamento in attesa per la stessa
+ * prenotazione. A seconda della versione di SQLite il messaggio riporta la
+ * colonna oppure il nome dell'indice, quindi si accettano entrambi.
+ */
+export function eAnnullamentoDuplicato(errore: unknown): boolean {
+  if (!(errore instanceof Error) || !errore.message.includes('UNIQUE constraint failed')) return false;
+  return (
+    errore.message.includes('richieste.richiesta_riferimento_id') ||
+    errore.message.includes('idx_richieste_annullamento_pendente')
+  );
+}
+
 export type Conflitto = { slot_key: string; societa: string };
 
 /**

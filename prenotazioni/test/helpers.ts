@@ -89,8 +89,12 @@ export async function cookieAdmin(): Promise<string> {
   return setCookie.split(';')[0];
 }
 
-export async function postAdmin(percorso: string, cookie: string): Promise<Response> {
-  return await app.request(percorso, { method: 'POST', headers: { Cookie: cookie } }, env);
+/** POST admin, con corpo JSON facoltativo (es. la motivazione delle decisioni). */
+export async function postAdmin(percorso: string, cookie: string, corpo?: unknown): Promise<Response> {
+  if (corpo === undefined) {
+    return await app.request(percorso, { method: 'POST', headers: { Cookie: cookie } }, env);
+  }
+  return await postJson(percorso, cookie, corpo);
 }
 
 /** slot_key prenotati per una richiesta, in ordine. */

@@ -137,7 +137,7 @@ describe('invio richieste dalla società', () => {
 });
 
 describe('annullamento dalla società', () => {
-  it('annulla una richiesta approvata liberando gli slot e salvando annullata_at', async () => {
+  it('ritira una richiesta ancora in attesa salvando annullata_at', async () => {
     const { token } = await creaSocietaConToken();
     const cookieSoc = await cookieSocieta(token);
     const creazione = await postJson('/api/societa/richieste', cookieSoc, {
@@ -147,19 +147,33 @@ describe('annullamento dalla società', () => {
     });
     const { id } = (await creazione.json()) as { id: number };
 
-    const cookieAmm = await cookieAdmin();
-    expect((await postAdmin(`/api/admin/richieste/${id}/approva`, cookieAmm)).status).toBe(200);
-    expect((await slotDiRichiesta(id)).length).toBe(2);
-
     const annullamento = await postJson(`/api/societa/richieste/${id}/annulla`, cookieSoc, {});
     expect(annullamento.status).toBe(200);
-    expect(await slotDiRichiesta(id)).toEqual([]);
     const riga = await env.DB
       .prepare('SELECT stato, annullata_at FROM richieste WHERE id = ?1')
       .bind(id)
       .first<{ stato: string; annullata_at: string | null }>();
     expect(riga?.stato).toBe('annullata');
     expect(riga?.annullata_at).not.toBeNull();
+  });
+
+  it('una prenotazione approvata non si annulla direttamente: 409 e slot intatti', async () => {
+    const { token } = await creaSocietaConToken();
+    const cookieSoc = await cookieSocieta(token);
+    const creazione = await postJson('/api/societa/richieste', cookieSoc, {
+      data: dataFutura,
+      ora_inizio: '18:00',
+      ora_fine: '19:00',
+    });
+    const { id } = (await creazione.json()) as { id: number };
+    const cookieAmm = await cookieAdmin();
+    expect((await postAdmin(`/api/admin/richieste/${id}/approva`, cookieAmm, { motivazione: 'Ok' })).status).toBe(200);
+
+    const tentativo = await postJson(`/api/societa/richieste/${id}/annulla`, cookieSoc, {});
+    expect(tentativo.status).toBe(409);
+    expect((await slotDiRichiesta(id)).length).toBe(2);
+    const riga = await env.DB.prepare('SELECT stato FROM richieste WHERE id = ?1').bind(id).first<{ stato: string }>();
+    expect(riga?.stato).toBe('approvata');
   });
 
   it('non permette di annullare richieste di altre società', async () => {

@@ -114,7 +114,7 @@ export function richiedeSocieta(): MiddlewareHandler<{ Bindings: Bindings; Varia
     if (!parti || parti.length !== 2) return c.json({ errore: 'Sessione non valida o scaduta' }, 401);
     const [idTesto, tokenHashSessione] = parti;
     const societa = await c.env.DB
-      .prepare('SELECT id, nome, referente, email, telefono, stato, token_accesso, created_at FROM societa WHERE id = ?1')
+      .prepare('SELECT id, nome, referente, email, telefono, stato, colore, token_accesso, created_at FROM societa WHERE id = ?1')
       .bind(Number(idTesto))
       .first<SocietaRow>();
     if (!societa || societa.stato !== 'attiva') return c.json({ errore: 'Accesso non più valido' }, 401);

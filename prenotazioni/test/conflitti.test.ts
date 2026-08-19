@@ -40,7 +40,7 @@ describe('approvazione richiesta', () => {
     const societaId = await creaSocieta();
     const richiestaId = await creaRichiesta(societaId, '2030-01-07', '18:00', '19:30');
 
-    const risposta = await postAdmin(`/api/admin/richieste/${richiestaId}/approva`, cookie);
+    const risposta = await postAdmin(`/api/admin/richieste/${richiestaId}/approva`, cookie, { motivazione: 'Ok' });
     expect(risposta.status).toBe(200);
     expect(await slotDiRichiesta(richiestaId)).toEqual(['2030-01-07_1800', '2030-01-07_1830', '2030-01-07_1900']);
     expect(await statoRichiesta(richiestaId)).toBe('approvata');
@@ -53,8 +53,8 @@ describe('approvazione richiesta', () => {
     const prima = await creaRichiesta(societaA, '2030-01-07', '18:00', '19:30');
     const seconda = await creaRichiesta(societaB, '2030-01-07', '19:00', '20:30'); // sovrapposta su 19:00-19:30
 
-    expect((await postAdmin(`/api/admin/richieste/${prima}/approva`, cookie)).status).toBe(200);
-    const risposta = await postAdmin(`/api/admin/richieste/${seconda}/approva`, cookie);
+    expect((await postAdmin(`/api/admin/richieste/${prima}/approva`, cookie, { motivazione: 'Ok' })).status).toBe(200);
+    const risposta = await postAdmin(`/api/admin/richieste/${seconda}/approva`, cookie, { motivazione: 'Ok' });
     expect(risposta.status).toBe(409);
 
     const corpo = (await risposta.json()) as RispostaConflitto;
@@ -74,7 +74,7 @@ describe('materializzazione ricorrenza', () => {
     const societaId = await creaSocieta();
     const ricorrenzaId = await creaRicorrenza(societaId, 0, '18:00', '19:00', '2030-01-07', '2030-01-28', 'Corso avanzato');
 
-    const risposta = await postAdmin(`/api/admin/ricorrenze/${ricorrenzaId}/approva`, cookie);
+    const risposta = await postAdmin(`/api/admin/ricorrenze/${ricorrenzaId}/approva`, cookie, { motivazione: 'Ok' });
     expect(risposta.status).toBe(200);
 
     const richieste = await env.DB
@@ -97,11 +97,11 @@ describe('materializzazione ricorrenza', () => {
     // Un'altra società occupa 18:30-19:00 del terzo lunedì.
     const altra = await creaSocieta('Altra Società');
     const occupante = await creaRichiesta(altra, '2030-01-21', '18:30', '19:00');
-    expect((await postAdmin(`/api/admin/richieste/${occupante}/approva`, cookie)).status).toBe(200);
+    expect((await postAdmin(`/api/admin/richieste/${occupante}/approva`, cookie, { motivazione: 'Ok' })).status).toBe(200);
 
     const societaId = await creaSocieta();
     const ricorrenzaId = await creaRicorrenza(societaId, 0, '18:00', '19:00', '2030-01-07', '2030-01-28');
-    const risposta = await postAdmin(`/api/admin/ricorrenze/${ricorrenzaId}/approva`, cookie);
+    const risposta = await postAdmin(`/api/admin/ricorrenze/${ricorrenzaId}/approva`, cookie, { motivazione: 'Ok' });
     expect(risposta.status).toBe(409);
 
     const corpo = (await risposta.json()) as RispostaConflitto;
@@ -129,7 +129,7 @@ describe('annullamento', () => {
     const societaA = await creaSocieta('Società A');
     const societaB = await creaSocieta('Società B');
     const prima = await creaRichiesta(societaA, '2030-01-07', '18:00', '19:00');
-    expect((await postAdmin(`/api/admin/richieste/${prima}/approva`, cookie)).status).toBe(200);
+    expect((await postAdmin(`/api/admin/richieste/${prima}/approva`, cookie, { motivazione: 'Ok' })).status).toBe(200);
 
     const annullamento = await postAdmin(`/api/admin/richieste/${prima}/annulla`, cookie);
     expect(annullamento.status).toBe(200);
@@ -143,7 +143,7 @@ describe('annullamento', () => {
 
     // La stessa fascia ora è di nuovo prenotabile.
     const seconda = await creaRichiesta(societaB, '2030-01-07', '18:00', '19:00');
-    expect((await postAdmin(`/api/admin/richieste/${seconda}/approva`, cookie)).status).toBe(200);
+    expect((await postAdmin(`/api/admin/richieste/${seconda}/approva`, cookie, { motivazione: 'Ok' })).status).toBe(200);
     expect(await slotDiRichiesta(seconda)).toEqual(['2030-01-07_1800', '2030-01-07_1830']);
   });
 });

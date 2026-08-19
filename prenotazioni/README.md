@@ -158,9 +158,37 @@ Consiglio: fai un backup prima di ogni `migrate:remote`.
   4 settimane. All'approvazione le occorrenze vengono materializzate come
   richieste indipendenti, così una singola data si può annullare senza
   rompere la serie.
-- **Annullamenti**: le richieste annullate restano nel database con stato
-  `annullata` e timestamp `annullata_at`, per poter verificare quando una
-  società ha rinunciato a uno slot.
+- **Annullamenti** (migrazione `0005`): una richiesta ancora in attesa può
+  essere ritirata direttamente dalla società; una prenotazione approvata
+  futura invece si annulla solo con una richiesta di tipo `annullamento`
+  (riferita alla prenotazione, al massimo una pendente per volta grazie a un
+  indice UNIQUE parziale) che l'admin approva — liberando gli slot in un
+  batch atomico — o rifiuta, sempre con motivazione. L'admin conserva la
+  cancellazione diretta immediata dal suo pannello (che fa decadere le
+  richieste di annullamento pendenti). Le richieste annullate restano nel
+  database con stato `annullata` e timestamp `annullata_at`, per poter
+  verificare quando una società ha rinunciato a uno slot.
+- **Motivazione delle decisioni** (migrazione `0004`): approvare o rifiutare
+  una richiesta o una ricorrenza richiede una motivazione (2–300 caratteri,
+  validata lato server). Per l'approvazione può essere breve ("ok"), per il
+  rifiuto deve spiegare il perché. La motivazione è salvata sulla riga decisa
+  (per le ricorrenze viene copiata in ogni richiesta materializzata), è
+  visibile alla società nella sua area accanto allo stato ed è registrata in
+  `audit_log`.
+- **Colore per società** (migrazione `0006`): l'admin assegna a ogni società
+  un colore `#RRGGBB` (validato lato server, default `#3b82f6`) alla
+  creazione o dalla modifica. Nel calendario admin ogni prenotazione usa il
+  colore della sua società (sfondo semitrasparente + barra piena, con legenda
+  della settimana); nell'area società le proprie prenotazioni usano il
+  proprio colore. Il calendario pubblico resta neutro e anonimo.
+- **Tariffe e report mensile** (migrazione `0007`): ogni società ha una
+  tariffa oraria (€/h), impostata dall'admin dal suo pannello (la creazione
+  parte da 0). La vista "Report mensile" mostra, con una sola query aggregata,
+  ore prenotate (slot approvati / 2), tariffa e importo per società più la
+  riga totale; `GET /api/admin/report.csv?mese=AAAA-MM` esporta una riga per
+  prenotazione in CSV per Excel italiano (BOM UTF-8, separatore `;`, numeri
+  con la virgola, `Content-Disposition: attachment`). Le tariffe non
+  compaiono mai nell'area società né nella parte pubblica.
 - **Calendario ICS**: ogni società ha un URL `/api/ics/<token>` da importare
   in Google Calendar (Impostazioni → Aggiungi calendario → Da URL) con le
   proprie prenotazioni approvate, fuso `Europe/Rome`.

@@ -73,6 +73,7 @@
           </button>
         </div>
         <p id="cal-stato" class="stato" role="status" hidden></p>
+        <div id="cal-legenda" class="legenda" aria-label="Legenda dei colori delle società" hidden></div>
         <div class="scorri-griglia">
           <div id="cal-griglia" class="calendario" aria-label="Calendario settimanale con i nomi delle società"></div>
         </div>
@@ -80,6 +81,35 @@
         <p id="esito-cal" class="stato" role="status" hidden></p>
         <ul id="lista-prenotazioni" class="lista"></ul>
         <p id="vuoto-prenotazioni" class="vuoto" hidden>Nessuna prenotazione in questa settimana.</p>
+      </section>
+
+      <section class="pannello">
+        <div class="pannello-testata">
+          <h2>Report mensile</h2>
+          <a id="report-csv" class="btn" href="#" hidden>Scarica CSV</a>
+        </div>
+        <div class="campo report-selettore">
+          <label for="report-mese">Mese</label>
+          <input type="month" id="report-mese">
+        </div>
+        <p id="esito-report" class="stato" role="status" hidden></p>
+        <div class="scorri-tabella">
+          <table id="tabella-report" class="tabella-report" hidden>
+            <thead>
+              <tr>
+                <th scope="col">Società</th>
+                <th scope="col" class="cella-numero">Ore</th>
+                <th scope="col" class="cella-numero">Tariffa €/h</th>
+                <th scope="col" class="cella-numero">Importo €</th>
+              </tr>
+            </thead>
+            <tbody id="report-righe"></tbody>
+            <tfoot>
+              <tr id="report-totale"></tr>
+            </tfoot>
+          </table>
+        </div>
+        <p id="vuoto-report" class="vuoto" hidden>Nessuna prenotazione nel mese selezionato.</p>
       </section>
 
       <section class="pannello">
@@ -108,6 +138,10 @@
               <label for="soc-telefono">Telefono (facoltativo)</label>
               <input type="tel" id="soc-telefono" maxlength="30">
             </div>
+          </div>
+          <div class="campo">
+            <label for="soc-colore">Colore distintivo (calendario admin e area società)</label>
+            <input type="color" id="soc-colore" value="#3b82f6">
           </div>
           <div class="riga-azioni">
             <button type="submit" class="btn btn-primario" id="bottone-societa">Crea società</button>

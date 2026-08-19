@@ -3,8 +3,10 @@ import type { Bindings, RichiestaRow, RicorrenzaRow, StatoRichiesta } from '../t
 import {
   aggiungiGiorni,
   isDataValida,
+  isMeseValido,
   lunediDellaSettimana,
   MAX_SETTIMANE_RICORRENZA,
+  meseSuccessivo,
   occorrenzeRicorrenza,
   oraRoma,
   slotKeyCorrente,
@@ -22,11 +24,27 @@ import {
 } from '../auth';
 import { tentativoConsentito } from '../ratelimit';
 import { eConflittoSlot, trovaConflitti } from '../conflitti';
-import { emailValida, intero, leggiJson, MAX_TITOLO, scriviAudit, testo, titoloAttivita } from '../util';
+import {
+  COLORE_PREDEFINITO,
+  coloreEsadecimale,
+  emailValida,
+  intero,
+  leggiJson,
+  MAX_MOTIVAZIONE,
+  MAX_TITOLO,
+  MIN_MOTIVAZIONE,
+  motivazioneDecisione,
+  scriviAudit,
+  tariffaOraria,
+  testo,
+  titoloAttivita,
+} from '../util';
 
 const STATI_RICHIESTA: StatoRichiesta[] = ['in_attesa', 'approvata', 'rifiutata', 'annullata'];
 const MAX_TENTATIVI_LOGIN = 10;
 const FINESTRA_LOGIN_S = 15 * 60;
+
+const ERRORE_MOTIVAZIONE = `Serve una motivazione (da ${MIN_MOTIVAZIONE} a ${MAX_MOTIVAZIONE} caratteri)`;
 
 export const admin = new Hono<{ Bindings: Bindings }>();
 
@@ -69,8 +87,9 @@ admin.get('/richieste', async (c) => {
   if (!STATI_RICHIESTA.includes(stato)) return c.json({ errore: 'Stato non valido' }, 400);
   const { results } = await c.env.DB
     .prepare(
-      `SELECT r.id, r.societa_id, s.nome AS societa, r.data, r.ora_inizio, r.ora_fine, r.stato, r.titolo, r.note,
-              r.ricorrenza_id, r.created_at, r.decisa_at, r.annullata_at
+      `SELECT r.id, r.societa_id, s.nome AS societa, r.data, r.ora_inizio, r.ora_fine, r.stato, r.tipo,
+              r.richiesta_riferimento_id, r.titolo, r.note, r.motivazione, r.ricorrenza_id,
+              r.created_at, r.decisa_at, r.annullata_at
        FROM richieste r JOIN societa s ON s.id = r.societa_id
        WHERE r.stato = ?1 ORDER BY r.data, r.ora_inizio LIMIT 300`,
     )
@@ -80,7 +99,9 @@ admin.get('/richieste', async (c) => {
 });
 
 /**
- * Approvazione di una richiesta singola, in un solo db.batch() atomico:
+ * Approvazione di una richiesta singola, in un solo db.batch() atomico.
+ *
+ * Per una richiesta di tipo 'nuova':
  *   1. la richiesta passa ad 'approvata' (con guardia su stato='in_attesa',
  *      per non approvare due volte in caso di richieste concorrenti);
  *   2. le prenotazioni vengono inserite con INSERT..SELECT che produce righe
@@ -88,14 +109,25 @@ admin.get('/richieste', async (c) => {
  * Se anche un solo slot è già occupato, il vincolo UNIQUE su slot_key fa
  * fallire l'intero batch (rollback implicito): a quel punto una singola query
  * diagnostica dice all'admin esattamente quali slot confliggono e con chi.
+ *
+ * Per una richiesta di tipo 'annullamento':
+ *   1. la richiesta di annullamento passa ad 'approvata' (stessa guardia);
+ *   2. gli slot della prenotazione originaria vengono liberati (DELETE);
+ *   3. la prenotazione originaria passa ad 'annullata' con annullata_at.
+ * I passi 2 e 3 hanno una guardia EXISTS sull'esito del passo 1: se la
+ * richiesta non era più in attesa non toccano nulla.
  */
 admin.post('/richieste/:id/approva', async (c) => {
   const id = intero(c.req.param('id'));
   if (id === null) return c.json({ errore: 'Identificativo non valido' }, 400);
+  const corpo = await leggiJson(c);
+  const motivazione = motivazioneDecisione(corpo?.motivazione);
+  if (motivazione === null) return c.json({ errore: ERRORE_MOTIVAZIONE }, 400);
 
   const richiesta = await c.env.DB
     .prepare(
-      `SELECT r.id, r.societa_id, r.data, r.ora_inizio, r.ora_fine, r.stato, s.stato AS societa_stato
+      `SELECT r.id, r.societa_id, r.data, r.ora_inizio, r.ora_fine, r.stato, r.tipo, r.richiesta_riferimento_id,
+              s.stato AS societa_stato
        FROM richieste r JOIN societa s ON s.id = r.societa_id WHERE r.id = ?1`,
     )
     .bind(id)
@@ -107,14 +139,58 @@ admin.post('/richieste/:id/approva', async (c) => {
   if (richiesta.societa_stato !== 'attiva') return c.json({ errore: 'La società è sospesa' }, 409);
   if (richiesta.data < oraRoma(new Date()).data) return c.json({ errore: 'La data della richiesta è già passata' }, 409);
 
+  if (richiesta.tipo === 'annullamento') {
+    const originaria = await c.env.DB
+      .prepare("SELECT id, stato FROM richieste WHERE id = ?1")
+      .bind(richiesta.richiesta_riferimento_id)
+      .first<{ id: number; stato: string }>();
+    if (!originaria || originaria.stato !== 'approvata') {
+      return c.json({ errore: 'La prenotazione da annullare non è più attiva' }, 409);
+    }
+
+    const esiti = await c.env.DB.batch([
+      c.env.DB
+        .prepare(
+          `UPDATE richieste SET stato = 'approvata', decisa_at = datetime('now'), motivazione = ?2
+           WHERE id = ?1 AND stato = 'in_attesa'`,
+        )
+        .bind(id, motivazione),
+      c.env.DB
+        .prepare(
+          `DELETE FROM prenotazioni WHERE richiesta_id = ?1
+           AND EXISTS (SELECT 1 FROM richieste ann WHERE ann.id = ?2 AND ann.stato = 'approvata')`,
+        )
+        .bind(originaria.id, id),
+      c.env.DB
+        .prepare(
+          `UPDATE richieste SET stato = 'annullata', annullata_at = datetime('now')
+           WHERE id = ?1 AND stato = 'approvata'
+           AND EXISTS (SELECT 1 FROM richieste ann WHERE ann.id = ?2 AND ann.stato = 'approvata')`,
+        )
+        .bind(originaria.id, id),
+    ]);
+    if ((esiti[0].meta.changes ?? 0) === 0) return c.json({ errore: 'La richiesta non è più in attesa' }, 409);
+
+    await scriviAudit(
+      c.env.DB,
+      'annullamento_approvato',
+      `richiesta ${originaria.id} annullata su richiesta ${id} (${richiesta.data} ${richiesta.ora_inizio}-${richiesta.ora_fine}) — motivazione: ${motivazione}`,
+      'admin',
+    );
+    return c.json({ ok: true, slot_liberati: esiti[1].meta.changes ?? 0 });
+  }
+
   const chiavi = slotKeys(richiesta.data, richiesta.ora_inizio, richiesta.ora_fine);
   const segnaposto = chiavi.map(() => '(?)').join(', ');
   let esiti: D1Result[];
   try {
     esiti = await c.env.DB.batch([
       c.env.DB
-        .prepare("UPDATE richieste SET stato = 'approvata', decisa_at = datetime('now') WHERE id = ?1 AND stato = 'in_attesa'")
-        .bind(id),
+        .prepare(
+          `UPDATE richieste SET stato = 'approvata', decisa_at = datetime('now'), motivazione = ?2
+           WHERE id = ?1 AND stato = 'in_attesa'`,
+        )
+        .bind(id, motivazione),
       c.env.DB
         .prepare(
           `WITH slot(chiave) AS (VALUES ${segnaposto})
@@ -130,7 +206,12 @@ admin.post('/richieste/:id/approva', async (c) => {
   }
   if ((esiti[1].meta.changes ?? 0) === 0) return c.json({ errore: 'La richiesta non è più in attesa' }, 409);
 
-  await scriviAudit(c.env.DB, 'richiesta_approvata', `richiesta ${id} (${richiesta.data} ${richiesta.ora_inizio}-${richiesta.ora_fine})`, 'admin');
+  await scriviAudit(
+    c.env.DB,
+    'richiesta_approvata',
+    `richiesta ${id} (${richiesta.data} ${richiesta.ora_inizio}-${richiesta.ora_fine}) — motivazione: ${motivazione}`,
+    'admin',
+  );
   return c.json({ ok: true, slot_inseriti: chiavi.length });
 });
 
@@ -138,14 +219,18 @@ admin.post('/richieste/:id/rifiuta', async (c) => {
   const id = intero(c.req.param('id'));
   if (id === null) return c.json({ errore: 'Identificativo non valido' }, 400);
   const corpo = await leggiJson(c);
-  const motivo = typeof corpo?.motivo === 'string' ? (testo(corpo.motivo, 300) ?? '') : '';
+  const motivazione = motivazioneDecisione(corpo?.motivazione);
+  if (motivazione === null) return c.json({ errore: ERRORE_MOTIVAZIONE }, 400);
 
   const esito = await c.env.DB
-    .prepare("UPDATE richieste SET stato = 'rifiutata', decisa_at = datetime('now') WHERE id = ?1 AND stato = 'in_attesa'")
-    .bind(id)
+    .prepare(
+      `UPDATE richieste SET stato = 'rifiutata', decisa_at = datetime('now'), motivazione = ?2
+       WHERE id = ?1 AND stato = 'in_attesa'`,
+    )
+    .bind(id, motivazione)
     .run();
   if ((esito.meta.changes ?? 0) === 0) return c.json({ errore: 'Richiesta non trovata o non più in attesa' }, 409);
-  await scriviAudit(c.env.DB, 'richiesta_rifiutata', `richiesta ${id}${motivo ? ` — motivo: ${motivo}` : ''}`, 'admin');
+  await scriviAudit(c.env.DB, 'richiesta_rifiutata', `richiesta ${id} — motivazione: ${motivazione}`, 'admin');
   return c.json({ ok: true });
 });
 
@@ -178,6 +263,14 @@ admin.post('/richieste/:id/annulla', async (c) => {
          WHERE id = ?1 AND stato IN ('in_attesa', 'approvata')`,
       )
       .bind(id),
+    // Le eventuali richieste di annullamento pendenti che puntavano a questa
+    // prenotazione decadono con essa (non resterebbero approvabili comunque).
+    c.env.DB
+      .prepare(
+        `UPDATE richieste SET stato = 'annullata', annullata_at = datetime('now')
+         WHERE richiesta_riferimento_id = ?1 AND tipo = 'annullamento' AND stato = 'in_attesa'`,
+      )
+      .bind(id),
   ]);
   if ((esiti[1].meta.changes ?? 0) === 0) return c.json({ errore: 'La richiesta risulta già decisa o annullata' }, 409);
   await scriviAudit(c.env.DB, 'richiesta_annullata', `richiesta ${id} (${richiesta.data} ${richiesta.ora_inizio}-${richiesta.ora_fine})`, 'admin');
@@ -194,7 +287,7 @@ admin.get('/ricorrenze', async (c) => {
   const { results } = await c.env.DB
     .prepare(
       `SELECT r.id, r.societa_id, s.nome AS societa, r.giorno_settimana, r.ora_inizio, r.ora_fine,
-              r.valida_dal, r.valida_al, r.stato, r.titolo, r.note, r.created_at
+              r.valida_dal, r.valida_al, r.stato, r.titolo, r.note, r.motivazione, r.created_at
        FROM ricorrenze r JOIN societa s ON s.id = r.societa_id
        WHERE r.stato = ?1 ORDER BY r.valida_dal LIMIT 100`,
     )
@@ -225,6 +318,9 @@ admin.get('/ricorrenze', async (c) => {
 admin.post('/ricorrenze/:id/approva', async (c) => {
   const id = intero(c.req.param('id'));
   if (id === null) return c.json({ errore: 'Identificativo non valido' }, 400);
+  const corpo = await leggiJson(c);
+  const motivazione = motivazioneDecisione(corpo?.motivazione);
+  if (motivazione === null) return c.json({ errore: ERRORE_MOTIVAZIONE }, 400);
 
   const ricorrenza = await c.env.DB
     .prepare(
@@ -248,12 +344,17 @@ admin.post('/ricorrenze/:id/approva', async (c) => {
 
   const segnapostoGiorni = date.map(() => '(?)').join(', ');
   const istruzioni = [
-    c.env.DB.prepare("UPDATE ricorrenze SET stato = 'approvata' WHERE id = ?1 AND stato = 'in_attesa'").bind(id),
+    c.env.DB
+      .prepare("UPDATE ricorrenze SET stato = 'approvata', motivazione = ?2 WHERE id = ?1 AND stato = 'in_attesa'")
+      .bind(id, motivazione),
+    // La motivazione viene copiata in ogni richiesta materializzata (come
+    // titolo e note): il passo 1 è già stato eseguito nello stesso batch,
+    // quindi ric.motivazione qui è quella appena salvata.
     c.env.DB
       .prepare(
         `WITH giorno(data) AS (VALUES ${segnapostoGiorni})
-         INSERT INTO richieste (societa_id, data, ora_inizio, ora_fine, stato, titolo, note, ricorrenza_id, decisa_at)
-         SELECT ric.societa_id, giorno.data, ric.ora_inizio, ric.ora_fine, 'approvata', ric.titolo, ric.note, ric.id, datetime('now')
+         INSERT INTO richieste (societa_id, data, ora_inizio, ora_fine, stato, titolo, note, motivazione, ricorrenza_id, decisa_at)
+         SELECT ric.societa_id, giorno.data, ric.ora_inizio, ric.ora_fine, 'approvata', ric.titolo, ric.note, ric.motivazione, ric.id, datetime('now')
          FROM giorno, ricorrenze ric WHERE ric.id = ? AND ric.stato = 'approvata'`,
       )
       .bind(...date, id),
@@ -289,19 +390,28 @@ admin.post('/ricorrenze/:id/approva', async (c) => {
     return c.json({ errore: 'La ricorrenza non è più in attesa' }, 409);
   }
 
-  await scriviAudit(c.env.DB, 'ricorrenza_approvata', `ricorrenza ${id}: materializzate ${date.length} date (${date.join(', ')})`, 'admin');
+  await scriviAudit(
+    c.env.DB,
+    'ricorrenza_approvata',
+    `ricorrenza ${id}: materializzate ${date.length} date (${date.join(', ')}) — motivazione: ${motivazione}`,
+    'admin',
+  );
   return c.json({ ok: true, occorrenze: date, slot_inseriti: chiaviTotali.length });
 });
 
 admin.post('/ricorrenze/:id/rifiuta', async (c) => {
   const id = intero(c.req.param('id'));
   if (id === null) return c.json({ errore: 'Identificativo non valido' }, 400);
+  const corpo = await leggiJson(c);
+  const motivazione = motivazioneDecisione(corpo?.motivazione);
+  if (motivazione === null) return c.json({ errore: ERRORE_MOTIVAZIONE }, 400);
+
   const esito = await c.env.DB
-    .prepare("UPDATE ricorrenze SET stato = 'rifiutata' WHERE id = ?1 AND stato = 'in_attesa'")
-    .bind(id)
+    .prepare("UPDATE ricorrenze SET stato = 'rifiutata', motivazione = ?2 WHERE id = ?1 AND stato = 'in_attesa'")
+    .bind(id, motivazione)
     .run();
   if ((esito.meta.changes ?? 0) === 0) return c.json({ errore: 'Ricorrenza non trovata o non più in attesa' }, 409);
-  await scriviAudit(c.env.DB, 'ricorrenza_rifiutata', `ricorrenza ${id}`, 'admin');
+  await scriviAudit(c.env.DB, 'ricorrenza_rifiutata', `ricorrenza ${id} — motivazione: ${motivazione}`, 'admin');
   return c.json({ ok: true });
 });
 
@@ -312,7 +422,7 @@ admin.post('/ricorrenze/:id/rifiuta', async (c) => {
 admin.get('/societa', async (c) => {
   const origine = new URL(c.req.url).origin;
   const { results } = await c.env.DB
-    .prepare('SELECT id, nome, referente, email, telefono, stato, token_accesso, created_at FROM societa ORDER BY nome')
+    .prepare('SELECT id, nome, referente, email, telefono, stato, colore, tariffa_oraria, token_accesso, created_at FROM societa ORDER BY nome')
     .all<{ token_accesso: string } & Record<string, unknown>>();
   // Il token non viene esposto così com'è: si restituisce direttamente il
   // link di accesso pronto da consegnare alla società.
@@ -337,18 +447,25 @@ admin.post('/societa', async (c) => {
     telefono = testo(corpo.telefono, 30);
     if (telefono === null) return c.json({ errore: 'Telefono non valido (max 30 caratteri)' }, 400);
   }
+  let colore = COLORE_PREDEFINITO;
+  if (corpo.colore !== undefined) {
+    const coloreValidato = coloreEsadecimale(corpo.colore);
+    if (coloreValidato === null) return c.json({ errore: 'Colore non valido (formato atteso #RRGGBB)' }, 400);
+    colore = coloreValidato;
+  }
 
   const token = crypto.randomUUID();
   const esito = await c.env.DB
-    .prepare('INSERT INTO societa (nome, referente, email, telefono, token_accesso) VALUES (?1, ?2, ?3, ?4, ?5)')
-    .bind(nome, referente, email, telefono, token)
+    .prepare('INSERT INTO societa (nome, referente, email, telefono, colore, token_accesso) VALUES (?1, ?2, ?3, ?4, ?5, ?6)')
+    .bind(nome, referente, email, telefono, colore, token)
     .run();
   await scriviAudit(c.env.DB, 'societa_creata', `società ${esito.meta.last_row_id} (${nome})`, 'admin');
   const origine = new URL(c.req.url).origin;
   return c.json({ id: esito.meta.last_row_id, nome, link_accesso: `${origine}/accesso/${token}` }, 201);
 });
 
-/** Aggiornamento anagrafica (nome, referente, email, telefono). */
+/** Aggiornamento anagrafica (nome, referente, email, telefono, colore) e
+ *  tariffa oraria (impostabile solo da qui: la creazione parte da 0). */
 admin.patch('/societa/:id', async (c) => {
   const id = intero(c.req.param('id'));
   if (id === null) return c.json({ errore: 'Identificativo non valido' }, 400);
@@ -356,7 +473,7 @@ admin.patch('/societa/:id', async (c) => {
   if (!corpo) return c.json({ errore: 'Corpo della richiesta non valido' }, 400);
 
   const assegnazioni: string[] = [];
-  const parametri: (string | null)[] = [];
+  const parametri: (string | number | null)[] = [];
   if (corpo.nome !== undefined) {
     const nome = testo(corpo.nome, 100);
     if (!nome) return c.json({ errore: 'Nome non valido' }, 400);
@@ -383,6 +500,18 @@ admin.patch('/societa/:id', async (c) => {
     }
     assegnazioni.push('telefono = ?');
     parametri.push(telefono);
+  }
+  if (corpo.colore !== undefined) {
+    const colore = coloreEsadecimale(corpo.colore);
+    if (colore === null) return c.json({ errore: 'Colore non valido (formato atteso #RRGGBB)' }, 400);
+    assegnazioni.push('colore = ?');
+    parametri.push(colore);
+  }
+  if (corpo.tariffa_oraria !== undefined) {
+    const tariffa = tariffaOraria(corpo.tariffa_oraria);
+    if (tariffa === null) return c.json({ errore: 'Tariffa oraria non valida (numero tra 0 e 10000)' }, 400);
+    assegnazioni.push('tariffa_oraria = ?');
+    parametri.push(tariffa);
   }
   if (assegnazioni.length === 0) return c.json({ errore: 'Nessun campo da aggiornare' }, 400);
 
@@ -415,10 +544,13 @@ admin.post('/societa/:id/sospendi', async (c) => {
     c.env.DB.prepare('DELETE FROM prenotazioni WHERE societa_id = ?1 AND slot_key > ?2').bind(id, slotKeyCorrente(new Date())),
     // Richieste con almeno una parte ancora da svolgersi (incluse quelle in
     // corso in questo momento: i loro slot residui sono stati liberati sopra).
+    // Le richieste di annullamento già approvate sono atti amministrativi
+    // conclusi, non prenotazioni: restano intatte (da qui il filtro su tipo).
     c.env.DB
       .prepare(
         `UPDATE richieste SET stato = 'annullata', annullata_at = datetime('now')
          WHERE societa_id = ?1 AND stato IN ('in_attesa', 'approvata')
+           AND (tipo = 'nuova' OR stato = 'in_attesa')
            AND (data > ?2 OR (data = ?2 AND ora_fine > ?3))`,
       )
       .bind(id, adesso.data, adesso.ora),
@@ -478,7 +610,7 @@ admin.get('/calendario', async (c) => {
   const lunediSuccessivo = aggiungiGiorni(lunedi, 7);
   const { results } = await c.env.DB
     .prepare(
-      `SELECT p.slot_key, p.societa_id, s.nome AS societa, p.richiesta_id, r.titolo
+      `SELECT p.slot_key, p.societa_id, s.nome AS societa, s.colore, p.richiesta_id, r.titolo
        FROM prenotazioni p
        JOIN societa s ON s.id = p.societa_id
        JOIN richieste r ON r.id = p.richiesta_id
@@ -548,4 +680,104 @@ admin.post('/prenotazioni', async (c) => {
   const richiestaId = esiti[0].meta.last_row_id;
   await scriviAudit(c.env.DB, 'prenotazione_diretta', `società ${societaId} (${soc.nome}): ${data} ${oraInizio}-${oraFine}`, 'admin');
   return c.json({ ok: true, richiesta_id: richiestaId, slot_inseriti: chiavi.length }, 201);
+});
+
+// ---------------------------------------------------------------------------
+// Report mensile (tariffe e importi: solo admin, mai esposti alle società)
+// ---------------------------------------------------------------------------
+
+/** Range lessicografico [da, a) delle slot_key di un mese 'YYYY-MM'. */
+function rangeMese(mese: string): { da: string; a: string } {
+  return { da: `${mese}-01_0000`, a: `${meseSuccessivo(mese)}-01_0000` };
+}
+
+/** Campo testuale CSV: quotato (con raddoppio delle virgolette) se contiene
+ *  separatore, virgolette o a-capo — il nome società è input utente. */
+function campoCsv(valore: string): string {
+  if (/[";\n\r]/.test(valore)) return `"${valore.replace(/"/g, '""')}"`;
+  return valore;
+}
+
+/** Numero con la virgola decimale, come si aspetta Excel italiano. */
+function numeroCsv(valore: number, decimali: number): string {
+  return valore.toFixed(decimali).replace('.', ',');
+}
+
+/** 'YYYY-MM-DD' → 'DD/MM/YYYY', il formato data di Excel italiano. */
+function dataCsv(data: string): string {
+  const [anno, mese, giorno] = data.split('-');
+  return `${giorno}/${mese}/${anno}`;
+}
+
+/**
+ * Riepilogo mensile per società: ore prenotate (slot approvati / 2, e le
+ * righe di prenotazioni esistono solo per richieste approvate), tariffa e
+ * importo. UNA sola query aggregata (GROUP BY società) sul range
+ * lessicografico del mese; la riga totale è calcolata qui dalle righe lette.
+ */
+admin.get('/report', async (c) => {
+  const mese = c.req.query('mese') ?? '';
+  if (!isMeseValido(mese)) return c.json({ errore: 'Parametro mese non valido (formato atteso AAAA-MM)' }, 400);
+  const { da, a } = rangeMese(mese);
+  const { results } = await c.env.DB
+    .prepare(
+      `SELECT s.id AS societa_id, s.nome AS societa, s.tariffa_oraria,
+              COUNT(p.id) / 2.0 AS ore,
+              COUNT(p.id) / 2.0 * s.tariffa_oraria AS importo
+       FROM prenotazioni p JOIN societa s ON s.id = p.societa_id
+       WHERE p.slot_key >= ?1 AND p.slot_key < ?2
+       GROUP BY s.id ORDER BY s.nome`,
+    )
+    .bind(da, a)
+    .all<{ societa_id: number; societa: string; tariffa_oraria: number; ore: number; importo: number }>();
+  const totale = results.reduce(
+    (accumulo, riga) => ({ ore: accumulo.ore + riga.ore, importo: accumulo.importo + riga.importo }),
+    { ore: 0, importo: 0 },
+  );
+  return c.json({ mese, righe: results, totale });
+});
+
+/**
+ * Export CSV del mese: una riga per prenotazione (= richiesta approvata di
+ * una singola data), aggregando gli slot con UNA query (GROUP BY richiesta).
+ * Separatore ';', numeri con la virgola e BOM UTF-8 iniziale, così Excel
+ * italiano apre il file correttamente con un doppio clic.
+ */
+admin.get('/report.csv', async (c) => {
+  const mese = c.req.query('mese') ?? '';
+  if (!isMeseValido(mese)) return c.json({ errore: 'Parametro mese non valido (formato atteso AAAA-MM)' }, 400);
+  const { da, a } = rangeMese(mese);
+  const { results } = await c.env.DB
+    .prepare(
+      `SELECT r.data, s.nome AS societa, r.ora_inizio, r.ora_fine,
+              COUNT(p.id) / 2.0 AS ore, s.tariffa_oraria,
+              COUNT(p.id) / 2.0 * s.tariffa_oraria AS importo
+       FROM prenotazioni p
+       JOIN richieste r ON r.id = p.richiesta_id
+       JOIN societa s ON s.id = p.societa_id
+       WHERE p.slot_key >= ?1 AND p.slot_key < ?2
+       GROUP BY p.richiesta_id
+       ORDER BY r.data, r.ora_inizio, s.nome`,
+    )
+    .bind(da, a)
+    .all<{ data: string; societa: string; ora_inizio: string; ora_fine: string; ore: number; tariffa_oraria: number; importo: number }>();
+
+  const righe = results.map((riga) =>
+    [
+      dataCsv(riga.data),
+      campoCsv(riga.societa),
+      riga.ora_inizio,
+      riga.ora_fine,
+      numeroCsv(riga.ore, 1),
+      numeroCsv(riga.tariffa_oraria, 2),
+      numeroCsv(riga.importo, 2),
+    ].join(';'),
+  );
+  const intestazione = 'Data;Società;Inizio;Fine;Ore;Tariffa;Importo';
+  // BOM UTF-8 iniziale: senza, Excel italiano legge male i caratteri accentati.
+  const csv = `\ufeff${[intestazione, ...righe].join('\r\n')}\r\n`;
+  return c.body(csv, 200, {
+    'Content-Type': 'text/csv; charset=utf-8',
+    'Content-Disposition': `attachment; filename="report-${mese}.csv"`,
+  });
 });

@@ -269,6 +269,13 @@
     resize: vertical;
 }
 
+.campo input[type="color"] {
+    padding: 0.15rem;
+    width: 4.5rem;
+    height: 2.3rem;
+    cursor: pointer;
+}
+
 fieldset.campo {
     border: 1px dashed var(--bordo-forte);
     border-radius: var(--raggio);
@@ -379,6 +386,12 @@ fieldset.campo {
     color: #5f6b76;
 }
 
+/* tipo di richiesta (annullamento), non uno stato: tinta distinta apposta */
+.badge-annullamento {
+    background: #ece7f6;
+    color: #5b4a8a;
+}
+
 .badge-attiva {
     background: #e2f2e9;
     color: #2e7d54;
@@ -387,6 +400,44 @@ fieldset.campo {
 .badge-sospesa {
     background: #e9edf1;
     color: #5f6b76;
+}
+
+/* -------------------------------------------------------- report mensile */
+
+.report-selettore {
+    max-width: 12rem;
+    margin-bottom: 0.75rem;
+}
+
+.scorri-tabella {
+    overflow-x: auto;
+}
+
+.tabella-report {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 0.88rem;
+}
+
+.tabella-report th,
+.tabella-report td {
+    border-bottom: 1px solid var(--bordo);
+    padding: 0.45rem 0.6rem;
+    text-align: left;
+}
+
+.tabella-report thead th {
+    border-bottom: 2px solid var(--bordo-forte);
+}
+
+.tabella-report .cella-numero {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.tabella-report tfoot th {
+    border-bottom: none;
+    font-weight: 650;
 }
 
 /* ----------------------------------------------------------------- liste */
@@ -447,7 +498,7 @@ fieldset.campo {
 .calendario {
     /* fixed height of every 30-minute row, shared by .slot and the block
        label overlay (.blocco-etichetta) so the two never drift apart */
-    --altezza-slot: 22px;
+    --altezza-slot: 44px;
     display: grid;
     grid-template-columns: 3.4rem repeat(7, minmax(64px, 1fr));
     min-width: 580px;
@@ -488,17 +539,22 @@ fieldset.campo {
     font-weight: 600;
 }
 
+/* one label per half-hour row; its border mirrors the slots on the right
+   (solid on full hours, dotted on half hours) so the lines stay continuous */
 .cal-ora {
-    grid-row: span 2; /* the label covers both the :00 and the :30 slot */
     font-size: 0.72rem;
     color: var(--testo-tenue);
     text-align: right;
     padding: 0.1rem 0.45rem 0 0;
-    border-top: 1px solid var(--bordo);
+    border-top: 1px dotted var(--bordo);
     position: sticky;
     left: 0;
     background: var(--superficie);
     z-index: 1;
+}
+
+.cal-ora.inizio-ora {
+    border-top: 1px solid var(--bordo);
 }
 
 .slot {
@@ -537,6 +593,49 @@ fieldset.campo {
     background: var(--mio-passato);
 }
 
+/* --------------------------------------------------- colori per società */
+
+/* solid bar on the left edge of a colored cell: an inset shadow, so the
+   grid lines drawn with real borders stay untouched (shared by the admin
+   .occupato.colorato cells and the area .mio cells) */
+.slot {
+    --spia-colore: inset 3px 0 0 var(--colore-societa);
+}
+
+/* admin calendar: booked cells tinted with the società color — translucent
+   fill plus the solid bar */
+.slot.occupato.colorato {
+    background: color-mix(in srgb, var(--colore-societa) 25%, transparent);
+    box-shadow: var(--spia-colore);
+}
+
+.slot.occupato.colorato.passato {
+    background: color-mix(in srgb, var(--colore-societa) 12%, transparent);
+}
+
+/* over the light tinted background the block label switches from white
+   (used on the solid --occupato fill) to the normal text color */
+.slot.colorato .slot-nome,
+.slot.colorato .slot-attivita {
+    color: var(--testo);
+}
+
+/* area società: own bookings and matching legend square use the società
+   color when the profile provides one (.con-colore set by js/area.js) */
+.con-colore .slot.mio {
+    background: color-mix(in srgb, var(--colore-societa) 30%, transparent);
+    box-shadow: var(--spia-colore);
+}
+
+.con-colore .slot.mio.passato {
+    background: color-mix(in srgb, var(--colore-societa) 14%, transparent);
+}
+
+.con-colore .quadretto-mio {
+    background: var(--colore-societa);
+    border-color: var(--colore-societa);
+}
+
 /* first slot of a booked block: anchor for the block label overlay */
 .slot.con-etichetta {
     position: relative;
@@ -544,15 +643,17 @@ fieldset.campo {
 
 /*
  * Label overlay of a booked block (admin view): società name plus activity
- * title. Its height spans the --slot-del-blocco consecutive slots of the
- * same booking (set inline by admin.js), so the second text line lies over
- * the next cell of the block instead of stretching the first grid row.
- * pointer-events: none keeps the per-slot tooltips underneath working.
+ * title, both fitting inside the first slot of the block. Its height spans
+ * the --slot-del-blocco consecutive slots of the same booking (set inline by
+ * admin.js) so overflowing text is clipped at the block boundary, never over
+ * a different booking. pointer-events: none keeps the per-slot tooltips
+ * underneath working.
  */
 .blocco-etichetta {
     position: absolute;
     inset: 0 0 auto 0;
     height: calc(var(--slot-del-blocco, 1) * var(--altezza-slot));
+    padding-top: 0.15rem;
     overflow: hidden;
     pointer-events: none;
 }
@@ -570,14 +671,14 @@ fieldset.campo {
 
 /* società name, first line of the block label */
 .slot-nome {
-    font-size: 0.62rem;
+    font-size: 0.7rem;
     font-weight: 600;
-    line-height: var(--altezza-slot);
+    line-height: 1.35;
 }
 
-/* activity title, second line (only on blocks of 2+ slots) */
+/* activity title, second line of the block label */
 .slot-attivita {
-    font-size: 0.6rem;
+    font-size: 0.66rem;
     line-height: 1.25;
     opacity: 0.85;
 }

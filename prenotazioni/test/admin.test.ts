@@ -74,7 +74,7 @@ describe('gestione società', () => {
       data: dataFutura, ora_inizio: '18:00', ora_fine: '19:00',
     });
     const { id: idRichiesta } = (await creazione.json()) as { id: number };
-    expect((await postAdmin(`/api/admin/richieste/${idRichiesta}/approva`, cookieAmm)).status).toBe(200);
+    expect((await postAdmin(`/api/admin/richieste/${idRichiesta}/approva`, cookieAmm, { motivazione: 'Ok' })).status).toBe(200);
     expect((await slotDiRichiesta(idRichiesta)).length).toBe(2);
     await postJson('/api/societa/richieste', cookieSoc, {
       data: dataFutura, ora_inizio: '20:00', ora_fine: '21:00', ripeti_fino_al: aggiungiGiorni(dataFutura, 21),

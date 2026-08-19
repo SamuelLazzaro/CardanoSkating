@@ -15,6 +15,12 @@ export const MAX_SETTIMANE_RICORRENZA = 4;
 /** @type {string} default activity title of a booking (mirrors the server default) */
 export const TITOLO_PREDEFINITO = 'Allenamento';
 
+/** @type {number} minimum length of the admin decision motivation (mirrors the server rule) */
+export const MIN_MOTIVAZIONE = 2;
+
+/** @type {string} default società color (mirrors the server/migration default) */
+export const COLORE_PREDEFINITO = '#3b82f6';
+
 /** @type {string[]} weekday names, index 0 = lunedì (project-wide convention) */
 export const NOMI_GIORNI = ['lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato', 'domenica'];
 
@@ -26,6 +32,7 @@ export const TESTO_STATO = {
   annullata: 'Annullata',
   attiva: 'Attiva',
   sospesa: 'Sospesa',
+  annullamento: 'Annullamento', // richiesta tipo, not a stato: reuses the badge machinery
 };
 
 /* --- tap feedback (see js/tap-feedback.js and .is-tapped in css/base.css) --- */

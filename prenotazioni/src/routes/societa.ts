@@ -9,6 +9,7 @@ import {
   validaIntervallo,
 } from '../slots';
 import { cancellaCookieSessione, COOKIE_SOCIETA, richiedeSocieta } from '../auth';
+import { eAnnullamentoDuplicato } from '../conflitti';
 import { intero, leggiJson, MAX_TITOLO, scriviAudit, stmtAudit, testo, titoloAttivita } from '../util';
 
 const MAX_NOTE = 500;
@@ -28,7 +29,7 @@ societa.get('/me', (c) => {
   const soc = c.get('societa');
   const origine = new URL(c.req.url).origin;
   return c.json({
-    societa: { id: soc.id, nome: soc.nome, referente: soc.referente, email: soc.email, telefono: soc.telefono },
+    societa: { id: soc.id, nome: soc.nome, referente: soc.referente, email: soc.email, telefono: soc.telefono, colore: soc.colore },
     link_ics: `${origine}/api/ics/${soc.token_accesso}`,
   });
 });
@@ -37,14 +38,15 @@ societa.get('/richieste', async (c) => {
   const soc = c.get('societa');
   const richieste = await c.env.DB
     .prepare(
-      `SELECT id, data, ora_inizio, ora_fine, stato, titolo, note, ricorrenza_id, created_at, decisa_at, annullata_at
+      `SELECT id, data, ora_inizio, ora_fine, stato, tipo, richiesta_riferimento_id, titolo, note, motivazione,
+              ricorrenza_id, created_at, decisa_at, annullata_at
        FROM richieste WHERE societa_id = ?1 ORDER BY data DESC, ora_inizio DESC LIMIT 200`,
     )
     .bind(soc.id)
     .all<RichiestaRow>();
   const ricorrenze = await c.env.DB
     .prepare(
-      `SELECT id, giorno_settimana, ora_inizio, ora_fine, valida_dal, valida_al, stato, titolo, note, created_at
+      `SELECT id, giorno_settimana, ora_inizio, ora_fine, valida_dal, valida_al, stato, titolo, note, motivazione, created_at
        FROM ricorrenze WHERE societa_id = ?1 ORDER BY created_at DESC LIMIT 50`,
     )
     .bind(soc.id)
@@ -124,9 +126,11 @@ societa.post('/richieste', async (c) => {
 });
 
 /**
- * Annullamento di una richiesta futura: libera gli slot e marca la richiesta
- * come annullata (con annullata_at, per poter verificare a posteriori quando
- * la società ha rinunciato allo slot). DELETE e UPDATE in un batch atomico.
+ * Ritiro di una richiesta ANCORA IN ATTESA (nessuno slot occupato): la
+ * richiesta passa ad 'annullata' con annullata_at. Vale sia per le richieste
+ * nuove sia per le richieste di annullamento non ancora decise. Le
+ * prenotazioni approvate NON si toccano da qui: si annullano solo con una
+ * richiesta di annullamento approvata dall'admin (vedi sotto).
  */
 societa.post('/richieste/:id/annulla', async (c) => {
   const soc = c.get('societa');
@@ -138,23 +142,27 @@ societa.post('/richieste/:id/annulla', async (c) => {
     .bind(id, soc.id)
     .first<RichiestaRow>();
   if (!richiesta) return c.json({ errore: 'Richiesta non trovata' }, 404);
-  if (richiesta.stato !== 'in_attesa' && richiesta.stato !== 'approvata') {
+  if (richiesta.stato === 'approvata') {
+    return c.json(
+      { errore: "La prenotazione è già approvata: invia una richiesta di annullamento e attendi la conferma dell'amministratore" },
+      409,
+    );
+  }
+  if (richiesta.stato !== 'in_attesa') {
     return c.json({ errore: 'La richiesta è già stata rifiutata o annullata' }, 409);
   }
   const adesso = oraRoma(new Date());
   const futura = richiesta.data > adesso.data || (richiesta.data === adesso.data && richiesta.ora_inizio > adesso.ora);
   if (!futura) return c.json({ errore: 'Si possono annullare solo richieste future' }, 409);
 
-  const esiti = await c.env.DB.batch([
-    c.env.DB.prepare('DELETE FROM prenotazioni WHERE richiesta_id = ?1').bind(id),
-    c.env.DB
-      .prepare(
-        `UPDATE richieste SET stato = 'annullata', annullata_at = datetime('now')
-         WHERE id = ?1 AND stato IN ('in_attesa', 'approvata')`,
-      )
-      .bind(id),
-  ]);
-  if ((esiti[1].meta.changes ?? 0) === 0) {
+  const esito = await c.env.DB
+    .prepare(
+      `UPDATE richieste SET stato = 'annullata', annullata_at = datetime('now')
+       WHERE id = ?1 AND stato = 'in_attesa'`,
+    )
+    .bind(id)
+    .run();
+  if ((esito.meta.changes ?? 0) === 0) {
     return c.json({ errore: 'La richiesta risulta già decisa o annullata' }, 409);
   }
   await scriviAudit(
@@ -163,7 +171,57 @@ societa.post('/richieste/:id/annulla', async (c) => {
     `richiesta ${id} (${richiesta.data} ${richiesta.ora_inizio}-${richiesta.ora_fine})`,
     `societa:${soc.id}`,
   );
-  return c.json({ ok: true, slot_liberati: esiti[0].meta.changes ?? 0 });
+  return c.json({ ok: true });
+});
+
+/**
+ * Richiesta di annullamento di una prenotazione approvata futura: non libera
+ * nulla subito, crea una richiesta di tipo 'annullamento' (data, orari e
+ * titolo copiati dalla prenotazione) che l'admin approverà o rifiuterà con
+ * motivazione. Gli slot restano occupati fino all'approvazione. L'indice
+ * UNIQUE parziale della migrazione 0005 respinge una seconda richiesta
+ * pendente sulla stessa prenotazione.
+ */
+societa.post('/richieste/:id/richiedi-annullamento', async (c) => {
+  const soc = c.get('societa');
+  const id = intero(c.req.param('id'));
+  if (id === null) return c.json({ errore: 'Identificativo non valido' }, 400);
+
+  // Il filtro societa_id garantisce che non si possa agire su prenotazioni
+  // altrui: per le altre società la risposta è la stessa di un id inesistente.
+  const prenotazione = await c.env.DB
+    .prepare('SELECT id, data, ora_inizio, ora_fine, stato, tipo, titolo FROM richieste WHERE id = ?1 AND societa_id = ?2')
+    .bind(id, soc.id)
+    .first<RichiestaRow>();
+  if (!prenotazione) return c.json({ errore: 'Prenotazione non trovata' }, 404);
+  if (prenotazione.tipo !== 'nuova' || prenotazione.stato !== 'approvata') {
+    return c.json({ errore: "Si può chiedere l'annullamento solo di una prenotazione approvata" }, 409);
+  }
+  const adesso = oraRoma(new Date());
+  const futura = prenotazione.data > adesso.data || (prenotazione.data === adesso.data && prenotazione.ora_inizio > adesso.ora);
+  if (!futura) return c.json({ errore: "Non si può chiedere l'annullamento di una data già passata" }, 409);
+
+  let esiti: D1Result[];
+  try {
+    esiti = await c.env.DB.batch([
+      c.env.DB
+        .prepare(
+          `INSERT INTO richieste (societa_id, data, ora_inizio, ora_fine, titolo, tipo, richiesta_riferimento_id)
+           VALUES (?1, ?2, ?3, ?4, ?5, 'annullamento', ?6)`,
+        )
+        .bind(soc.id, prenotazione.data, prenotazione.ora_inizio, prenotazione.ora_fine, prenotazione.titolo, id),
+      stmtAudit(
+        c.env.DB,
+        'annullamento_richiesto',
+        `richiesta ${id} (${prenotazione.data} ${prenotazione.ora_inizio}-${prenotazione.ora_fine})`,
+        `societa:${soc.id}`,
+      ),
+    ]);
+  } catch (errore) {
+    if (!eAnnullamentoDuplicato(errore)) throw errore;
+    return c.json({ errore: "C'è già una richiesta di annullamento in attesa per questa prenotazione" }, 409);
+  }
+  return c.json({ tipo: 'annullamento', id: esiti[0].meta.last_row_id }, 201);
 });
 
 /** Annullamento di una ricorrenza non ancora approvata. */

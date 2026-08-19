@@ -55,11 +55,22 @@ export function inviaRichiestaPrenotazione(corpo) {
 }
 
 /**
- * @param {number} idRichiesta - id of the richiesta to cancel
+ * Withdraws a richiesta that is still pending (no slots booked yet).
+ * @param {number} idRichiesta - id of the pending richiesta to withdraw
  * @returns {Promise<{ok: boolean}>}
  */
 export function annullaRichiesta(idRichiesta) {
   return richiestaJson(`/api/societa/richieste/${idRichiesta}/annulla`, { method: 'POST' });
+}
+
+/**
+ * Asks the admin to cancel an approved future booking: slots stay occupied
+ * until the admin approves the annullamento request.
+ * @param {number} idRichiesta - id of the approved richiesta to cancel
+ * @returns {Promise<{tipo: 'annullamento', id: number}>}
+ */
+export function richiediAnnullamento(idRichiesta) {
+  return richiestaJson(`/api/societa/richieste/${idRichiesta}/richiedi-annullamento`, { method: 'POST' });
 }
 
 /**
@@ -107,20 +118,23 @@ export function ottieniRicorrenzeAdmin(stato = 'in_attesa') {
 }
 
 /**
+ * Approves a richiesta: books the slots for tipo 'nuova' (slot_inseriti),
+ * frees the referenced booking for tipo 'annullamento' (slot_liberati).
  * @param {number} idRichiesta
- * @returns {Promise<{ok: boolean, slot_inseriti: number}>}
+ * @param {string} motivazione - mandatory decision motivation
+ * @returns {Promise<{ok: boolean, slot_inseriti?: number, slot_liberati?: number}>}
  */
-export function approvaRichiesta(idRichiesta) {
-  return richiestaJson(`/api/admin/richieste/${idRichiesta}/approva`, { method: 'POST' });
+export function approvaRichiesta(idRichiesta, motivazione) {
+  return richiestaJson(`/api/admin/richieste/${idRichiesta}/approva`, { method: 'POST', body: JSON.stringify({ motivazione }) });
 }
 
 /**
  * @param {number} idRichiesta
- * @param {string} [motivo] - optional rejection reason (audit only)
+ * @param {string} motivazione - mandatory decision motivation (min 3 chars)
  * @returns {Promise<{ok: boolean}>}
  */
-export function rifiutaRichiesta(idRichiesta, motivo = '') {
-  return richiestaJson(`/api/admin/richieste/${idRichiesta}/rifiuta`, { method: 'POST', body: JSON.stringify({ motivo }) });
+export function rifiutaRichiesta(idRichiesta, motivazione) {
+  return richiestaJson(`/api/admin/richieste/${idRichiesta}/rifiuta`, { method: 'POST', body: JSON.stringify({ motivazione }) });
 }
 
 /**
@@ -133,18 +147,20 @@ export function annullaRichiestaAdmin(idRichiesta) {
 
 /**
  * @param {number} idRicorrenza
+ * @param {string} motivazione - mandatory decision motivation (min 3 chars)
  * @returns {Promise<{ok: boolean, occorrenze: string[], slot_inseriti: number}>}
  */
-export function approvaRicorrenza(idRicorrenza) {
-  return richiestaJson(`/api/admin/ricorrenze/${idRicorrenza}/approva`, { method: 'POST' });
+export function approvaRicorrenza(idRicorrenza, motivazione) {
+  return richiestaJson(`/api/admin/ricorrenze/${idRicorrenza}/approva`, { method: 'POST', body: JSON.stringify({ motivazione }) });
 }
 
 /**
  * @param {number} idRicorrenza
+ * @param {string} motivazione - mandatory decision motivation (min 3 chars)
  * @returns {Promise<{ok: boolean}>}
  */
-export function rifiutaRicorrenza(idRicorrenza) {
-  return richiestaJson(`/api/admin/ricorrenze/${idRicorrenza}/rifiuta`, { method: 'POST' });
+export function rifiutaRicorrenza(idRicorrenza, motivazione) {
+  return richiestaJson(`/api/admin/ricorrenze/${idRicorrenza}/rifiuta`, { method: 'POST', body: JSON.stringify({ motivazione }) });
 }
 
 /** @returns {Promise<{societa: object[]}>} */
@@ -153,7 +169,7 @@ export function ottieniElencoSocieta() {
 }
 
 /**
- * @param {{nome: string, referente: string, email: string, telefono?: string}} corpo
+ * @param {{nome: string, referente: string, email: string, telefono?: string, colore?: string}} corpo
  * @returns {Promise<{id: number, nome: string, link_accesso: string}>}
  */
 export function creaSocietaAdmin(corpo) {
@@ -162,7 +178,7 @@ export function creaSocietaAdmin(corpo) {
 
 /**
  * @param {number} idSocieta
- * @param {{nome?: string, referente?: string, email?: string, telefono?: string}} corpo
+ * @param {{nome?: string, referente?: string, email?: string, telefono?: string, colore?: string, tariffa_oraria?: number}} corpo
  * @returns {Promise<{ok: boolean}>}
  */
 export function aggiornaSocietaAdmin(idSocieta, corpo) {
@@ -195,7 +211,7 @@ export function rigeneraTokenSocieta(idSocieta) {
 
 /**
  * @param {string} lunedi - Monday of the requested week
- * @returns {Promise<{settimana: string, prenotazioni: {slot_key: string, societa_id: number, societa: string, richiesta_id: number, titolo: string}[]}>}
+ * @returns {Promise<{settimana: string, prenotazioni: {slot_key: string, societa_id: number, societa: string, colore: string, richiesta_id: number, titolo: string}[]}>}
  */
 export function ottieniCalendarioAdmin(lunedi) {
   return richiestaJson(`/api/admin/calendario?settimana=${lunedi}`);
@@ -207,4 +223,13 @@ export function ottieniCalendarioAdmin(lunedi) {
  */
 export function creaPrenotazioneDiretta(corpo) {
   return richiestaJson('/api/admin/prenotazioni', { method: 'POST', body: JSON.stringify(corpo) });
+}
+
+/**
+ * Monthly report: booked hours, tariffa and importo per società.
+ * @param {string} mese - 'YYYY-MM'
+ * @returns {Promise<{mese: string, righe: {societa_id: number, societa: string, tariffa_oraria: number, ore: number, importo: number}[], totale: {ore: number, importo: number}}>}
+ */
+export function ottieniReport(mese) {
+  return richiestaJson(`/api/admin/report?mese=${mese}`);
 }

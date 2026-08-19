@@ -7,9 +7,9 @@ import { etichettaGiorno, oraTesto } from './utils.js';
  * hour). The look of each cell is delegated to decoraCella; decoraGiorno is
  * optional and decorates the day headers (e.g. to highlight today).
  *
- * The insertion order leans on CSS grid auto-placement: the hour label spans
- * two rows (class .cal-ora), so the cells of the following half hour slide
- * by themselves into columns 2-8.
+ * Every half-hour row starts with its own time label (class .cal-ora, e.g.
+ * 8:00, 8:30, ...), so CSS grid auto-placement fills columns 2-8 with the 7
+ * day cells of that row.
  * @param {HTMLElement} contenitore - grid container (emptied first)
  * @param {string[]} giorni - the 7 dates of the week
  * @param {(cella: HTMLElement, giorno: string, minuti: number) => void} decoraCella
@@ -39,15 +39,16 @@ export function costruisciGriglia(contenitore, giorni, decoraCella, decoraGiorno
   }
 
   for (let minuti = APERTURA_MIN; minuti < CHIUSURA_MIN; minuti += PASSO_MIN) {
-    if (minuti % 60 === 0) {
-      const etichettaOra = document.createElement('div');
-      etichettaOra.className = 'cal-ora';
-      etichettaOra.textContent = oraTesto(minuti);
-      frammento.appendChild(etichettaOra);
-    }
+    // .inizio-ora marks full-hour rows: label and slots share a solid top
+    // border there, a dotted one on half-hour rows.
+    const inizioOra = minuti % 60 === 0;
+    const etichettaOra = document.createElement('div');
+    etichettaOra.className = inizioOra ? 'cal-ora inizio-ora' : 'cal-ora';
+    etichettaOra.textContent = oraTesto(minuti);
+    frammento.appendChild(etichettaOra);
     for (const giorno of giorni) {
       const cella = document.createElement('div');
-      cella.className = minuti % 60 === 0 ? 'slot inizio-ora' : 'slot';
+      cella.className = inizioOra ? 'slot inizio-ora' : 'slot';
       decoraCella(cella, giorno, minuti);
       frammento.appendChild(cella);
     }

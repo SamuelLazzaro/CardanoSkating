@@ -108,6 +108,26 @@ export function espandiSlot(data, oraInizio, oraFine) {
 }
 
 /**
+ * @param {number} valore - number to format
+ * @param {number} decimali - fixed decimal digits
+ * @returns {string} Italian-style number (decimal comma), e.g. "12,50"
+ */
+export function numeroItaliano(valore, decimali) {
+  return valore.toFixed(decimali).replace('.', ',');
+}
+
+/**
+ * Defence in depth: the server already validates società colors, but values
+ * coming from the API are re-checked before being injected into inline
+ * styles, so a corrupted value can never reach the DOM.
+ * @param {unknown} valore - candidate '#RRGGBB' color
+ * @returns {boolean} true when the value is a well-formed hex color
+ */
+export function eColoreEsadecimale(valore) {
+  return typeof valore === 'string' && /^#[0-9a-fA-F]{6}$/.test(valore);
+}
+
+/**
  * @param {string} data - 'YYYY-MM-DD'
  * @returns {Date} the civil date as a UTC Date (for Intl formatting only)
  */

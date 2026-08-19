@@ -7,6 +7,7 @@ export type Bindings = {
 
 export type StatoSocieta = 'attiva' | 'sospesa';
 export type StatoRichiesta = 'in_attesa' | 'approvata' | 'rifiutata' | 'annullata';
+export type TipoRichiesta = 'nuova' | 'annullamento';
 
 export type SocietaRow = {
   id: number;
@@ -15,6 +16,8 @@ export type SocietaRow = {
   email: string;
   telefono: string | null;
   stato: StatoSocieta;
+  colore: string;
+  tariffa_oraria: number;
   token_accesso: string;
   created_at: string;
 };
@@ -26,8 +29,11 @@ export type RichiestaRow = {
   ora_inizio: string;
   ora_fine: string;
   stato: StatoRichiesta;
+  tipo: TipoRichiesta;
+  richiesta_riferimento_id: number | null;
   titolo: string;
   note: string | null;
+  motivazione: string | null;
   ricorrenza_id: number | null;
   created_at: string;
   decisa_at: string | null;
@@ -45,6 +51,7 @@ export type RicorrenzaRow = {
   stato: StatoRichiesta;
   titolo: string;
   note: string | null;
+  motivazione: string | null;
   created_at: string;
 };
 

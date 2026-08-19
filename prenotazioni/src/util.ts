@@ -40,6 +40,46 @@ export function titoloAttivita(valore: unknown): string | null {
   return testo(valore, MAX_TITOLO);
 }
 
+/** Limiti di lunghezza della motivazione di una decisione admin: il minimo
+ *  a 2 caratteri ammette un "ok" sulle approvazioni (scelta del committente). */
+export const MIN_MOTIVAZIONE = 2;
+export const MAX_MOTIVAZIONE = 300;
+
+/**
+ * Valida la motivazione obbligatoria di una decisione admin (approvazione o
+ * rifiuto): trim, da MIN_MOTIVAZIONE a MAX_MOTIVAZIONE caratteri. Ritorna la
+ * motivazione ripulita, o null (→ 400 nel chiamante) se assente o fuori misura.
+ */
+export function motivazioneDecisione(valore: unknown): string | null {
+  const ripulita = testo(valore, MAX_MOTIVAZIONE);
+  if (ripulita === null || ripulita.length < MIN_MOTIVAZIONE) return null;
+  return ripulita;
+}
+
+/** Colore distintivo assegnato alle società quando l'admin non ne sceglie uno
+ *  (stesso valore del DEFAULT della migrazione 0006). */
+export const COLORE_PREDEFINITO = '#3b82f6';
+
+/**
+ * Valida un colore '#RRGGBB' e lo normalizza in minuscolo.
+ * Ritorna null (→ 400 nel chiamante) se il formato non è quello atteso.
+ */
+export function coloreEsadecimale(valore: unknown): string | null {
+  if (typeof valore !== 'string') return null;
+  const ripulito = valore.trim();
+  if (!/^#[0-9a-fA-F]{6}$/.test(ripulito)) return null;
+  return ripulito.toLowerCase();
+}
+
+/**
+ * Valida la tariffa oraria (€/h): numero finito tra 0 e 10000, arrotondato
+ * ai centesimi. Ritorna null (→ 400 nel chiamante) se non valida.
+ */
+export function tariffaOraria(valore: unknown): number | null {
+  if (typeof valore !== 'number' || !Number.isFinite(valore) || valore < 0 || valore > 10000) return null;
+  return Math.round(valore * 100) / 100;
+}
+
 export function emailValida(valore: string): boolean {
   return valore.length <= 200 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(valore);
 }
