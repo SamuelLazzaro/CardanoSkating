@@ -1,3 +1,5 @@
 - Inserire mappa google maps e gestire eventuali cookie
 - Gestire cookie per google maps e per github pages
 - Aggiungere backup periodico: segnati npx wrangler d1 export palazzetto --remote --output backup.sql da eseguire ogni tanto (o da automatizzare poi con GitHub Actions).
+- Aggiungere una sezione per esportare in pdf le prenotazioni di una settimana
+- Il calendario deve avere ogni slot di mezz'ora più grande in modo tale che sia visibile anche il tipo di attività
