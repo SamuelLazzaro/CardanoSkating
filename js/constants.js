@@ -102,7 +102,7 @@ export const TRANSLATIONS = {
         "hero.kicker": "Cardano al Campo · Varese",
         "hero.title1": "Velocità su rotelle",
         "hero.title2": "e su ghiaccio",
-        "hero.sub": "Pattinaggio corsa dal 1981. Rotelle e ghiaccio: entra in pista con noi.",
+        "hero.sub": "Pattinaggio corsa su rotelle e su ghiaccio: entra in pista con noi.",
         "hero.cta": "Scopri i corsi",
 
         "about.title": "Una storia che corre da tre generazioni",
@@ -114,14 +114,14 @@ export const TRANSLATIONS = {
 
         "disciplines.title": "Due modi di andare veloce",
         "disciplines.rollerTitle": "Corsa a rotelle",
-        "disciplines.rollerText": "La disciplina regina del club: pattinaggio corsa in linea su pista e su strada, dalle prime gare regionali ai campionati nazionali.",
+        "disciplines.rollerText": "La disciplina regina del club: pattinaggio corsa in linea su pista e su strada, dalle prime gare regionali ai campionati nazionali, europei e mondiali.",
         "disciplines.iceTitle": "Ghiaccio pista lunga",
-        "disciplines.iceText": "D'inverno le rotelle lasciano il posto alle lame: velocità pura sull'anello di ghiaccio, nella tradizione dello speed skating.",
+        "disciplines.iceText": "D'inverno le rotelle lasciano il posto alle lame da ghiaccio per allenamenti e gare su pista lunga.",
 
-        "venue.title": "La nostra casa: il pattinodromo di via Carreggia",
-        "venue.p1": "Il pattinodromo comunale di via Carreggia, a Cardano al Campo, è il cuore delle nostre attività: una pista sopraelevata di 200m con curve a pendenza variabile e un circuito stradale asfaltato, immersi nel verde.",
+        "venue.title": "La nostra casa",
+        "venue.p1": "Il pattinodromo comunale di via Carreggia, a Cardano al Campo, è il cuore delle nostre attività: una pista piana, una pista sopraelevata di 200m con curve a pendenza variabile e un circuito stradale, immersi nel verde.",
         "venue.f1": "Pista per pattinaggio corsa",
-        "venue.f2": "Circuito stradale asfaltato",
+        "venue.f2": "Circuito stradale",
         "venue.f3": "Illuminazione per gli allenamenti serali",
         "venue.photoAlt": "L'impianto di Cardano al Campo illuminato al tramonto",
         // gallery alts: numbers match the impianto_N.jpeg files;
@@ -140,7 +140,7 @@ export const TRANSLATIONS = {
         "booking.photo2": "Il campo di gioco del palazzetto",
         "booking.photo3": "Gli spazi del palazzetto",
 
-        "courses.title": "In pista si comincia da piccoli. O da grandi.",
+        "courses.title": "In pista si comincia da piccoli o da grandi.",
         "courses.p1": "Dai primi passi sui pattini fino all'agonismo: i nostri corsi accompagnano bambini, ragazzi e adulti con lo staff tecnico della società. Scrivici per conoscere giorni, orari e come provare.",
         "courses.cta": "Scrivici per i corsi",
         "courses.note": "corsi@cardanoskating.it",
@@ -273,7 +273,7 @@ export const TRANSLATIONS = {
         "hero.kicker": "Cardano al Campo · Varese, Italy",
         "hero.title1": "Speed on wheels",
         "hero.title2": "and on ice",
-        "hero.sub": "Speed skating since 1981. Inline and ice: hit the track with us.",
+        "hero.sub": "Inline and ice speed skating: hit the track with us.",
         "hero.cta": "Discover our courses",
 
         "about.title": "A story racing across three generations",
@@ -285,14 +285,14 @@ export const TRANSLATIONS = {
 
         "disciplines.title": "Two ways to go fast",
         "disciplines.rollerTitle": "Inline speed skating",
-        "disciplines.rollerText": "The club's flagship discipline: inline speed skating on track and road, from the first regional races to national championships.",
+        "disciplines.rollerText": "The club's flagship discipline: inline speed skating on track and road, from the first regional races to national, European and world championships.",
         "disciplines.iceTitle": "Long track ice skating",
-        "disciplines.iceText": "In winter, wheels give way to blades: pure speed on the ice ring, in the tradition of speed skating.",
+        "disciplines.iceText": "In winter, wheels give way to ice blades for training and races on long track.",
 
-        "venue.title": "Our home: the via Carreggia skating track",
-        "venue.p1": "The municipal skating track in via Carreggia, Cardano al Campo, is the heart of our activities: a 200m banked track with variable-slope curves and a paved road circuit, surrounded by greenery.",
+        "venue.title": "Our home",
+        "venue.p1": "The municipal skating track in via Carreggia, Cardano al Campo, is the heart of our activities: a flat track, a 200m banked track with variable-slope curves and a road circuit, surrounded by greenery.",
         "venue.f1": "Speed skating track",
-        "venue.f2": "Paved road circuit",
+        "venue.f2": "Road circuit",
         "venue.f3": "Floodlights for evening training",
         "venue.photoAlt": "The Cardano al Campo venue lit up at sunset",
         // gallery alts: numbers match the impianto_N.jpeg files;
@@ -311,7 +311,7 @@ export const TRANSLATIONS = {
         "booking.photo2": "The sports hall floor",
         "booking.photo3": "The sports hall spaces",
 
-        "courses.title": "You can start young. Or grown up.",
+        "courses.title": "You can start young or as an adult.",
         "courses.p1": "From the very first steps on skates to competitive racing: our courses support kids, teens and adults with the club's technical staff. Write to us to find out days, times and how to try.",
         "courses.cta": "Ask about courses",
         "courses.note": "corsi@cardanoskating.it",
