@@ -25,6 +25,16 @@ import {
 import { tentativoConsentito } from '../ratelimit';
 import { eConflittoSlot, trovaConflitti } from '../conflitti';
 import {
+  notificaAnnullamentoApprovato,
+  notificaAnnullataDaAdmin,
+  notificaPrenotazioneDiretta,
+  notificaRichiestaApprovata,
+  notificaRichiestaRifiutata,
+  notificaRicorrenzaApprovata,
+  notificaRicorrenzaRifiutata,
+  notificaSospensione,
+} from '../notifiche';
+import {
   COLORE_PREDEFINITO,
   coloreEsadecimale,
   emailValida,
@@ -127,11 +137,11 @@ admin.post('/richieste/:id/approva', async (c) => {
   const richiesta = await c.env.DB
     .prepare(
       `SELECT r.id, r.societa_id, r.data, r.ora_inizio, r.ora_fine, r.stato, r.tipo, r.richiesta_riferimento_id,
-              s.stato AS societa_stato
+              r.titolo, s.stato AS societa_stato, s.nome AS societa_nome, s.email AS societa_email
        FROM richieste r JOIN societa s ON s.id = r.societa_id WHERE r.id = ?1`,
     )
     .bind(id)
-    .first<RichiestaRow & { societa_stato: string }>();
+    .first<RichiestaRow & { societa_stato: string; societa_nome: string; societa_email: string }>();
   if (!richiesta) return c.json({ errore: 'Richiesta non trovata' }, 404);
   if (richiesta.stato !== 'in_attesa') {
     return c.json({ errore: `La richiesta non è in attesa (stato attuale: ${richiesta.stato})` }, 409);
@@ -177,6 +187,7 @@ admin.post('/richieste/:id/approva', async (c) => {
       `richiesta ${originaria.id} annullata su richiesta ${id} (${richiesta.data} ${richiesta.ora_inizio}-${richiesta.ora_fine}) — motivazione: ${motivazione}`,
       'admin',
     );
+    notificaAnnullamentoApprovato(c, { nome: richiesta.societa_nome, email: richiesta.societa_email }, richiesta, motivazione);
     return c.json({ ok: true, slot_liberati: esiti[1].meta.changes ?? 0 });
   }
 
@@ -212,6 +223,7 @@ admin.post('/richieste/:id/approva', async (c) => {
     `richiesta ${id} (${richiesta.data} ${richiesta.ora_inizio}-${richiesta.ora_fine}) — motivazione: ${motivazione}`,
     'admin',
   );
+  notificaRichiestaApprovata(c, { nome: richiesta.societa_nome, email: richiesta.societa_email }, richiesta, motivazione);
   return c.json({ ok: true, slot_inseriti: chiavi.length });
 });
 
@@ -222,6 +234,16 @@ admin.post('/richieste/:id/rifiuta', async (c) => {
   const motivazione = motivazioneDecisione(corpo?.motivazione);
   if (motivazione === null) return c.json({ errore: ERRORE_MOTIVAZIONE }, 400);
 
+  // La lettura serve solo per i dettagli della notifica email: la guardia di
+  // stato resta nell'UPDATE, che decide da solo l'esito della chiamata.
+  const richiesta = await c.env.DB
+    .prepare(
+      `SELECT r.data, r.ora_inizio, r.ora_fine, r.tipo, r.titolo, s.nome AS societa_nome, s.email AS societa_email
+       FROM richieste r JOIN societa s ON s.id = r.societa_id WHERE r.id = ?1`,
+    )
+    .bind(id)
+    .first<RichiestaRow & { societa_nome: string; societa_email: string }>();
+
   const esito = await c.env.DB
     .prepare(
       `UPDATE richieste SET stato = 'rifiutata', decisa_at = datetime('now'), motivazione = ?2
@@ -231,6 +253,9 @@ admin.post('/richieste/:id/rifiuta', async (c) => {
     .run();
   if ((esito.meta.changes ?? 0) === 0) return c.json({ errore: 'Richiesta non trovata o non più in attesa' }, 409);
   await scriviAudit(c.env.DB, 'richiesta_rifiutata', `richiesta ${id} — motivazione: ${motivazione}`, 'admin');
+  if (richiesta) {
+    notificaRichiestaRifiutata(c, { nome: richiesta.societa_nome, email: richiesta.societa_email }, richiesta, richiesta.tipo, motivazione);
+  }
   return c.json({ ok: true });
 });
 
@@ -244,9 +269,13 @@ admin.post('/richieste/:id/annulla', async (c) => {
   if (id === null) return c.json({ errore: 'Identificativo non valido' }, 400);
 
   const richiesta = await c.env.DB
-    .prepare('SELECT id, data, ora_inizio, ora_fine, stato, societa_id FROM richieste WHERE id = ?1')
+    .prepare(
+      `SELECT r.id, r.data, r.ora_inizio, r.ora_fine, r.stato, r.tipo, r.titolo, r.societa_id,
+              s.nome AS societa_nome, s.email AS societa_email
+       FROM richieste r JOIN societa s ON s.id = r.societa_id WHERE r.id = ?1`,
+    )
     .bind(id)
-    .first<RichiestaRow>();
+    .first<RichiestaRow & { societa_nome: string; societa_email: string }>();
   if (!richiesta) return c.json({ errore: 'Richiesta non trovata' }, 404);
   if (richiesta.stato !== 'in_attesa' && richiesta.stato !== 'approvata') {
     return c.json({ errore: 'La richiesta è già stata rifiutata o annullata' }, 409);
@@ -274,6 +303,7 @@ admin.post('/richieste/:id/annulla', async (c) => {
   ]);
   if ((esiti[1].meta.changes ?? 0) === 0) return c.json({ errore: 'La richiesta risulta già decisa o annullata' }, 409);
   await scriviAudit(c.env.DB, 'richiesta_annullata', `richiesta ${id} (${richiesta.data} ${richiesta.ora_inizio}-${richiesta.ora_fine})`, 'admin');
+  notificaAnnullataDaAdmin(c, { nome: richiesta.societa_nome, email: richiesta.societa_email }, richiesta, richiesta.tipo);
   return c.json({ ok: true, slot_liberati: esiti[0].meta.changes ?? 0 });
 });
 
@@ -325,11 +355,11 @@ admin.post('/ricorrenze/:id/approva', async (c) => {
   const ricorrenza = await c.env.DB
     .prepare(
       `SELECT r.id, r.societa_id, r.giorno_settimana, r.ora_inizio, r.ora_fine, r.valida_dal, r.valida_al,
-              r.stato, r.note, s.stato AS societa_stato
+              r.stato, r.note, r.titolo, s.stato AS societa_stato, s.nome AS societa_nome, s.email AS societa_email
        FROM ricorrenze r JOIN societa s ON s.id = r.societa_id WHERE r.id = ?1`,
     )
     .bind(id)
-    .first<RicorrenzaRow & { societa_stato: string }>();
+    .first<RicorrenzaRow & { societa_stato: string; societa_nome: string; societa_email: string }>();
   if (!ricorrenza) return c.json({ errore: 'Ricorrenza non trovata' }, 404);
   if (ricorrenza.stato !== 'in_attesa') {
     return c.json({ errore: `La ricorrenza non è in attesa (stato attuale: ${ricorrenza.stato})` }, 409);
@@ -396,6 +426,7 @@ admin.post('/ricorrenze/:id/approva', async (c) => {
     `ricorrenza ${id}: materializzate ${date.length} date (${date.join(', ')}) — motivazione: ${motivazione}`,
     'admin',
   );
+  notificaRicorrenzaApprovata(c, { nome: ricorrenza.societa_nome, email: ricorrenza.societa_email }, ricorrenza, date, motivazione);
   return c.json({ ok: true, occorrenze: date, slot_inseriti: chiaviTotali.length });
 });
 
@@ -406,12 +437,26 @@ admin.post('/ricorrenze/:id/rifiuta', async (c) => {
   const motivazione = motivazioneDecisione(corpo?.motivazione);
   if (motivazione === null) return c.json({ errore: ERRORE_MOTIVAZIONE }, 400);
 
+  // La lettura serve solo per i dettagli della notifica email: la guardia di
+  // stato resta nell'UPDATE, che decide da solo l'esito della chiamata.
+  const ricorrenza = await c.env.DB
+    .prepare(
+      `SELECT r.giorno_settimana, r.ora_inizio, r.ora_fine, r.valida_dal, r.valida_al, r.titolo,
+              s.nome AS societa_nome, s.email AS societa_email
+       FROM ricorrenze r JOIN societa s ON s.id = r.societa_id WHERE r.id = ?1`,
+    )
+    .bind(id)
+    .first<RicorrenzaRow & { societa_nome: string; societa_email: string }>();
+
   const esito = await c.env.DB
     .prepare("UPDATE ricorrenze SET stato = 'rifiutata', motivazione = ?2 WHERE id = ?1 AND stato = 'in_attesa'")
     .bind(id, motivazione)
     .run();
   if ((esito.meta.changes ?? 0) === 0) return c.json({ errore: 'Ricorrenza non trovata o non più in attesa' }, 409);
   await scriviAudit(c.env.DB, 'ricorrenza_rifiutata', `ricorrenza ${id} — motivazione: ${motivazione}`, 'admin');
+  if (ricorrenza) {
+    notificaRicorrenzaRifiutata(c, { nome: ricorrenza.societa_nome, email: ricorrenza.societa_email }, ricorrenza, motivazione);
+  }
   return c.json({ ok: true });
 });
 
@@ -453,11 +498,16 @@ admin.post('/societa', async (c) => {
     if (coloreValidato === null) return c.json({ errore: 'Colore non valido (formato atteso #RRGGBB)' }, 400);
     colore = coloreValidato;
   }
+  // Tariffa oraria obbligatoria fin dalla creazione (scelta del committente):
+  // evita società lasciate a 0 €/h per dimenticanza. Lo 0 resta ammesso, ma
+  // deve essere indicato esplicitamente.
+  const tariffa = tariffaOraria(corpo.tariffa_oraria);
+  if (tariffa === null) return c.json({ errore: 'Tariffa oraria obbligatoria (numero tra 0 e 10000)' }, 400);
 
   const token = crypto.randomUUID();
   const esito = await c.env.DB
-    .prepare('INSERT INTO societa (nome, referente, email, telefono, colore, token_accesso) VALUES (?1, ?2, ?3, ?4, ?5, ?6)')
-    .bind(nome, referente, email, telefono, colore, token)
+    .prepare('INSERT INTO societa (nome, referente, email, telefono, colore, tariffa_oraria, token_accesso) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)')
+    .bind(nome, referente, email, telefono, colore, tariffa, token)
     .run();
   await scriviAudit(c.env.DB, 'societa_creata', `società ${esito.meta.last_row_id} (${nome})`, 'admin');
   const origine = new URL(c.req.url).origin;
@@ -465,7 +515,7 @@ admin.post('/societa', async (c) => {
 });
 
 /** Aggiornamento anagrafica (nome, referente, email, telefono, colore) e
- *  tariffa oraria (impostabile solo da qui: la creazione parte da 0). */
+ *  tariffa oraria. */
 admin.patch('/societa/:id', async (c) => {
   const id = intero(c.req.param('id'));
   if (id === null) return c.json({ errore: 'Identificativo non valido' }, 400);
@@ -533,7 +583,10 @@ admin.patch('/societa/:id', async (c) => {
 admin.post('/societa/:id/sospendi', async (c) => {
   const id = intero(c.req.param('id'));
   if (id === null) return c.json({ errore: 'Identificativo non valido' }, 400);
-  const soc = await c.env.DB.prepare('SELECT id, nome, stato FROM societa WHERE id = ?1').bind(id).first<{ nome: string; stato: string }>();
+  const soc = await c.env.DB
+    .prepare('SELECT id, nome, email, stato FROM societa WHERE id = ?1')
+    .bind(id)
+    .first<{ nome: string; email: string; stato: string }>();
   if (!soc) return c.json({ errore: 'Società non trovata' }, 404);
   if (soc.stato === 'sospesa') return c.json({ errore: 'La società è già sospesa' }, 409);
 
@@ -564,6 +617,7 @@ admin.post('/societa/:id/sospendi', async (c) => {
     `società ${id} (${soc.nome}): liberati ${slotLiberati} slot, annullate ${richiesteAnnullate} richieste`,
     'admin',
   );
+  notificaSospensione(c, soc, { slotLiberati, richiesteAnnullate });
   return c.json({ ok: true, slot_liberati: slotLiberati, richieste_annullate: richiesteAnnullate });
 });
 
@@ -647,7 +701,10 @@ admin.post('/prenotazioni', async (c) => {
     if (note === null) return c.json({ errore: 'Note troppo lunghe (max 500 caratteri)' }, 400);
   }
 
-  const soc = await c.env.DB.prepare('SELECT id, nome, stato FROM societa WHERE id = ?1').bind(societaId).first<{ nome: string; stato: string }>();
+  const soc = await c.env.DB
+    .prepare('SELECT id, nome, email, stato FROM societa WHERE id = ?1')
+    .bind(societaId)
+    .first<{ nome: string; email: string; stato: string }>();
   if (!soc) return c.json({ errore: 'Società non trovata' }, 404);
   if (soc.stato !== 'attiva') return c.json({ errore: 'La società è sospesa' }, 409);
 
@@ -679,6 +736,7 @@ admin.post('/prenotazioni', async (c) => {
 
   const richiestaId = esiti[0].meta.last_row_id;
   await scriviAudit(c.env.DB, 'prenotazione_diretta', `società ${societaId} (${soc.nome}): ${data} ${oraInizio}-${oraFine}`, 'admin');
+  notificaPrenotazioneDiretta(c, soc, { data, ora_inizio: oraInizio, ora_fine: oraFine, titolo });
   return c.json({ ok: true, richiesta_id: richiestaId, slot_inseriti: chiavi.length }, 201);
 });
 

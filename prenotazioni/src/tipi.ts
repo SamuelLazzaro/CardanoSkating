@@ -3,6 +3,12 @@ export type Bindings = {
   ASSETS: Fetcher;
   ADMIN_SECRET: string;
   ADMIN_PASSWORD: string;
+  /** Chiave API Brevo per le notifiche email (secret): assente = invio disattivato. */
+  BREVO_API_KEY?: string;
+  /** Mittente delle notifiche (indirizzo su dominio autenticato in Brevo). */
+  EMAIL_MITTENTE?: string;
+  /** Indirizzo dell'amministratore: in copia su ogni notifica e Reply-To. */
+  EMAIL_ADMIN?: string;
 };
 
 export type StatoSocieta = 'attiva' | 'sospesa';

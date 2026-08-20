@@ -28,11 +28,12 @@ async function patchSocieta(id: number, cookie: string, corpo: unknown): Promise
 
 /** Società + tariffa + prenotazioni dirette note nel mese osservato (e una fuori). */
 async function scenarioNoto(cookieAmm: string): Promise<{ idAlfa: number; idBeta: number }> {
-  const alfa = await postJson('/api/admin/societa', cookieAmm, { nome: 'ASD Alfa', referente: 'A', email: 'alfa@example.com' });
+  const alfa = await postJson('/api/admin/societa', cookieAmm, { nome: 'ASD Alfa', referente: 'A', email: 'alfa@example.com', tariffa_oraria: 20 });
   const { id: idAlfa } = (await alfa.json()) as { id: number };
-  const beta = await postJson('/api/admin/societa', cookieAmm, { nome: 'ASD Beta', referente: 'B', email: 'beta@example.com' });
+  // Beta nasce con una tariffa provvisoria poi corretta via PATCH: copre il
+  // percorso di aggiornamento della tariffa usato dal dialogo di modifica.
+  const beta = await postJson('/api/admin/societa', cookieAmm, { nome: 'ASD Beta', referente: 'B', email: 'beta@example.com', tariffa_oraria: 5 });
   const { id: idBeta } = (await beta.json()) as { id: number };
-  expect((await patchSocieta(idAlfa, cookieAmm, { tariffa_oraria: 20 })).status).toBe(200);
   expect((await patchSocieta(idBeta, cookieAmm, { tariffa_oraria: 12.5 })).status).toBe(200);
 
   // Alfa: 3h + 1h30 nel mese; Beta: 1h nel mese; Alfa: 2h nel mese successivo.
@@ -49,19 +50,18 @@ async function scenarioNoto(cookieAmm: string): Promise<{ idAlfa: number; idBeta
 }
 
 describe('tariffa oraria', () => {
-  it('rifiuta valori non validi e resta fuori dalla creazione', async () => {
+  it('rifiuta valori non validi in modifica; la creazione salva la tariffa indicata', async () => {
     const cookieAmm = await cookieAdmin();
     for (const tariffa of [-5, Number.NaN, 20000, '20']) {
       expect((await patchSocieta(1, cookieAmm, { tariffa_oraria: tariffa })).status).toBe(400);
     }
-    // La creazione non legge la tariffa: parte sempre da 0 (campo separato).
     const creazione = await postJson('/api/admin/societa', cookieAmm, {
       nome: 'ASD Nuova', referente: 'R', email: 'nuova@example.com', tariffa_oraria: 99,
     });
     expect(creazione.status).toBe(201);
     const { id } = (await creazione.json()) as { id: number };
     const riga = await env.DB.prepare('SELECT tariffa_oraria FROM societa WHERE id = ?1').bind(id).first<{ tariffa_oraria: number }>();
-    expect(riga?.tariffa_oraria).toBe(0);
+    expect(riga?.tariffa_oraria).toBe(99);
   });
 
   it('non compare mai nella risposta dell\'area società', async () => {
@@ -103,7 +103,7 @@ describe('report mensile', () => {
     await scenarioNoto(cookieAmm);
     // Nome con separatore e virgolette: il campo va quotato con raddoppio.
     const strana = await postJson('/api/admin/societa', cookieAmm, {
-      nome: 'ASD; "Strana"', referente: 'S', email: 'strana@example.com',
+      nome: 'ASD; "Strana"', referente: 'S', email: 'strana@example.com', tariffa_oraria: 0,
     });
     const { id: idStrana } = (await strana.json()) as { id: number };
     await postJson('/api/admin/prenotazioni', cookieAmm, {

@@ -42,16 +42,22 @@ describe('login admin', () => {
 });
 
 describe('gestione società', () => {
-  it('crea una società e il link personale restituito funziona', async () => {
+  it('crea una società con tariffa oraria e il link personale restituito funziona', async () => {
     const cookieAmm = await cookieAdmin();
     const risposta = await postJson('/api/admin/societa', cookieAmm, {
       nome: 'Nuova ASD',
       referente: 'Mario Rossi',
       email: 'mario@example.com',
       telefono: '333 1234567',
+      tariffa_oraria: 25.5,
     });
     expect(risposta.status).toBe(201);
     const corpo = (await risposta.json()) as { id: number; link_accesso: string };
+    const riga = await env.DB
+      .prepare('SELECT tariffa_oraria FROM societa WHERE id = ?1')
+      .bind(corpo.id)
+      .first<{ tariffa_oraria: number }>();
+    expect(riga?.tariffa_oraria).toBe(25.5);
     const token = corpo.link_accesso.split('/accesso/')[1];
     const cookieSoc = await cookieSocieta(token);
     const profilo = await getConCookie('/api/societa/me', cookieSoc);
@@ -62,6 +68,18 @@ describe('gestione società', () => {
     const cookieAmm = await cookieAdmin();
     const risposta = await postJson('/api/admin/societa', cookieAmm, { nome: 'X', referente: 'Y', email: 'non-una-email' });
     expect(risposta.status).toBe(400);
+  });
+
+  it('rifiuta la creazione senza tariffa oraria o con tariffa non valida', async () => {
+    const cookieAmm = await cookieAdmin();
+    const anagrafica = { nome: 'ASD Senza Tariffa', referente: 'Referente', email: 'tariffa@example.com' };
+    for (const tariffa of [undefined, -1, 10001, 'venti']) {
+      const risposta = await postJson('/api/admin/societa', cookieAmm, { ...anagrafica, tariffa_oraria: tariffa });
+      expect(risposta.status).toBe(400);
+    }
+    // Lo 0 esplicito resta un valore ammesso.
+    const conZero = await postJson('/api/admin/societa', cookieAmm, { ...anagrafica, tariffa_oraria: 0 });
+    expect(conZero.status).toBe(201);
   });
 
   it('la sospensione cancella il futuro e invalida gli accessi; la riattivazione non ripristina', async () => {

@@ -2,4 +2,9 @@
 - Gestire cookie per google maps e per github pages
 - Aggiungere backup periodico: segnati npx wrangler d1 export palazzetto --remote --output backup.sql da eseguire ogni tanto (o da automatizzare poi con GitHub Actions).
 - Aggiungere una sezione per esportare in pdf le prenotazioni di una settimana
-- Il calendario deve avere ogni slot di mezz'ora più grande in modo tale che sia visibile anche il tipo di attività
+- Attivare le notifiche email (Brevo) — passi manuali:
+  1. Creare l'account Brevo (piano free, 300 email/giorno) e accettare il DPA (Data Processing Agreement) dal pannello
+  2. Autenticare il dominio cardanoskating.it: aggiungere i 3 record DNS (Brevo code, DKIM, DMARC) proposti in Brevo > Senders & Domains (mittente configurato: prenotazioni@cardanoskating.it)
+  3. Creare la API key transazionale e configurarla: da prenotazioni/ eseguire npx wrangler secret put BREVO_API_KEY (finché il secret manca, l'invio resta disattivato)
+  4. Completare public/privacy.html: sede legale e CF/P.IVA del titolare (segnaposto "[da completare]")
+  5. Aggiornare l'email segnaposto della società di casa dal pannello admin (altrimenti le sue notifiche vanno a da-compilare@example.com)

@@ -2,3 +2,6 @@
 # per lo sviluppo locale. In produzione usare `wrangler secret put`.
 ADMIN_SECRET=stringa-casuale-lunga-almeno-32-caratteri
 ADMIN_PASSWORD=password-robusta-per-il-pannello-admin
+# Chiave API Brevo per le notifiche email: lasciare vuota (o rimuovere la
+# riga) per disattivare l'invio durante lo sviluppo locale.
+BREVO_API_KEY=

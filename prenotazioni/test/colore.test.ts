@@ -14,7 +14,7 @@ import { cookieAdmin, cookieSocieta, getConCookie, postJson } from './helpers';
 const oggi = oraRoma(new Date()).data;
 const dataFutura = aggiungiGiorni(oggi, 7);
 
-const ANAGRAFICA = { nome: 'ASD Colorata', referente: 'Referente', email: 'colori@example.com' };
+const ANAGRAFICA = { nome: 'ASD Colorata', referente: 'Referente', email: 'colori@example.com', tariffa_oraria: 20 };
 
 describe('validazione del colore', () => {
   it('rifiuta formati diversi da #RRGGBB in creazione e modifica', async () => {

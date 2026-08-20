@@ -1,22 +1,47 @@
 /* ===========================================================================
    base.css — reset, design tokens, global typography, shared utilities.
+   Palette aligned with the main site "Dark Racing" theme (css/base.css of
+   the one-page site): brand orange #ff8800 sampled from the club crest,
+   near-black header, warm neutral grays — but on a light background, since
+   this is a functional booking app, not the showcase page.
    =========================================================================== */
+
+/* ----- Fonts (self-hosted like the main site, GDPR-safe) ----- */
+@font-face {
+    font-family: "Inter";
+    src: url("../assets/fonts/inter-v20-latin-regular.woff2") format("woff2");
+    font-weight: 400;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "Inter";
+    src: url("../assets/fonts/inter-v20-latin-600.woff2") format("woff2");
+    font-weight: 600;
+    font-display: swap;
+}
 
 :root {
     /* palette */
-    --fondo: #f5f6f8;
+    --nero: #0a0a0a;              /* site black — dark header */
+    --fondo: #f6f5f3;             /* warm off-white page background */
     --superficie: #ffffff;
-    --testo: #22303c;
-    --testo-tenue: #5f6b76;
-    --bordo: #dde2e8;
-    --bordo-forte: #c3ccd6;
-    --accento: #2c5f8a;
-    --accento-scuro: #1f4463;
-    --occupato: #46617e;
-    --occupato-passato: #9aa9ba;
-    --mio-passato: #8fb0c9;
-    --passato: #edf0f3;
-    --oggi: #f3f8fd;
+    --testo: #1c1a17;             /* warm near-black */
+    --testo-tenue: #6b655d;       /* warm gray, 5.3:1 on --fondo */
+    --bordo: #e4e1dc;
+    --bordo-forte: #c9c4bc;
+    /* brand orange, split by role: the bright fill fails WCAG contrast on
+       white for text and thin UI strokes, so darker variants cover those */
+    --accento: #ff8800;           /* fills only (slots, bars, primary btn) */
+    --accento-scuro: #e07000;     /* hover fills, focus outlines (3.2:1) */
+    --accento-testo: #a35100;     /* links / colored text (5.6:1 on white) */
+    --accento-testo-scuro: #7d3e00; /* hover state of colored text */
+    --accento-tinta: #fff3e5;     /* pale orange wash for hover backgrounds */
+    --occupato: #ff0000;          /* charcoal, echoes the site dark surfaces */
+    --occupato-passato: #ff8c00;
+    --mio-passato: #ffd2a1;       /* faded orange for own past slots */
+    --passato: #edebe7;
+    --oggi: #fff8ef;              /* pale orange wash on today's column */
     --ok: #2e7d54;
     --errore: #a8442f;
 
@@ -41,9 +66,14 @@ body {
     margin: 0;
     background: var(--fondo);
     color: var(--testo);
-    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     font-size: 16px;
     line-height: 1.5;
+}
+
+/* bare links (footer, privacy page); nav and .btn-testo restyle their own */
+a {
+    color: var(--accento-testo);
 }
 
 /*

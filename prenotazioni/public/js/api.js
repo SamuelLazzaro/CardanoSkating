@@ -169,7 +169,7 @@ export function ottieniElencoSocieta() {
 }
 
 /**
- * @param {{nome: string, referente: string, email: string, telefono?: string, colore?: string}} corpo
+ * @param {{nome: string, referente: string, email: string, tariffa_oraria: number, telefono?: string, colore?: string}} corpo
  * @returns {Promise<{id: number, nome: string, link_accesso: string}>}
  */
 export function creaSocietaAdmin(corpo) {

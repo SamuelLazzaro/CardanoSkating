@@ -19,6 +19,13 @@
 		"directory": "./public",
 		"binding": "ASSETS"
 	},
+	// Indirizzi delle notifiche email (vedi src/notifiche.ts). La chiave API
+	// di Brevo è un secret: wrangler secret put BREVO_API_KEY — senza chiave
+	// configurata l'invio delle notifiche resta disattivato.
+	"vars": {
+		"EMAIL_MITTENTE": "info@cardanoskating.it",
+		"EMAIL_ADMIN": "info@cardanoskating.it"
+	},
 	"d1_databases": [
 		{
 			// "binding" è il nome della variabile con cui il codice vede il DB

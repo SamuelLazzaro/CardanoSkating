@@ -11,6 +11,13 @@ import {
 import { cancellaCookieSessione, COOKIE_SOCIETA, richiedeSocieta } from '../auth';
 import { eAnnullamentoDuplicato } from '../conflitti';
 import { intero, leggiJson, MAX_TITOLO, scriviAudit, stmtAudit, testo, titoloAttivita } from '../util';
+import {
+  notificaAnnullamentoRichiesto,
+  notificaRichiestaInviata,
+  notificaRichiestaRitirata,
+  notificaRicorrenzaInviata,
+  notificaRicorrenzaRitirata,
+} from '../notifiche';
 
 const MAX_NOTE = 500;
 const MAX_GIORNI_FUTURO = 365;
@@ -110,6 +117,14 @@ societa.post('/richieste', async (c) => {
         .bind(soc.id, giorno, oraInizio, oraFine, data, ripetiFinoAl, titolo, note),
       stmtAudit(c.env.DB, 'ricorrenza_creata', `${data} → ${ripetiFinoAl} ${oraInizio}-${oraFine}`, `societa:${soc.id}`),
     ]);
+    notificaRicorrenzaInviata(c, soc, {
+      giorno_settimana: giorno,
+      ora_inizio: oraInizio,
+      ora_fine: oraFine,
+      valida_dal: data,
+      valida_al: ripetiFinoAl,
+      titolo,
+    });
     return c.json(
       { tipo: 'ricorrenza', id: esiti[0].meta.last_row_id, occorrenze: occorrenzeRicorrenza(data, ripetiFinoAl, giorno) },
       201,
@@ -122,6 +137,7 @@ societa.post('/richieste', async (c) => {
       .bind(soc.id, data, oraInizio, oraFine, titolo, note),
     stmtAudit(c.env.DB, 'richiesta_creata', `${data} ${oraInizio}-${oraFine}`, `societa:${soc.id}`),
   ]);
+  notificaRichiestaInviata(c, soc, { data, ora_inizio: oraInizio, ora_fine: oraFine, titolo });
   return c.json({ tipo: 'richiesta', id: esiti[0].meta.last_row_id }, 201);
 });
 
@@ -138,7 +154,7 @@ societa.post('/richieste/:id/annulla', async (c) => {
   if (id === null) return c.json({ errore: 'Identificativo non valido' }, 400);
 
   const richiesta = await c.env.DB
-    .prepare('SELECT id, data, ora_inizio, ora_fine, stato FROM richieste WHERE id = ?1 AND societa_id = ?2')
+    .prepare('SELECT id, data, ora_inizio, ora_fine, stato, tipo, titolo FROM richieste WHERE id = ?1 AND societa_id = ?2')
     .bind(id, soc.id)
     .first<RichiestaRow>();
   if (!richiesta) return c.json({ errore: 'Richiesta non trovata' }, 404);
@@ -171,6 +187,7 @@ societa.post('/richieste/:id/annulla', async (c) => {
     `richiesta ${id} (${richiesta.data} ${richiesta.ora_inizio}-${richiesta.ora_fine})`,
     `societa:${soc.id}`,
   );
+  notificaRichiestaRitirata(c, soc, richiesta, richiesta.tipo);
   return c.json({ ok: true });
 });
 
@@ -221,6 +238,7 @@ societa.post('/richieste/:id/richiedi-annullamento', async (c) => {
     if (!eAnnullamentoDuplicato(errore)) throw errore;
     return c.json({ errore: "C'è già una richiesta di annullamento in attesa per questa prenotazione" }, 409);
   }
+  notificaAnnullamentoRichiesto(c, soc, prenotazione);
   return c.json({ tipo: 'annullamento', id: esiti[0].meta.last_row_id }, 201);
 });
 
@@ -230,6 +248,16 @@ societa.post('/ricorrenze/:id/annulla', async (c) => {
   const id = intero(c.req.param('id'));
   if (id === null) return c.json({ errore: 'Identificativo non valido' }, 400);
 
+  // La lettura serve solo per i dettagli della notifica email: la guardia di
+  // stato resta nell'UPDATE, che decide da solo l'esito della chiamata.
+  const ricorrenza = await c.env.DB
+    .prepare(
+      `SELECT giorno_settimana, ora_inizio, ora_fine, valida_dal, valida_al, titolo
+       FROM ricorrenze WHERE id = ?1 AND societa_id = ?2`,
+    )
+    .bind(id, soc.id)
+    .first<RicorrenzaRow>();
+
   const esito = await c.env.DB
     .prepare("UPDATE ricorrenze SET stato = 'annullata' WHERE id = ?1 AND societa_id = ?2 AND stato = 'in_attesa'")
     .bind(id, soc.id)
@@ -238,5 +266,6 @@ societa.post('/ricorrenze/:id/annulla', async (c) => {
     return c.json({ errore: 'Ricorrenza non trovata o non più in attesa' }, 409);
   }
   await scriviAudit(c.env.DB, 'ricorrenza_annullata', `ricorrenza ${id}`, `societa:${soc.id}`);
+  if (ricorrenza) notificaRicorrenzaRitirata(c, soc, ricorrenza);
   return c.json({ ok: true });
 });

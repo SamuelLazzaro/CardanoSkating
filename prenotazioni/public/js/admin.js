@@ -95,11 +95,19 @@ function preparaEventi() {
   // A stale error from a previous attempt must not greet the reopened dialog.
   elemento('bottone-nuova-prenotazione').addEventListener('click', () => mostraMessaggio(elemento('esito-form'), ''));
 
+  preparaDialogo(
+    elemento('dialogo-societa'),
+    elemento('bottone-nuova-societa'),
+    elemento('bottone-chiudi-societa'),
+  );
+  // The "Nuova società" button always reopens the dialog in create mode,
+  // discarding any leftover edit state from a previous opening.
+  elemento('bottone-nuova-societa').addEventListener('click', () => impostaFormSocieta(null));
+
   elemento('form-login').addEventListener('submit', accedi);
   elemento('bottone-esci').addEventListener('click', esci);
   elemento('form-diretta').addEventListener('submit', prenotaDiretta);
   elemento('form-societa').addEventListener('submit', salvaSocieta);
-  elemento('bottone-annulla-modifica').addEventListener('click', () => impostaModifica(null));
   elemento('cal-precedente').addEventListener('click', () => spostaSettimana(-7));
   elemento('cal-successiva').addEventListener('click', () => spostaSettimana(7));
   elemento('cal-oggi').addEventListener('click', () => {
@@ -711,8 +719,7 @@ function renderSocieta(societa) {
     azioni.className = 'riga-azioni';
     azioni.append(
       bottoneAzione('Copia link', 'btn', (bottone) => copiaLink(soc, bottone)),
-      bottoneAzione('Modifica', 'btn', () => impostaModifica(soc)),
-      bottoneAzione('Tariffa', 'btn', () => modificaTariffa(soc)),
+      bottoneAzione('Modifica', 'btn', () => apriModificaSocieta(soc)),
       bottoneAzione('Rigenera link', 'btn', () => rigenera(soc)),
       soc.stato === 'attiva'
         ? bottoneAzione('Sospendi', 'btn btn-pericolo', () => sospendi(soc))
@@ -756,21 +763,34 @@ async function copiaLink(soc, bottone) {
 }
 
 /**
- * Switches the società form between create mode (null) and edit mode.
- * @param {object|null} soc - società to edit, or null to reset
+ * Fills the società dialog form for create mode (null) or edit mode.
+ * Does not open the dialog: the caller decides (the "Nuova società" button
+ * is already wired to showModal() by preparaDialogo).
+ * @param {object|null} soc - società to edit, or null for a blank form
  * @returns {void}
  */
-function impostaModifica(soc) {
+function impostaFormSocieta(soc) {
   g_societaInModifica = soc;
-  elemento('titolo-form-societa').textContent = soc ? `Modifica: ${soc.nome}` : 'Nuova società';
+  elemento('titolo-dialogo-societa').textContent = soc ? `Modifica: ${soc.nome}` : 'Nuova società';
   elemento('bottone-societa').textContent = soc ? 'Salva modifiche' : 'Crea società';
-  elemento('bottone-annulla-modifica').hidden = soc === null;
   elemento('soc-nome').value = soc?.nome ?? '';
   elemento('soc-referente').value = soc?.referente ?? '';
   elemento('soc-email').value = soc?.email ?? '';
   elemento('soc-telefono').value = soc?.telefono ?? '';
+  elemento('soc-tariffa').value = soc ? String(soc.tariffa_oraria) : '';
   elemento('soc-colore').value = eColoreEsadecimale(soc?.colore) ? soc.colore : COLORE_PREDEFINITO;
-  if (soc) elemento('soc-nome').focus();
+  // A stale error from a previous attempt must not greet the reopened dialog.
+  mostraMessaggio(elemento('esito-form-societa'), '');
+}
+
+/**
+ * Opens the società dialog prefilled with the data of an existing società.
+ * @param {object} soc - società to edit
+ * @returns {void}
+ */
+function apriModificaSocieta(soc) {
+  impostaFormSocieta(soc);
+  elemento('dialogo-societa').showModal();
 }
 
 /**
@@ -779,50 +799,31 @@ function impostaModifica(soc) {
  */
 async function salvaSocieta(evento) {
   evento.preventDefault();
-  const esito = elemento('esito-societa');
   const corpo = {
     nome: elemento('soc-nome').value.trim(),
     referente: elemento('soc-referente').value.trim(),
     email: elemento('soc-email').value.trim(),
     telefono: elemento('soc-telefono').value.trim(),
     colore: elemento('soc-colore').value,
+    tariffa_oraria: Number(elemento('soc-tariffa').value),
   };
   try {
+    // Success closes the popup: the confirmation goes to the page-level
+    // status next to the società list, where it stays readable.
     if (g_societaInModifica) {
       await aggiornaSocietaAdmin(g_societaInModifica.id, corpo);
-      mostraMessaggio(esito, 'Società aggiornata.', 'ok');
+      mostraMessaggio(elemento('esito-societa'), 'Società aggiornata.', 'ok');
     } else {
       const creata = await creaSocietaAdmin(corpo);
-      mostraMessaggio(esito, `Società creata. Link personale da consegnare: ${creata.link_accesso}`, 'ok');
+      mostraMessaggio(elemento('esito-societa'), `Società creata. Link personale da consegnare: ${creata.link_accesso}`, 'ok');
     }
-    impostaModifica(null);
-    await caricaSocieta();
-  } catch (errore) {
-    mostraMessaggio(esito, errore.message, 'errore');
-  }
-}
-
-/**
- * Updates the società hourly rate via prompt() (accepts the decimal comma).
- * @param {object} soc - società whose tariffa is edited
- * @returns {Promise<void>}
- */
-async function modificaTariffa(soc) {
-  const esito = elemento('esito-societa');
-  const inserito = prompt(`Tariffa oraria di ${soc.nome} (€/h):`, numeroItaliano(soc.tariffa_oraria, 2));
-  if (inserito === null) return; // cancelled by the admin
-  const tariffa = Number(inserito.trim().replace(',', '.'));
-  if (!Number.isFinite(tariffa) || tariffa < 0) {
-    mostraMessaggio(esito, 'Tariffa non valida: inserisci un numero maggiore o uguale a 0.', 'errore');
-    return;
-  }
-  try {
-    await aggiornaSocietaAdmin(soc.id, { tariffa_oraria: tariffa });
-    mostraMessaggio(esito, `Tariffa di ${soc.nome} aggiornata a ${numeroItaliano(tariffa, 2)} €/h.`, 'ok');
+    elemento('dialogo-societa').close();
     await caricaSocieta();
     await caricaReport(); // the report importi depend on the tariffa
   } catch (errore) {
-    mostraMessaggio(esito, errore.message, 'errore');
+    // Errors stay inside the popup, so the admin can fix the fields
+    // without reopening it.
+    mostraMessaggio(elemento('esito-form-societa'), errore.message, 'errore');
   }
 }
 

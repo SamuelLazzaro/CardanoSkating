@@ -113,41 +113,13 @@
       </section>
 
       <section class="pannello">
-        <h2>Società</h2>
+        <div class="pannello-testata">
+          <h2>Società</h2>
+          <button type="button" class="btn btn-primario" id="bottone-nuova-societa">Nuova società</button>
+        </div>
         <p id="esito-societa" class="stato" role="status" hidden></p>
         <ul id="lista-societa" class="lista"></ul>
         <p id="vuoto-societa" class="vuoto" hidden>Nessuna società registrata.</p>
-        <h3 id="titolo-form-societa">Nuova società</h3>
-        <form id="form-societa" class="modulo">
-          <div class="campo-riga">
-            <div class="campo">
-              <label for="soc-nome">Nome</label>
-              <input type="text" id="soc-nome" maxlength="100" required>
-            </div>
-            <div class="campo">
-              <label for="soc-referente">Referente</label>
-              <input type="text" id="soc-referente" maxlength="100" required>
-            </div>
-          </div>
-          <div class="campo-riga">
-            <div class="campo">
-              <label for="soc-email">Email</label>
-              <input type="email" id="soc-email" maxlength="200" required>
-            </div>
-            <div class="campo">
-              <label for="soc-telefono">Telefono (facoltativo)</label>
-              <input type="tel" id="soc-telefono" maxlength="30">
-            </div>
-          </div>
-          <div class="campo">
-            <label for="soc-colore">Colore distintivo (calendario admin e area società)</label>
-            <input type="color" id="soc-colore" value="#3b82f6">
-          </div>
-          <div class="riga-azioni">
-            <button type="submit" class="btn btn-primario" id="bottone-societa">Crea società</button>
-            <button type="button" class="btn" id="bottone-annulla-modifica" hidden>Annulla modifica</button>
-          </div>
-        </form>
       </section>
     </div>
 
@@ -189,6 +161,49 @@
           </div>
         </form>
         <p id="esito-form" class="stato" role="status" hidden></p>
+      </div>
+    </dialog>
+
+    <dialog id="dialogo-societa" class="dialogo" aria-labelledby="titolo-dialogo-societa">
+      <div class="dialogo-contenuto">
+        <div class="dialogo-testata">
+          <h2 id="titolo-dialogo-societa">Nuova società</h2>
+          <button type="button" class="btn btn-testo" id="bottone-chiudi-societa" aria-label="Chiudi">✕</button>
+        </div>
+        <form id="form-societa" class="modulo">
+          <div class="campo-riga">
+            <div class="campo">
+              <label for="soc-nome">Nome</label>
+              <input type="text" id="soc-nome" maxlength="100" required>
+            </div>
+            <div class="campo">
+              <label for="soc-referente">Referente</label>
+              <input type="text" id="soc-referente" maxlength="100" required>
+            </div>
+          </div>
+          <div class="campo-riga">
+            <div class="campo">
+              <label for="soc-email">Email</label>
+              <input type="email" id="soc-email" maxlength="200" required>
+            </div>
+            <div class="campo">
+              <label for="soc-telefono">Telefono (facoltativo)</label>
+              <input type="tel" id="soc-telefono" maxlength="30">
+            </div>
+          </div>
+          <div class="campo">
+            <label for="soc-tariffa">Tariffa oraria (€/h)</label>
+            <input type="number" id="soc-tariffa" min="0" max="10000" step="0.01" required>
+          </div>
+          <div class="campo">
+            <label for="soc-colore">Colore distintivo (calendario admin e area società)</label>
+            <input type="color" id="soc-colore" value="#3b82f6">
+          </div>
+          <div>
+            <button type="submit" class="btn btn-primario" id="bottone-societa">Crea società</button>
+          </div>
+        </form>
+        <p id="esito-form-societa" class="stato" role="status" hidden></p>
       </div>
     </dialog>
   </main>

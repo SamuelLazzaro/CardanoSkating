@@ -7,9 +7,11 @@
 
 .btn {
     /* shared between :hover, :focus-visible and .is-tapped; the variants
-       below override these two properties instead of redeclaring rules */
-    --btn-fondo-attivo: #eef2f6;
-    --btn-bordo-attivo: var(--accento);
+       below override these two properties instead of redeclaring rules.
+       The active border uses the darker orange: the bright fill would sit
+       below the 3:1 non-text contrast threshold on a white button */
+    --btn-fondo-attivo: var(--accento-tinta);
+    --btn-bordo-attivo: var(--accento-scuro);
     font: inherit;
     color: var(--testo);
     background: var(--superficie);
@@ -59,12 +61,12 @@
 .btn-testo {
     --btn-fondo-attivo: transparent;
     --btn-bordo-attivo: transparent;
-    --btn-testo-colore-attivo: var(--accento-scuro);
+    --btn-testo-colore-attivo: var(--accento-testo-scuro);
     border: none;
     background: none;
     padding: 0.1rem 0.3rem;
     font-size: 0.82rem;
-    color: var(--accento);
+    color: var(--accento-testo);
     text-decoration: underline;
 }
 
@@ -82,12 +84,15 @@
     color: var(--btn-testo-colore-attivo);
 }
 
+/* brand orange fill with dark text (7.2:1), like the main site CTAs;
+   white text on this orange would fail WCAG contrast */
 .btn-primario {
     --btn-fondo-attivo: var(--accento-scuro);
     --btn-bordo-attivo: var(--accento-scuro);
     background: var(--accento);
     border-color: var(--accento);
-    color: #fff;
+    color: var(--testo);
+    font-weight: 600;
 }
 
 .btn-pericolo {
@@ -187,7 +192,7 @@
 .dialogo-testata h2 {
     margin: 0 0 0.75rem;
     font-size: 1.05rem;
-    font-weight: 650;
+    font-weight: 600;
 }
 
 /* panel header row: title on the left, action button top-right */
@@ -207,7 +212,7 @@
 .pannello h3 {
     margin: 1.25rem 0 0.5rem;
     font-size: 0.95rem;
-    font-weight: 650;
+    font-weight: 600;
 }
 
 .testo-tenue {
@@ -261,7 +266,8 @@
 .campo input:focus-visible,
 .campo select:focus-visible,
 .campo textarea:focus-visible {
-    outline: 2px solid var(--accento);
+    /* darker orange: the bright fill is below 3:1 against white */
+    outline: 2px solid var(--accento-scuro);
     outline-offset: 1px;
 }
 
@@ -331,7 +337,7 @@ fieldset.campo {
 }
 
 .dialogo::backdrop {
-    background: rgba(34, 48, 60, 0.5);
+    background: rgba(10, 10, 10, 0.55);
 }
 
 .dialogo-contenuto {
@@ -371,35 +377,27 @@ fieldset.campo {
     color: #8a6116;
 }
 
-.badge-approvata {
+.badge-approvata,
+.badge-attiva {
     background: #e2f2e9;
-    color: #2e7d54;
+    color: var(--ok);
 }
 
 .badge-rifiutata {
     background: #f9e5e0;
-    color: #a8442f;
+    color: var(--errore);
 }
 
-.badge-annullata {
-    background: #e9edf1;
-    color: #5f6b76;
+.badge-annullata,
+.badge-sospesa {
+    background: #eceae7;
+    color: var(--testo-tenue);
 }
 
 /* tipo di richiesta (annullamento), non uno stato: tinta distinta apposta */
 .badge-annullamento {
     background: #ece7f6;
     color: #5b4a8a;
-}
-
-.badge-attiva {
-    background: #e2f2e9;
-    color: #2e7d54;
-}
-
-.badge-sospesa {
-    background: #e9edf1;
-    color: #5f6b76;
 }
 
 /* -------------------------------------------------------- report mensile */
@@ -437,7 +435,7 @@ fieldset.campo {
 
 .tabella-report tfoot th {
     border-bottom: none;
-    font-weight: 650;
+    font-weight: 600;
 }
 
 /* ----------------------------------------------------------------- liste */
@@ -518,7 +516,7 @@ fieldset.campo {
     align-items: center;
     padding: 0.45rem 0.2rem;
     font-size: 0.8rem;
-    font-weight: 650;
+    font-weight: 600;
     border-bottom: 2px solid var(--bordo-forte);
     border-left: 1px solid var(--bordo);
     text-transform: capitalize;
@@ -531,11 +529,11 @@ fieldset.campo {
 }
 
 .cal-giorno.oggi {
-    color: var(--accento);
+    color: var(--accento-testo);
 }
 
 .cal-giorno.oggi .cal-giorno-data {
-    color: var(--accento);
+    color: var(--accento-testo);
     font-weight: 600;
 }
 
