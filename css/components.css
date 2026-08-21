@@ -480,9 +480,9 @@
     justify-content: center;
     min-height: 110px;
     padding: 22px 26px;
-    background: #fbfbfb;
+    background: var(--c-white);
     /* filter: grayscale(1); */
-    opacity: 0.8;
+    /* opacity: 0.8; */
 	border: solid 3px transparent;
     transition: filter var(--t-hover), opacity var(--t-hover), box-shadow var(--t-hover), transform var(--t-hover), border-color var(--t-hover);
 	border-radius: var(--border-radius-common);
@@ -499,7 +499,7 @@
     .sponsor-item:hover {
 		cursor: pointer;
         /* filter: grayscale(0); */
-        opacity: 1;
+        /* opacity: 1; */
         box-shadow: var(--glow-orange);
 		transform: translateY(-10px);
 		border-color: var(--c-orange);
@@ -509,7 +509,7 @@
 .sponsor-item.is-tapped {
 	cursor: pointer;
 	/* filter: grayscale(0); */
-	opacity: 1;
+	/* opacity: 1; */
 	box-shadow: var(--glow-orange);
 	transform: translateY(-10px);
 	border-color: var(--c-orange);
