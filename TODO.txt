@@ -6,5 +6,3 @@
   1. Creare l'account Brevo (piano free, 300 email/giorno) e accettare il DPA (Data Processing Agreement) dal pannello
   2. Autenticare il dominio cardanoskating.it: aggiungere i 3 record DNS (Brevo code, DKIM, DMARC) proposti in Brevo > Senders & Domains (mittente configurato: info@cardanoskating.it)
   3. Creare la API key transazionale e configurarla: da prenotazioni/ eseguire npx wrangler secret put BREVO_API_KEY (finché il secret manca, l'invio resta disattivato)
-  4. Completare public/privacy.html: sede legale e CF/P.IVA del titolare (segnaposto "[da completare]")
-  5. Aggiornare l'email segnaposto della società di casa dal pannello admin (altrimenti le sue notifiche vanno a da-compilare@example.com)

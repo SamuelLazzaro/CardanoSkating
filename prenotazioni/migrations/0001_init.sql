@@ -85,6 +85,5 @@ CREATE UNIQUE INDEX idx_richieste_ricorrenza_data
   ON richieste(ricorrenza_id, data) WHERE ricorrenza_id IS NOT NULL;
 
 -- Società di casa, usata dall'admin per le prenotazioni dirette.
--- Email segnaposto: da aggiornare con il contatto reale dal pannello admin.
 INSERT INTO societa (nome, referente, email, token_accesso)
-VALUES ('Cardano Skating S.R.L. S.S.D.', 'Admin', 'da-compilare@example.com', lower(hex(randomblob(16))));
+VALUES ('Cardano Skating S.R.L. S.S.D.', 'Admin', 'info@cardanoskating.it', lower(hex(randomblob(16))));

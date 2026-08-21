@@ -107,6 +107,21 @@
     font-size: 0.8rem;
 }
 
+.btn-con-icona {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.btn-con-icona svg {
+    /* the inline SVG uses stroke="currentColor": the icon inherits the
+       button text color and its color transition from .btn */
+    display: block;
+    width: 1em;
+    height: 1em;
+    flex-shrink: 0;
+}
+
 .riga-azioni {
     display: flex;
     gap: 0.4rem;
