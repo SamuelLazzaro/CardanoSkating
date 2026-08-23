@@ -30,6 +30,7 @@
     --testo-tenue: #6b655d;       /* warm gray, 5.3:1 on --fondo */
     --bordo: #e4e1dc;
     --bordo-forte: #c9c4bc;
+	--c-white: #f5f5f5;
     /* brand orange, split by role: the bright fill fails WCAG contrast on
        white for text and thin UI strokes, so darker variants cover those */
     --accento: #ff8800;           /* fills only (slots, bars, primary btn) */

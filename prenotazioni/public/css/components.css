@@ -91,7 +91,7 @@
     --btn-bordo-attivo: var(--accento-scuro);
     background: var(--accento);
     border-color: var(--accento);
-    color: var(--testo);
+    color: var(--c-white);
     font-weight: 600;
 }
 
