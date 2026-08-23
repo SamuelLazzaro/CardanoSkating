@@ -83,6 +83,46 @@ export function slotKeys(data: string, oraInizio: string, oraFine: string): stri
   return chiavi;
 }
 
+/** Minuti da mezzanotte → 'HH:MM' (1440 → '24:00', l'ora di chiusura). */
+export function oraDaMinuti(minuti: number): string {
+  return `${String(Math.floor(minuti / 60)).padStart(2, '0')}:${String(minuti % 60).padStart(2, '0')}`;
+}
+
+/** Intervallo continuo su una singola data, come viene mostrato agli utenti. */
+export type FasciaOraria = { data: string; ora_inizio: string; ora_fine: string };
+
+/**
+ * Comprime una lista di slot_key nelle fasce continue che ricoprono.
+ *
+ * Serve a dire a chi prenota "12/03/2027 dalle 18:00 alle 19:00" invece di
+ * elencare ogni mezz'ora: una richiesta ricorrente può toccare fino a 128
+ * slot, illeggibili uno per uno.
+ *
+ * Algoritmo: le slot_key hanno formato ordinabile a larghezza fissa, quindi
+ * ordinarle lessicograficamente le mette in ordine cronologico. Scorrendole
+ * in sequenza, ogni slot o prolunga la fascia aperta — se inizia esattamente
+ * quando quella finisce, nella stessa data — oppure ne apre una nuova. Un
+ * buco temporale o un cambio di data chiudono sempre la fascia in corso.
+ */
+export function raggruppaSlotInFasce(chiavi: string[]): FasciaOraria[] {
+  const fasce: FasciaOraria[] = [];
+  for (const chiave of [...chiavi].sort()) {
+    const [data, orario] = chiave.split('_');
+    const minutiInizio = Number(orario.slice(0, 2)) * 60 + Number(orario.slice(2));
+    const oraInizio = oraDaMinuti(minutiInizio);
+    const oraFine = oraDaMinuti(minutiInizio + 30);
+
+    const fasciaAperta = fasce[fasce.length - 1];
+    const prolungaLaFascia = fasciaAperta !== undefined && fasciaAperta.data === data && fasciaAperta.ora_fine === oraInizio;
+    if (prolungaLaFascia) {
+      fasciaAperta.ora_fine = oraFine;
+    } else {
+      fasce.push({ data, ora_inizio: oraInizio, ora_fine: oraFine });
+    }
+  }
+  return fasce;
+}
+
 /** Aritmetica su date civili (via Date.UTC, quindi senza effetti di fuso). */
 export function aggiungiGiorni(data: string, giorni: number): string {
   const [anno, mese, giorno] = data.split('-').map(Number);

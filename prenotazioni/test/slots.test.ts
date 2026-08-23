@@ -5,6 +5,7 @@ import {
   isDataValida,
   lunediDellaSettimana,
   occorrenzeRicorrenza,
+  raggruppaSlotInFasce,
   slotKeys,
   validaIntervallo,
 } from '../src/slots';
@@ -94,5 +95,37 @@ describe('occorrenzeRicorrenza', () => {
       '2030-01-21',
       '2030-01-28',
     ]);
+  });
+});
+
+describe('raggruppaSlotInFasce', () => {
+  it('unisce gli slot contigui in una sola fascia', () => {
+    expect(raggruppaSlotInFasce(['2030-01-07_1800', '2030-01-07_1830', '2030-01-07_1900'])).toEqual([
+      { data: '2030-01-07', ora_inizio: '18:00', ora_fine: '19:30' },
+    ]);
+  });
+
+  it('spezza la fascia su un buco orario e su un cambio di data', () => {
+    expect(
+      raggruppaSlotInFasce([
+        '2030-01-07_1800',
+        '2030-01-07_1900', // 18:30 libero: la fascia precedente si chiude
+        '2030-01-08_1800', // altra data: fascia a sé anche se l'orario prosegue
+      ]),
+    ).toEqual([
+      { data: '2030-01-07', ora_inizio: '18:00', ora_fine: '18:30' },
+      { data: '2030-01-07', ora_inizio: '19:00', ora_fine: '19:30' },
+      { data: '2030-01-08', ora_inizio: '18:00', ora_fine: '18:30' },
+    ]);
+  });
+
+  it('ordina le chiavi ricevute in disordine e chiude a 24:00 l\'ultimo slot', () => {
+    expect(raggruppaSlotInFasce(['2030-01-07_2330', '2030-01-07_2300'])).toEqual([
+      { data: '2030-01-07', ora_inizio: '23:00', ora_fine: '24:00' },
+    ]);
+  });
+
+  it('senza slot occupati non produce fasce', () => {
+    expect(raggruppaSlotInFasce([])).toEqual([]);
   });
 });

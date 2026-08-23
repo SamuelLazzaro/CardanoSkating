@@ -6,10 +6,12 @@ import {
   MAX_SETTIMANE_RICORRENZA,
   occorrenzeRicorrenza,
   oraRoma,
+  raggruppaSlotInFasce,
+  slotKeys,
   validaIntervallo,
 } from '../slots';
 import { cancellaCookieSessione, COOKIE_SOCIETA, richiedeSocieta } from '../auth';
-import { eAnnullamentoDuplicato } from '../conflitti';
+import { eAnnullamentoDuplicato, slotOccupati } from '../conflitti';
 import { intero, leggiJson, MAX_TITOLO, scriviAudit, stmtAudit, testo, titoloAttivita } from '../util';
 import {
   notificaAnnullamentoRichiesto,
@@ -21,6 +23,18 @@ import {
 
 const MAX_NOTE = 500;
 const MAX_GIORNI_FUTURO = 365;
+
+/**
+ * Corpo della risposta 409 quando le fasce richieste non sono tutte libere.
+ *
+ * Non viene mai indicato QUALE società occupa gli slot: il calendario
+ * pubblico li espone in forma anonima e la stessa riservatezza vale qui.
+ * Le fasce arrivano già compattate, così il popup le elenca per esteso
+ * senza dover ripetere ogni mezz'ora.
+ */
+function fasceNonDisponibili(messaggio: string, chiaviOccupate: string[]): Record<string, unknown> {
+  return { errore: messaggio, fasce_occupate: raggruppaSlotInFasce(chiaviOccupate) };
+}
 
 export const societa = new Hono<{ Bindings: Bindings; Variables: VariabiliSocieta }>();
 
@@ -108,6 +122,20 @@ societa.post('/richieste', async (c) => {
       );
     }
     const giorno = giornoSettimana(data);
+    const occorrenze = occorrenzeRicorrenza(data, ripetiFinoAl, giorno);
+    // Tutto o niente: se anche un solo slot di una sola occorrenza è già
+    // prenotato, la ricorrenza non viene creata affatto.
+    const occupatiRicorrenza = await slotOccupati(
+      c.env.DB,
+      occorrenze.flatMap((dataOccorrenza) => slotKeys(dataOccorrenza, oraInizio, oraFine)),
+    );
+    if (occupatiRicorrenza.length > 0) {
+      return c.json(
+        fasceNonDisponibili('La richiesta ricorrente non è stata creata: alcune fasce non sono disponibili', occupatiRicorrenza),
+        409,
+      );
+    }
+
     const esiti = await c.env.DB.batch([
       c.env.DB
         .prepare(
@@ -126,10 +154,12 @@ societa.post('/richieste', async (c) => {
       titolo,
       note,
     });
-    return c.json(
-      { tipo: 'ricorrenza', id: esiti[0].meta.last_row_id, occorrenze: occorrenzeRicorrenza(data, ripetiFinoAl, giorno) },
-      201,
-    );
+    return c.json({ tipo: 'ricorrenza', id: esiti[0].meta.last_row_id, occorrenze }, 201);
+  }
+
+  const occupati = await slotOccupati(c.env.DB, slotKeys(data, oraInizio, oraFine));
+  if (occupati.length > 0) {
+    return c.json(fasceNonDisponibili('La richiesta non è stata inviata: alcune fasce non sono disponibili', occupati), 409);
   }
 
   const esiti = await c.env.DB.batch([

@@ -9,7 +9,17 @@ import { describe, expect, it } from 'vitest';
 import { env } from 'cloudflare:test';
 import app from '../src/index';
 import { aggiungiGiorni, oraRoma } from '../src/slots';
-import { cookieAdmin, cookieSocieta, creaSocietaConToken, getConCookie, postAdmin, postJson, slotDiRichiesta } from './helpers';
+import {
+  cookieAdmin,
+  cookieSocieta,
+  creaRichiesta,
+  creaSocieta,
+  creaSocietaConToken,
+  getConCookie,
+  postAdmin,
+  postJson,
+  slotDiRichiesta,
+} from './helpers';
 
 const oggi = oraRoma(new Date()).data;
 const dataFutura = aggiungiGiorni(oggi, 7);
@@ -133,6 +143,83 @@ describe('invio richieste dalla società', () => {
     ]);
     const riga = await env.DB.prepare('SELECT stato FROM ricorrenze WHERE id = ?1').bind(corpo.id).first<{ stato: string }>();
     expect(riga?.stato).toBe('in_attesa');
+  });
+});
+
+/**
+ * Controllo di disponibilità all'invio: la richiesta viene respinta se anche
+ * un solo slot da 30 minuti è già prenotato da qualcuno. Sono occupati solo
+ * gli slot delle prenotazioni APPROVATE: due società possono ancora avere
+ * richieste in attesa sulla stessa fascia, e decide l'amministratore.
+ */
+describe('disponibilità degli slot al momento dell\'invio', () => {
+  /** Occupa una fascia facendo approvare all'admin la richiesta di un'altra società. */
+  async function occupaFascia(data: string, oraInizio: string, oraFine: string): Promise<void> {
+    const societaId = await creaSocieta('ASD Occupante');
+    const richiestaId = await creaRichiesta(societaId, data, oraInizio, oraFine);
+    const risposta = await postAdmin(`/api/admin/richieste/${richiestaId}/approva`, await cookieAdmin(), { motivazione: 'Ok' });
+    expect(risposta.status).toBe(200);
+  }
+
+  it('respinge la richiesta singola che si sovrappone anche solo in parte', async () => {
+    const data = aggiungiGiorni(oggi, 30);
+    await occupaFascia(data, '18:30', '19:00');
+    const { token } = await creaSocietaConToken();
+    const cookie = await cookieSocieta(token);
+
+    // 18:00-19:30 tocca lo slot 18:30 già prenotato: niente va creato.
+    const risposta = await postJson('/api/societa/richieste', cookie, {
+      data,
+      ora_inizio: '18:00',
+      ora_fine: '19:30',
+    });
+    expect(risposta.status).toBe(409);
+    const corpo = (await risposta.json()) as { errore: string; fasce_occupate: unknown[] };
+    expect(corpo.fasce_occupate).toEqual([{ data, ora_inizio: '18:30', ora_fine: '19:00' }]);
+    // Nessuna identità rivelata: il calendario pubblico è anonimo.
+    expect(JSON.stringify(corpo)).not.toContain('Occupante');
+
+    const rimaste = await env.DB
+      .prepare("SELECT COUNT(*) AS n FROM richieste WHERE data = ?1 AND stato = 'in_attesa'")
+      .bind(data)
+      .first<{ n: number }>();
+    expect(rimaste?.n).toBe(0);
+  });
+
+  it('accetta una fascia adiacente a una già prenotata', async () => {
+    const data = aggiungiGiorni(oggi, 31);
+    await occupaFascia(data, '17:00', '18:00');
+    const { token } = await creaSocietaConToken();
+    const cookie = await cookieSocieta(token);
+
+    // Lo slot 17:30 finisce quando inizia la richiesta: non è un conflitto.
+    const risposta = await postJson('/api/societa/richieste', cookie, { data, ora_inizio: '18:00', ora_fine: '19:00' });
+    expect(risposta.status).toBe(201);
+  });
+
+  it('respinge tutta la ricorrenza se una sola occorrenza è occupata', async () => {
+    const data = aggiungiGiorni(oggi, 32);
+    const secondaOccorrenza = aggiungiGiorni(data, 7);
+    await occupaFascia(secondaOccorrenza, '18:00', '18:30');
+    const { token } = await creaSocietaConToken();
+    const cookie = await cookieSocieta(token);
+
+    const risposta = await postJson('/api/societa/richieste', cookie, {
+      data,
+      ora_inizio: '18:00',
+      ora_fine: '19:00',
+      ripeti_fino_al: aggiungiGiorni(data, 14),
+    });
+    expect(risposta.status).toBe(409);
+    const corpo = (await risposta.json()) as { errore: string; fasce_occupate: unknown[] };
+    // Solo la fascia realmente occupata, non l'intera occorrenza richiesta.
+    expect(corpo.fasce_occupate).toEqual([{ data: secondaOccorrenza, ora_inizio: '18:00', ora_fine: '18:30' }]);
+
+    const ricorrenze = await env.DB
+      .prepare('SELECT COUNT(*) AS n FROM ricorrenze WHERE valida_dal = ?1')
+      .bind(data)
+      .first<{ n: number }>();
+    expect(ricorrenze?.n).toBe(0);
   });
 });
 

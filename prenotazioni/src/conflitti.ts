@@ -32,16 +32,22 @@ export function eAnnullamentoDuplicato(errore: unknown): boolean {
 export type Conflitto = { slot_key: string; societa: string };
 
 /**
- * Trova quali tra le chiavi candidate sono già occupate, e da chi.
+ * Estremi lessicografici delle chiavi candidate.
  *
- * Una sola query con range [min, max] delle candidate e intersezione in JS:
- * un IN (...) con tutte le chiavi potrebbe superare il limite D1 di 100
- * parametri bound per statement (una ricorrenza può candidare fino a 128
+ * Le ricerche di conflitto interrogano il range [min, max] e intersecano poi
+ * in JS: un IN (...) con tutte le chiavi potrebbe superare il limite D1 di
+ * 100 parametri bound per statement (una ricorrenza può candidare fino a 128
  * slot), mentre il range resta sempre a 2 parametri.
  */
+function estremi(chiaviCandidate: string[]): { minimo: string; massimo: string } {
+  const ordinate = [...chiaviCandidate].sort();
+  return { minimo: ordinate[0], massimo: ordinate[ordinate.length - 1] };
+}
+
+/** Trova quali tra le chiavi candidate sono già occupate, e da chi (vista admin). */
 export async function trovaConflitti(db: D1Database, chiaviCandidate: string[]): Promise<Conflitto[]> {
   if (chiaviCandidate.length === 0) return [];
-  const ordinate = [...chiaviCandidate].sort();
+  const { minimo, massimo } = estremi(chiaviCandidate);
   const { results } = await db
     .prepare(
       `SELECT p.slot_key, s.nome AS societa
@@ -49,8 +55,27 @@ export async function trovaConflitti(db: D1Database, chiaviCandidate: string[]):
        WHERE p.slot_key >= ?1 AND p.slot_key <= ?2
        ORDER BY p.slot_key`,
     )
-    .bind(ordinate[0], ordinate[ordinate.length - 1])
+    .bind(minimo, massimo)
     .all<Conflitto>();
   const cercate = new Set(chiaviCandidate);
   return results.filter((riga) => cercate.has(riga.slot_key));
+}
+
+/**
+ * Quali tra le chiavi candidate risultano già prenotate, SENZA dire da chi.
+ *
+ * È la variante destinata alle società: il calendario pubblico mostra gli
+ * slot occupati in forma anonima (vedi routes/pubblico.ts) e la stessa
+ * riservatezza vale qui. Il tipo di ritorno è di sole chiavi proprio perché
+ * l'identità di chi occupa lo slot non possa sfuggire nella risposta.
+ */
+export async function slotOccupati(db: D1Database, chiaviCandidate: string[]): Promise<string[]> {
+  if (chiaviCandidate.length === 0) return [];
+  const { minimo, massimo } = estremi(chiaviCandidate);
+  const { results } = await db
+    .prepare('SELECT slot_key FROM prenotazioni WHERE slot_key >= ?1 AND slot_key <= ?2 ORDER BY slot_key')
+    .bind(minimo, massimo)
+    .all<{ slot_key: string }>();
+  const cercate = new Set(chiaviCandidate);
+  return results.map((riga) => riga.slot_key).filter((chiave) => cercate.has(chiave));
 }

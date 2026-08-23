@@ -71,6 +71,29 @@ export function mostraMessaggio(elemento, testo, tipo = '') {
 }
 
 /**
+ * Status message followed by a bullet list (e.g. the time ranges that are no
+ * longer available). Both the message and every item go through textContent,
+ * so server-provided data can never become markup.
+ * @param {HTMLElement} elemento - element with the .stato class
+ * @param {string} testo - message shown above the list
+ * @param {string[]} voci - list items, already formatted for reading
+ * @param {'ok'|'errore'|''} [tipo] - visual variant
+ * @returns {void}
+ */
+export function mostraMessaggioConElenco(elemento, testo, voci, tipo = '') {
+  mostraMessaggio(elemento, testo, tipo);
+  if (voci.length === 0) return;
+  const elenco = document.createElement('ul');
+  elenco.className = 'elenco-stato';
+  for (const voce of voci) {
+    const riga = document.createElement('li');
+    riga.textContent = voce;
+    elenco.appendChild(riga);
+  }
+  elemento.appendChild(elenco);
+}
+
+/**
  * Wires a modal dialog to its open/close buttons. The dialog also closes on
  * Esc (native <dialog> behaviour) and on a click landing on the backdrop:
  * clicks inside the content target an inner element, so a target equal to

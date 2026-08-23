@@ -35,7 +35,7 @@ import {
   ottieniRichiesteSocieta,
   richiediAnnullamento,
 } from './api.js';
-import { costruisciGriglia, creaBadge, mostraMessaggio, preparaDialogo } from './ui.js';
+import { costruisciGriglia, creaBadge, mostraMessaggio, mostraMessaggioConElenco, preparaDialogo } from './ui.js';
 
 // First thing on every page: its capture listener must precede all others.
 avviaTapFeedback();
@@ -206,10 +206,30 @@ async function inviaForm(evento) {
     await caricaRichieste();
     await caricaCalendario();
   } catch (errore) {
-    mostraMessaggio(esitoForm, errore.message, 'errore');
+    mostraErroreInvio(esitoForm, errore);
   } finally {
     bottone.disabled = false;
   }
+}
+
+/**
+ * Renders a submission error inside the popup. When the server rejected the
+ * request because some 30-minute slots are already booked, the occupied time
+ * ranges are listed one per line; every other error keeps the plain message.
+ * @param {HTMLElement} esitoForm - status element inside the dialog
+ * @param {Error & {dati?: {fasce_occupate?: {data: string, ora_inizio: string, ora_fine: string}[]}}} errore
+ * @returns {void}
+ */
+function mostraErroreInvio(esitoForm, errore) {
+  const fasceOccupate = errore.dati?.fasce_occupate ?? [];
+  if (fasceOccupate.length === 0) {
+    mostraMessaggio(esitoForm, errore.message, 'errore');
+    return;
+  }
+  const voci = fasceOccupate.map(
+    (fascia) => `${dataEstesa(fascia.data)}, dalle ${fascia.ora_inizio} alle ${fascia.ora_fine}`,
+  );
+  mostraMessaggioConElenco(esitoForm, errore.message, voci, 'errore');
 }
 
 /* ----------------------------------------------------------------- liste */
