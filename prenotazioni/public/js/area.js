@@ -35,7 +35,15 @@ import {
   ottieniRichiesteSocieta,
   richiediAnnullamento,
 } from './api.js';
-import { costruisciGriglia, creaBadge, mostraMessaggio, mostraMessaggioConElenco, preparaDialogo } from './ui.js';
+import {
+  aggiungiBottoneSlot,
+  costruisciGriglia,
+  creaBadge,
+  mostraMessaggio,
+  mostraMessaggioConElenco,
+  preparaDialogo,
+  preparaScorciatoiaSlot,
+} from './ui.js';
 
 // First thing on every page: its capture listener must precede all others.
 avviaTapFeedback();
@@ -134,6 +142,10 @@ function preparaForm() {
   // A stale error from a previous attempt must not greet the reopened dialog.
   elemento('bottone-nuova-prenotazione').addEventListener('click', () => mostraMessaggio(elemento('esito-form'), ''));
 
+  // "+" shortcut on the free slots of the calendar: one delegated listener,
+  // registered before the first render because the container already exists.
+  preparaScorciatoiaSlot(elemento('cal-griglia'), apriRichiestaPerSlot);
+
   elemento('form-richiesta').addEventListener('submit', inviaForm);
   elemento('bottone-esci').addEventListener('click', esci);
   elemento('bottone-copia').addEventListener('click', copiaLinkIcs);
@@ -143,6 +155,26 @@ function preparaForm() {
     g_lunediArea = lunediDellaSettimana(adessoRoma().data);
     caricaCalendario();
   });
+}
+
+/**
+ * Opens the request popup on the slot whose "+" was pressed: the date and the
+ * start time come from the slot, the end is the end of that same slot (one
+ * PASSO_MIN step), which the società can then widen in the form.
+ * @param {string} giorno - 'YYYY-MM-DD' of the slot
+ * @param {number} minuti - slot start, minutes from midnight
+ * @returns {void}
+ */
+function apriRichiestaPerSlot(giorno, minuti) {
+  elemento('campo-data').value = giorno;
+  elemento('campo-inizio').value = oraTesto(minuti);
+  elemento('campo-fine').value = oraTesto(minuti + PASSO_MIN);
+  // The date was written programmatically, which fires no 'change' event:
+  // the repetition limits have to be refreshed by hand.
+  aggiornaLimitiRipetizione();
+  // A stale error from a previous attempt must not greet the reopened dialog.
+  mostraMessaggio(elemento('esito-form'), '');
+  elemento('dialogo-richiesta').showModal();
 }
 
 /** @returns {void} keeps the "fino al" limits tied to the chosen date */
@@ -543,8 +575,12 @@ function renderCalendario(occupati, miei) {
         cella.classList.add('occupato');
         descrizione = 'occupato';
       }
-      if (chiave < chiaveAdesso) cella.classList.add('passato');
+      const passato = chiave < chiaveAdesso;
+      if (passato) cella.classList.add('passato');
       if (giorno === adesso.data) cella.classList.add('colonna-oggi');
+      // Only a free future slot can be requested, so only there the "+"
+      // shortcut makes sense: elsewhere the popup would be born rejected.
+      if (!occupato && !mio && !passato) aggiungiBottoneSlot(cella, giorno, minuti);
       const etichetta = etichettaGiorno(giorno);
       cella.title = `${etichetta.nomeGiorno} ${etichetta.dataBreve} · ${oraTesto(minuti)}–${oraTesto(minuti + PASSO_MIN)} · ${descrizione}`;
     },

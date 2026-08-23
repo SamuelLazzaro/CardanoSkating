@@ -96,6 +96,17 @@ function intercettaClick(eventoClick) {
 }
 
 /**
+ * Tells whether the last pointer that went down was a finger. Lets other
+ * modules give touch screens a different interaction (e.g. the "+" shortcut
+ * of the calendar slots, revealed by a tap because touch has no :hover)
+ * without repeating the pointer-type bookkeeping done here.
+ * @returns {boolean} true when the last pointer press came from a touch screen
+ */
+export function eUltimoInputTouch() {
+  return g_ultimoInputTouch;
+}
+
+/**
  * Starts giving taps a visual feedback before their action runs.
  * Must be called before any other click handler is registered, so that its
  * capture-phase listener is the first one document sees.

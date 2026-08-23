@@ -42,7 +42,15 @@ import {
   rigeneraTokenSocieta,
   sospendiSocieta,
 } from './api.js';
-import { costruisciGriglia, creaBadge, mostraMessaggio, preparaDialogo, preparaSelectOrari } from './ui.js';
+import {
+  aggiungiBottoneSlot,
+  costruisciGriglia,
+  creaBadge,
+  mostraMessaggio,
+  preparaDialogo,
+  preparaScorciatoiaSlot,
+  preparaSelectOrari,
+} from './ui.js';
 
 // First thing on every page: its capture listener must precede all others.
 avviaTapFeedback();
@@ -103,6 +111,10 @@ function preparaEventi() {
   // The "Nuova società" button always reopens the dialog in create mode,
   // discarding any leftover edit state from a previous opening.
   elemento('bottone-nuova-societa').addEventListener('click', () => impostaFormSocieta(null));
+
+  // "+" shortcut on the free slots of the calendar: one delegated listener,
+  // registered before the first render because the container already exists.
+  preparaScorciatoiaSlot(elemento('cal-griglia'), apriDirettaPerSlot);
 
   elemento('form-login').addEventListener('submit', accedi);
   elemento('bottone-esci').addEventListener('click', esci);
@@ -478,8 +490,12 @@ function renderCalendario(prenotazioni) {
           cella.append(etichettaBlocco);
         }
       }
-      if (chiave < chiaveAdesso) cella.classList.add('passato');
+      const passato = chiave < chiaveAdesso;
+      if (passato) cella.classList.add('passato');
       if (giorno === adesso.data) cella.classList.add('colonna-oggi');
+      // Only a free future slot can be booked, so only there the "+"
+      // shortcut makes sense: elsewhere the popup would be born rejected.
+      if (!prenotazione && !passato) aggiungiBottoneSlot(cella, giorno, minuti);
       cella.title = `${etichetta.nomeGiorno} ${etichetta.dataBreve} · ${oraTesto(minuti)}–${oraTesto(minuti + PASSO_MIN)} · ${descrizione}`;
     },
     (testata, giorno) => {
@@ -563,6 +579,24 @@ async function annullaData(richiestaId, societa, data, oraInizio, oraFine) {
 }
 
 /* --------------------------------------------------- prenotazione diretta */
+
+/**
+ * Opens the direct booking popup on the slot whose "+" was pressed: the date
+ * and the start time come from the slot, the end is the end of that same slot
+ * (one PASSO_MIN step), which the admin can then widen in the form. The
+ * società select keeps its current selection: the slot says nothing about it.
+ * @param {string} giorno - 'YYYY-MM-DD' of the slot
+ * @param {number} minuti - slot start, minutes from midnight
+ * @returns {void}
+ */
+function apriDirettaPerSlot(giorno, minuti) {
+  elemento('dir-data').value = giorno;
+  elemento('dir-inizio').value = oraTesto(minuti);
+  elemento('dir-fine').value = oraTesto(minuti + PASSO_MIN);
+  // A stale error from a previous attempt must not greet the reopened dialog.
+  mostraMessaggio(elemento('esito-form'), '');
+  elemento('dialogo-diretta').showModal();
+}
 
 /**
  * @param {SubmitEvent} evento - direct booking form submit

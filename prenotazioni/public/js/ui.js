@@ -1,6 +1,16 @@
 /* ui.js — DOM manipulation helpers shared by the pages. No API calls here. */
 import { APERTURA_MIN, CHIUSURA_MIN, PASSO_MIN, TESTO_STATO } from './constants.js';
+import { eUltimoInputTouch } from './tap-feedback.js';
 import { etichettaGiorno, oraTesto } from './utils.js';
+
+/** @type {string} class of the "+" shortcut button placed on free slots */
+const CLASSE_BOTTONE_SLOT = 'btn-aggiungi-slot';
+
+/** @type {string} class marking the slot whose "+" a tap has revealed */
+const CLASSE_SLOT_RIVELATO = 'mostra-aggiungi';
+
+/** @type {string} SVG namespace, required by createElementNS */
+const NS_SVG = 'http://www.w3.org/2000/svg';
 
 /**
  * Builds the weekly grid (hour column + 7 day columns, one row per half
@@ -55,6 +65,100 @@ export function costruisciGriglia(contenitore, giorni, decoraCella, decoraGiorno
   }
 
   contenitore.appendChild(frammento);
+}
+
+/**
+ * Builds the stroked "+" icon of the slot shortcut: same shape as the icon
+ * inside the "Nuova prenotazione" buttons of the pages.
+ * @returns {SVGSVGElement}
+ */
+function creaIconaPiu() {
+  const icona = document.createElementNS(NS_SVG, 'svg');
+  icona.setAttribute('viewBox', '0 0 24 24');
+  icona.setAttribute('fill', 'none');
+  icona.setAttribute('stroke', 'currentColor');
+  icona.setAttribute('stroke-width', '3');
+  icona.setAttribute('stroke-linecap', 'round');
+  icona.setAttribute('aria-hidden', 'true');
+  const linee = [[12, 5, 12, 19], [5, 12, 19, 12]]; // vertical, then horizontal stroke
+  for (const [x1, y1, x2, y2] of linee) {
+    const linea = document.createElementNS(NS_SVG, 'line');
+    linea.setAttribute('x1', String(x1));
+    linea.setAttribute('y1', String(y1));
+    linea.setAttribute('x2', String(x2));
+    linea.setAttribute('y2', String(y2));
+    icona.append(linea);
+  }
+  return icona;
+}
+
+/**
+ * Adds the "+" shortcut to a free slot of the weekly grid: a small round
+ * button in the top-right corner of the cell, which opens the booking popup
+ * already filled with that date and time. Callers decide which slots deserve
+ * it (free and not past).
+ *
+ * Only the markup is created here: the click is served by the single
+ * delegated listener of preparaScorciatoiaSlot, so a whole week of slots
+ * costs one listener instead of ~200. Date and start minute travel in the
+ * button's data attributes.
+ * @param {HTMLElement} cella - the .slot cell the button belongs to
+ * @param {string} giorno - 'YYYY-MM-DD' of the slot
+ * @param {number} minuti - slot start, minutes from midnight
+ * @returns {void}
+ */
+export function aggiungiBottoneSlot(cella, giorno, minuti) {
+  const bottone = document.createElement('button');
+  bottone.type = 'button';
+  bottone.className = CLASSE_BOTTONE_SLOT;
+  bottone.dataset.giorno = giorno;
+  bottone.dataset.minuti = String(minuti);
+  const etichetta = etichettaGiorno(giorno);
+  bottone.setAttribute('aria-label', `Nuova prenotazione ${etichetta.nomeGiorno} ${etichetta.dataBreve} alle ${oraTesto(minuti)}`);
+  bottone.append(creaIconaPiu());
+  cella.classList.add('con-aggiungi');
+  cella.append(bottone);
+}
+
+/**
+ * Wires the "+" shortcut of a weekly grid with one delegated listener, which
+ * survives every week re-render (costruisciGriglia empties the container but
+ * the container itself stays in place).
+ *
+ * Mouse and stylus reveal the "+" on :hover, in pure CSS. Touch screens have
+ * no hover, so there the reveal takes two taps and every click is classified:
+ *   - tap on a "+": open the popup on its slot (the only case that acts)
+ *   - tap on a slot that owns a hidden "+": reveal it, so the next tap can
+ *     hit it; a second tap on the same slot hides it again
+ *   - anything else, anywhere on the page: just hide the revealed "+"
+ * At most one "+" is revealed at a time, so the grid never fills with them.
+ * @param {HTMLElement} contenitore - the grid container (.calendario)
+ * @param {(giorno: string, minuti: number) => void} alSelezione - opens the popup on a slot
+ * @returns {void}
+ */
+export function preparaScorciatoiaSlot(contenitore, alSelezione) {
+  document.addEventListener('click', (evento) => {
+    const bersaglio = evento.target instanceof Element ? evento.target : null;
+    const cellaCliccata = bersaglio?.closest('.slot') ?? null;
+    const bottone = bersaglio?.closest(`.${CLASSE_BOTTONE_SLOT}`) ?? null;
+    // Only this grid reacts: the page may host more than one.
+    const cellaNostra = cellaCliccata !== null && contenitore.contains(cellaCliccata);
+    const eraRivelata = cellaNostra && cellaCliccata.classList.contains(CLASSE_SLOT_RIVELATO);
+
+    const rivelata = contenitore.querySelector(`.${CLASSE_SLOT_RIVELATO}`);
+    if (rivelata !== null) rivelata.classList.remove(CLASSE_SLOT_RIVELATO);
+
+    if (bottone !== null && contenitore.contains(bottone)) {
+      alSelezione(bottone.dataset.giorno, Number(bottone.dataset.minuti));
+      return;
+    }
+
+    const daRivelare = cellaNostra
+      && !eraRivelata
+      && eUltimoInputTouch()
+      && cellaCliccata.querySelector(`.${CLASSE_BOTTONE_SLOT}`) !== null;
+    if (daRivelare) cellaCliccata.classList.add(CLASSE_SLOT_RIVELATO);
+  });
 }
 
 /**

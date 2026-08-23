@@ -702,6 +702,75 @@ fieldset.campo {
     opacity: 0.85;
 }
 
+/* ------------------------------------------- scorciatoia "+" sullo slot */
+
+/*
+ * Round "+" in the top-right corner of a free slot (admin and area pages):
+ * it opens the booking popup already filled with that slot's date and time.
+ * js/ui.js only puts it on free, non-past slots.
+ *
+ * It is a pointer affordance, so display: none is its resting state: that
+ * keeps ~200 buttons per week out of the tab order and of the accessibility
+ * tree, where they would bury the rest of the page (the panel "Nuova
+ * prenotazione" button stays the keyboard path to the same popup). A mouse
+ * reveals it on :hover; a touch screen, which has no hover, reveals it with
+ * the .mostra-aggiungi class that js/ui.js sets on the tapped slot.
+ */
+.slot.con-aggiungi {
+    position: relative;
+}
+
+.btn-aggiungi-slot {
+    /* shared between :hover and .is-tapped, so the two states cannot drift */
+    --aggiungi-fondo-attivo: var(--accento-scuro);
+    display: none;
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: var(--accento);
+    color: var(--c-white);
+    cursor: pointer;
+    transition: background-color var(--t-veloce);
+}
+
+.btn-aggiungi-slot svg {
+    /* the inline SVG uses stroke="currentColor": the plus inherits the
+       button text color and its transition */
+    display: block;
+    width: 12px;
+    height: 12px;
+}
+
+@media (pointer: fine) {
+    .slot:hover > .btn-aggiungi-slot {
+        display: flex;
+    }
+
+    .btn-aggiungi-slot:hover {
+        background: var(--aggiungi-fondo-attivo);
+    }
+}
+
+/* touch: the tapped slot shows its "+" until the next tap elsewhere */
+.slot.mostra-aggiungi > .btn-aggiungi-slot {
+    display: flex;
+}
+
+.btn-aggiungi-slot.is-tapped {
+    background: var(--aggiungi-fondo-attivo);
+}
+
+.btn-aggiungi-slot:focus-visible {
+    background: var(--aggiungi-fondo-attivo);
+}
+
 @media (max-width: 640px) {
     .calendario {
         grid-template-columns: 3rem repeat(7, minmax(56px, 1fr));
