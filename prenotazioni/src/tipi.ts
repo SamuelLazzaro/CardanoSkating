@@ -7,7 +7,10 @@ export type Bindings = {
   BREVO_API_KEY?: string;
   /** Mittente delle notifiche (indirizzo su dominio autenticato in Brevo). */
   EMAIL_MITTENTE?: string;
-  /** Indirizzo dell'amministratore: in copia su ogni notifica e Reply-To. */
+  /**
+   * Indirizzo dell'amministratore: riceve un'email dedicata per gli eventi
+   * avviati dalle società ed è il Reply-To delle email alle società.
+   */
   EMAIL_ADMIN?: string;
 };
 

@@ -124,6 +124,7 @@ societa.post('/richieste', async (c) => {
       valida_dal: data,
       valida_al: ripetiFinoAl,
       titolo,
+      note,
     });
     return c.json(
       { tipo: 'ricorrenza', id: esiti[0].meta.last_row_id, occorrenze: occorrenzeRicorrenza(data, ripetiFinoAl, giorno) },
@@ -137,7 +138,7 @@ societa.post('/richieste', async (c) => {
       .bind(soc.id, data, oraInizio, oraFine, titolo, note),
     stmtAudit(c.env.DB, 'richiesta_creata', `${data} ${oraInizio}-${oraFine}`, `societa:${soc.id}`),
   ]);
-  notificaRichiestaInviata(c, soc, { data, ora_inizio: oraInizio, ora_fine: oraFine, titolo });
+  notificaRichiestaInviata(c, soc, { data, ora_inizio: oraInizio, ora_fine: oraFine, titolo, note });
   return c.json({ tipo: 'richiesta', id: esiti[0].meta.last_row_id }, 201);
 });
 

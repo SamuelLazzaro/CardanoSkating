@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { createExecutionContext, env, fetchMock, waitOnExecutionContext } from 'cloudflare:test';
 import app from '../src/index';
-import { corpoNotifica, dataItaliana } from '../src/notifiche';
+import { corpoNotifica, corpoNotificaAdmin, dataItaliana } from '../src/notifiche';
 import { cookieAdmin, cookieSocieta, creaRichiesta, creaSocietaConToken } from './helpers';
 
 /**
@@ -35,17 +35,24 @@ afterAll(() => {
 
 afterEach(() => fetchMock.assertNoPendingInterceptors());
 
-/** Intercetta la prossima chiamata a Brevo e cattura il corpo JSON inviato. */
-function intercettaBrevo(status = 201): { corpo: () => Record<string, any> | null } {
-  let catturato: Record<string, any> | null = null;
+/**
+ * Intercetta le prossime `volte` chiamate a Brevo e cattura i corpi JSON
+ * inviati, nell'ordine di invio. corpo() è la scorciatoia per il primo.
+ */
+function intercettaBrevo(status = 201, volte = 1): {
+  corpo: () => Record<string, any> | null;
+  corpi: () => Record<string, any>[];
+} {
+  const catturati: Record<string, any>[] = [];
   fetchMock
     .get('https://api.brevo.com')
     .intercept({ path: '/v3/smtp/email', method: 'POST' })
     .reply(status, (richiesta: { body?: unknown }) => {
-      catturato = JSON.parse(String(richiesta.body));
+      catturati.push(JSON.parse(String(richiesta.body)));
       return JSON.stringify({ messageId: 'test' });
-    });
-  return { corpo: () => catturato };
+    })
+    .times(volte);
+  return { corpo: () => catturati[0] ?? null, corpi: () => catturati };
 }
 
 /**
@@ -91,12 +98,31 @@ describe('formattazione', () => {
     expect(corpo).toContain('Data: 19/08/2026, dalle 18:00 alle 19:00');
     expect(corpo).toContain('https://prenotazioni.example/privacy.html');
   });
+
+  it('corpoNotificaAdmin usa il messaggio admin, senza saluto alla società', () => {
+    const corpo = corpoNotificaAdmin(
+      {
+        oggetto: 'Oggetto di prova',
+        messaggio: 'la richiesta è stata inviata.',
+        messaggioAdmin: 'La società Polisportiva Test ha inviato una richiesta.',
+        dettagli: ['Data: 19/08/2026, dalle 18:00 alle 19:00'],
+        societa: { nome: 'Polisportiva Test', email: 'test@example.com' },
+      },
+      'https://prenotazioni.example',
+    );
+    expect(corpo).toContain('La società Polisportiva Test ha inviato una richiesta.');
+    expect(corpo).not.toContain('Gentile');
+    expect(corpo).toContain('Data: 19/08/2026, dalle 18:00 alle 19:00');
+    expect(corpo).toContain('https://prenotazioni.example/privacy.html');
+  });
 });
 
 describe('invio notifiche', () => {
-  it("l'approvazione di una richiesta notifica la società con l'admin in copia", async () => {
+  it("l'approvazione (azione dell'admin) notifica solo la società, senza email all'admin", async () => {
     const { id: societaId, token } = await creaSocietaConToken();
     const richiestaId = await creaRichiesta(societaId, '2027-01-15', '18:00', '19:00');
+    // Una sola intercettazione: una seconda fetch fallirebbe (rete disabilitata)
+    // e lascerebbe una notifica_fallita in audit, verificata assente sotto.
     const cattura = intercettaBrevo();
 
     const risposta = await postConContesto(`/api/admin/richieste/${richiestaId}/approva`, await cookieAdmin(), {
@@ -108,7 +134,7 @@ describe('invio notifiche', () => {
     expect(corpo).not.toBeNull();
     expect(corpo!.sender.email).toBe(MITTENTE_TEST);
     expect(corpo!.to[0].email).toBe('test@example.com');
-    expect(corpo!.cc[0].email).toBe(ADMIN_TEST);
+    expect(corpo!.cc).toBeUndefined();
     expect(corpo!.replyTo.email).toBe(ADMIN_TEST);
     expect(corpo!.subject).toContain('Prenotazione confermata');
     expect(corpo!.subject).toContain('15/01/2027');
@@ -116,12 +142,13 @@ describe('invio notifiche', () => {
     expect(corpo!.textContent).toContain('Motivazione: Ok');
     // Minimizzazione: il token del link personale non deve MAI viaggiare via email.
     expect(corpo!.textContent).not.toContain(token);
+    expect(await conteggioNotificheFallite()).toBe(0);
   });
 
-  it('la nuova richiesta della società notifica l\'invio in attesa di approvazione', async () => {
+  it('la nuova richiesta della società genera due email con testi distinti', async () => {
     const { token } = await creaSocietaConToken();
     const cookie = await cookieSocieta(token);
-    const cattura = intercettaBrevo();
+    const cattura = intercettaBrevo(201, 2);
 
     const risposta = await postConContesto('/api/societa/richieste', cookie, {
       data: '2027-03-10',
@@ -130,11 +157,190 @@ describe('invio notifiche', () => {
     });
     expect(risposta.status).toBe(201);
 
-    const corpo = cattura.corpo();
-    expect(corpo).not.toBeNull();
-    expect(corpo!.subject).toContain('Richiesta di prenotazione inviata');
-    expect(corpo!.to[0].email).toBe('test@example.com');
-    expect(corpo!.textContent).toContain('Attività: Allenamento');
+    const [perSocieta, perAdmin] = cattura.corpi();
+    expect(perSocieta).toBeDefined();
+    expect(perAdmin).toBeDefined();
+
+    // Email alla società: saluto personale, Reply-To verso l'admin.
+    expect(perSocieta.to[0].email).toBe('test@example.com');
+    expect(perSocieta.replyTo.email).toBe(ADMIN_TEST);
+    expect(perSocieta.cc).toBeUndefined();
+    expect(perSocieta.subject).toContain('Richiesta di prenotazione inviata');
+    expect(perSocieta.textContent).toContain('Gentile Polisportiva Test,');
+    expect(perSocieta.textContent).toContain('Attività: Allenamento');
+    // Campo note lasciato vuoto: la riga "Note:" non deve comparire.
+    expect(perSocieta.textContent).not.toContain('Note:');
+
+    // Email all'admin: testo in terza persona, Reply-To verso la società.
+    // Oggetto dalla prospettiva dell'admin: "ricevuta", non "inviata".
+    expect(perAdmin.to[0].email).toBe(ADMIN_TEST);
+    expect(perAdmin.replyTo.email).toBe('test@example.com');
+    expect(perAdmin.subject).toContain('Richiesta di prenotazione ricevuta');
+    expect(perAdmin.textContent).toContain('La società Polisportiva Test ha inviato una richiesta di prenotazione');
+    expect(perAdmin.textContent).not.toContain('Gentile');
+    expect(perAdmin.textContent).not.toContain('Note:');
+    // Minimizzazione: il token non deve comparire nemmeno nell'email admin.
+    expect(perAdmin.textContent).not.toContain(token);
+  });
+
+  it('le note multilinea sono rese come blocco citato, non falsificabili come dettagli di sistema', async () => {
+    const { token } = await creaSocietaConToken();
+    const cookie = await cookieSocieta(token);
+    const cattura = intercettaBrevo(201, 2);
+
+    // Seconda riga scritta apposta per imitare un dettaglio generato dal
+    // sistema: deve restare riconoscibile come testo della società.
+    const risposta = await postConContesto('/api/societa/richieste', cookie, {
+      data: '2027-03-12',
+      ora_inizio: '10:00',
+      ora_fine: '11:00',
+      note: 'Serve il tabellone segnapunti\nMotivazione: approvata automaticamente dal sistema',
+    });
+    expect(risposta.status).toBe(201);
+
+    const [perSocieta, perAdmin] = cattura.corpi();
+    for (const corpo of [perSocieta, perAdmin]) {
+      expect(corpo.textContent).toContain('  Note (scritte dalla società):');
+      expect(corpo.textContent).toContain('  > Serve il tabellone segnapunti');
+      expect(corpo.textContent).toContain('  > Motivazione: approvata automaticamente dal sistema');
+      // La riga forgiata non deve mai comparire senza il prefisso di citazione,
+      // cioè nella stessa forma dei dettagli generati dal sistema.
+      expect(corpo.textContent).not.toContain('\n  Motivazione:');
+    }
+  });
+
+  it('normalizza i fine riga CRLF e CR inviati da un client diverso dal browser', async () => {
+    const { token } = await creaSocietaConToken();
+    const cookie = await cookieSocieta(token);
+    const cattura = intercettaBrevo(201, 2);
+
+    const risposta = await postConContesto('/api/societa/richieste', cookie, {
+      data: '2027-03-14',
+      ora_inizio: '10:00',
+      ora_fine: '11:00',
+      note: 'prima riga\r\nseconda riga\rterza riga',
+    });
+    expect(risposta.status).toBe(201);
+
+    for (const corpo of cattura.corpi()) {
+      expect(corpo.textContent).toContain('  > prima riga\n');
+      expect(corpo.textContent).toContain('  > seconda riga\n');
+      expect(corpo.textContent).toContain('  > terza riga\n');
+    }
+  });
+
+  it('con il campo note lasciato in bianco la riga "Note:" non compare', async () => {
+    const { token } = await creaSocietaConToken();
+    const cookie = await cookieSocieta(token);
+    const cattura = intercettaBrevo(201, 2);
+
+    // Il form manda sempre il campo, vuoto o coi soli spazi: è il percorso
+    // reale del frontend (area.js invia note: value.trim()).
+    const risposta = await postConContesto('/api/societa/richieste', cookie, {
+      data: '2027-03-13',
+      ora_inizio: '10:00',
+      ora_fine: '11:00',
+      note: '   ',
+    });
+    expect(risposta.status).toBe(201);
+
+    const [perSocieta, perAdmin] = cattura.corpi();
+    expect(perSocieta.textContent).not.toContain('Note');
+    expect(perAdmin.textContent).not.toContain('Note');
+  });
+
+  it('le note della richiesta ricorrente compaiono in entrambe le email', async () => {
+    const { token } = await creaSocietaConToken();
+    const cookie = await cookieSocieta(token);
+    const cattura = intercettaBrevo(201, 2);
+
+    const risposta = await postConContesto('/api/societa/richieste', cookie, {
+      data: '2027-03-10',
+      ora_inizio: '10:00',
+      ora_fine: '11:00',
+      ripeti_fino_al: '2027-03-24',
+      note: 'Torneo giovanile',
+    });
+    expect(risposta.status).toBe(201);
+
+    const [perSocieta, perAdmin] = cattura.corpi();
+    expect(perSocieta.subject).toContain('Richiesta ricorrente inviata');
+    expect(perSocieta.textContent).toContain('  > Torneo giovanile');
+    expect(perAdmin.subject).toContain('Richiesta ricorrente ricevuta');
+    expect(perAdmin.textContent).toContain('  > Torneo giovanile');
+  });
+
+  it("l'approvazione non ripete le note della richiesta", async () => {
+    const { id: societaId } = await creaSocietaConToken();
+    const esito = await env.DB
+      .prepare("INSERT INTO richieste (societa_id, data, ora_inizio, ora_fine, note) VALUES (?1, '2027-05-04', '18:00', '19:00', ?2)")
+      .bind(societaId, 'Portiamo attrezzatura ingombrante')
+      .run();
+    const cattura = intercettaBrevo();
+
+    const risposta = await postConContesto(`/api/admin/richieste/${esito.meta.last_row_id}/approva`, await cookieAdmin(), {
+      motivazione: 'Ok',
+    });
+    expect(risposta.status).toBe(200);
+
+    // Le note appartengono all'evento di creazione: gli altri eventi non le
+    // ripetono, anche quando la riga DB le contiene.
+    expect(cattura.corpo()!.textContent).not.toContain('Portiamo attrezzatura ingombrante');
+    expect(cattura.corpo()!.textContent).not.toContain('Note');
+  });
+
+  it("il ritiro di una richiesta usa lo stesso oggetto per società e admin", async () => {
+    const { id: societaId, token } = await creaSocietaConToken();
+    const richiestaId = await creaRichiesta(societaId, '2027-05-05', '18:00', '19:00');
+    const cookie = await cookieSocieta(token);
+    const cattura = intercettaBrevo(201, 2);
+
+    const risposta = await postConContesto(`/api/societa/richieste/${richiestaId}/annulla`, cookie);
+    expect(risposta.status).toBe(200);
+
+    // "ritirata" descrive l'evento allo stesso modo da entrambe le
+    // prospettive: nessun oggettoAdmin, quindi si applica il fallback.
+    const [perSocieta, perAdmin] = cattura.corpi();
+    expect(perSocieta.subject).toContain('Richiesta di prenotazione ritirata');
+    expect(perAdmin.subject).toContain('Richiesta di prenotazione ritirata');
+    expect(perAdmin.to[0].email).toBe(ADMIN_TEST);
+    expect(perAdmin.textContent).toContain('La società Polisportiva Test ha ritirato la richiesta di prenotazione.');
+  });
+
+  it("la richiesta di annullamento arriva all'admin come 'ricevuta'", async () => {
+    const { id: societaId, token } = await creaSocietaConToken();
+    const esito = await env.DB
+      .prepare("INSERT INTO richieste (societa_id, data, ora_inizio, ora_fine, stato) VALUES (?1, '2027-05-06', '18:00', '19:00', 'approvata')")
+      .bind(societaId)
+      .run();
+    const cookie = await cookieSocieta(token);
+    const cattura = intercettaBrevo(201, 2);
+
+    const risposta = await postConContesto(`/api/societa/richieste/${esito.meta.last_row_id}/richiedi-annullamento`, cookie);
+    expect(risposta.status).toBe(201);
+
+    const [perSocieta, perAdmin] = cattura.corpi();
+    expect(perSocieta.subject).toContain('Richiesta di annullamento inviata');
+    expect(perAdmin.subject).toContain('Richiesta di annullamento ricevuta');
+    expect(perAdmin.textContent).toContain(`La società Polisportiva Test ha richiesto l'annullamento`);
+  });
+
+  it("il fallimento dell'email alla società non blocca quella all'admin", async () => {
+    const { token } = await creaSocietaConToken();
+    const cookie = await cookieSocieta(token);
+    // Le intercettazioni vengono consumate in ordine di registrazione:
+    // la prima (email società) fallisce, la seconda (email admin) riesce.
+    intercettaBrevo(500, 1);
+    const riuscita = intercettaBrevo(201, 1);
+
+    const risposta = await postConContesto('/api/societa/richieste', cookie, {
+      data: '2027-03-11',
+      ora_inizio: '10:00',
+      ora_fine: '11:00',
+    });
+    expect(risposta.status).toBe(201);
+    expect(await conteggioNotificheFallite()).toBe(1);
+    expect(riuscita.corpi()[0]?.to[0].email).toBe(ADMIN_TEST);
   });
 
   it("un errore di Brevo non blocca l'operazione e lascia traccia in audit", async () => {
@@ -166,23 +372,22 @@ describe('invio notifiche', () => {
     }
   });
 
-  it("quando la destinataria è la società di casa l'admin non è duplicato in copia", async () => {
+  it('alla società di casa (stessa email dell\'admin) non parte alcuna email', async () => {
     const token = crypto.randomUUID();
-    const esito = await env.DB
+    await env.DB
       .prepare("INSERT INTO societa (nome, referente, email, token_accesso) VALUES ('Casa', 'Referente', ?1, ?2)")
       .bind(ADMIN_TEST, token)
       .run();
-    const richiestaId = await creaRichiesta(esito.meta.last_row_id, '2027-01-18', '18:00', '19:00');
-    const cattura = intercettaBrevo();
+    const cookie = await cookieSocieta(token);
 
-    const risposta = await postConContesto(`/api/admin/richieste/${richiestaId}/approva`, await cookieAdmin(), {
-      motivazione: 'Ok',
+    // Nessuna intercettazione registrata: una fetch qui fallirebbe (rete
+    // disabilitata) e comparirebbe una notifica_fallita in audit.
+    const risposta = await postConContesto('/api/societa/richieste', cookie, {
+      data: '2027-01-18',
+      ora_inizio: '18:00',
+      ora_fine: '19:00',
     });
-    expect(risposta.status).toBe(200);
-
-    const corpo = cattura.corpo();
-    expect(corpo).not.toBeNull();
-    expect(corpo!.to[0].email).toBe(ADMIN_TEST);
-    expect(corpo!.cc).toBeUndefined();
+    expect(risposta.status).toBe(201);
+    expect(await conteggioNotificheFallite()).toBe(0);
   });
 });

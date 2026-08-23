@@ -11,11 +11,21 @@ import { scriviAudit } from './util';
  *    prenotazione. L'invio gira in executionCtx.waitUntil() (non ritarda
  *    la risposta HTTP) e un eventuale errore lascia solo una riga
  *    'notifica_fallita' nell'audit log.
- *  - Una sola chiamata API per evento: la società è il destinatario
- *    principale e l'admin è in copia (CC), così ogni evento consuma una
- *    sola email della quota gratuita giornaliera di Brevo (300/giorno).
+ *  - Testi (e oggetti, dove la prospettiva cambia) distinti per società e
+ *    admin: per gli eventi avviati dalle società partono due email — una
+ *    alla società ("Gentile <nome>, ...", Reply-To verso l'admin) e una
+ *    all'admin ("La società <nome> ha ...", Reply-To verso la società,
+ *    così rispondere = scrivere alla società).
+ *    Per le azioni dell'admin parte solo l'email alla società: l'admin non
+ *    viene notificato delle proprie azioni. Se la società ha la stessa
+ *    email dell'admin (società "di casa") non parte alcuna email: è la
+ *    stessa persona a fare tutto.
  *  - Solo testo semplice: niente HTML, quindi i contenuti inseriti dagli
- *    utenti (titoli, note, motivazioni) non possono iniettare markup.
+ *    utenti (titoli, note, motivazioni) non possono iniettare markup. Il
+ *    testo semplice però ha una struttura propria (righe indentate = un
+ *    dettaglio a testa): i contenuti multilinea vanno resi come blocco
+ *    citato, altrimenti restano falsificabili come righe di sistema —
+ *    vedi righeNote.
  *  - Minimizzazione (art. 5.1.c GDPR): nelle email non compare MAI il
  *    link personale col token di accesso — l'email non è un canale
  *    sicuro — né altri dati oltre quelli necessari a capire l'evento.
@@ -34,10 +44,16 @@ const GIORNI_SETTIMANA = ['lunedì', 'martedì', 'mercoledì', 'giovedì', 'vene
 /** Dati minimi della società destinataria di una notifica. */
 export type SocietaDaNotificare = { nome: string; email: string };
 
-/** Estremi di una richiesta su singola data (per il corpo dell'email). */
-type EstremiRichiesta = { data: string; ora_inizio: string; ora_fine: string; titolo?: string };
+/**
+ * Estremi di una richiesta su singola data (per il corpo dell'email).
+ * `note` compare solo nelle notifiche di creazione (vedi righeNote).
+ */
+type EstremiRichiesta = { data: string; ora_inizio: string; ora_fine: string; titolo?: string; note?: string | null };
 
-/** Estremi di una ricorrenza settimanale (per il corpo dell'email). */
+/**
+ * Estremi di una ricorrenza settimanale (per il corpo dell'email).
+ * `note` compare solo nelle notifiche di creazione (vedi righeNote).
+ */
 type EstremiRicorrenza = {
   giorno_settimana: number;
   ora_inizio: string;
@@ -45,6 +61,7 @@ type EstremiRicorrenza = {
   valida_dal: string;
   valida_al: string;
   titolo?: string;
+  note?: string | null;
 };
 
 /**
@@ -65,6 +82,18 @@ export type Notifica = {
   oggetto: string;
   /** Frase che descrive l'evento, riferita alla società destinataria. */
   messaggio: string;
+  /**
+   * Frase per l'email all'admin ("La società <nome> ha ..."): presente solo
+   * per gli eventi avviati dalle società, che sono gli unici a generare
+   * anche l'email all'admin.
+   */
+  messaggioAdmin?: string;
+  /**
+   * Oggetto dell'email all'admin, quando la prospettiva cambia rispetto a
+   * quella della società (es. richiesta "inviata" per chi la manda,
+   * "ricevuta" per chi la riceve). Se assente si riusa `oggetto`.
+   */
+  oggettoAdmin?: string;
   /** Righe di dettaglio già formattate ("Etichetta: valore"). */
   dettagli: string[];
   societa: SocietaDaNotificare;
@@ -82,6 +111,29 @@ function righeRichiesta(richiesta: EstremiRichiesta): string[] {
   return righe;
 }
 
+/**
+ * Righe di dettaglio per le note libere della società. Usate SOLO negli
+ * eventi di creazione ("richiesta inviata/ricevuta"), dove la società le ha
+ * appena scritte e servono all'admin per decidere; gli altri eventi non le
+ * ripetono, anche se la riga DB che ricevono contiene il campo note.
+ * Note vuote o assenti → nessuna riga.
+ *
+ * Le note sono testo libero scritto dagli utenti e possono essere
+ * multilinea, quindi vanno rese come blocco citato: intestazione esplicita
+ * e prefisso '> ' su OGNI riga. Senza il prefisso, le righe successive alla
+ * prima verrebbero indentate esattamente come i dettagli generati dal
+ * sistema ("Data: ...", "Motivazione: ..."), permettendo a una società di
+ * forgiare righe apparentemente autorevoli nell'email dell'amministratore,
+ * che è proprio chi deve decidere sulla richiesta.
+ */
+function righeNote(note: string | null | undefined): string[] {
+  if (!note) return [];
+  // Fine riga normalizzati: dal browser arrivano '\n', ma una chiamata API
+  // diretta può usare '\r\n' o '\r', che spezzerebbero il blocco citato.
+  const righeNota = note.replace(/\r\n?/g, '\n').split('\n');
+  return ['Note (scritte dalla società):', ...righeNota.map((riga) => `> ${riga}`)];
+}
+
 function righeRicorrenza(ricorrenza: EstremiRicorrenza): string[] {
   const righe = [
     `Giorno: ogni ${GIORNI_SETTIMANA[ricorrenza.giorno_settimana]}, dalle ${ricorrenza.ora_inizio} alle ${ricorrenza.ora_fine}`,
@@ -91,7 +143,7 @@ function righeRicorrenza(ricorrenza: EstremiRicorrenza): string[] {
   return righe;
 }
 
-/** Corpo in testo semplice, comune a tutte le notifiche (esportato per i test). */
+/** Corpo in testo semplice dell'email alla società (esportato per i test). */
 export function corpoNotifica(notifica: Notifica, origine: string): string {
   return [
     `Gentile ${notifica.societa.nome},`,
@@ -104,6 +156,20 @@ export function corpoNotifica(notifica: Notifica, origine: string): string {
     'Notifica automatica del sistema prenotazioni del Palazzetto dello Sport,',
     'Cardano Skating S.R.L. S.S.D. Per domande è possibile rispondere a questa email.',
     "Le prenotazioni si gestiscono dall'area riservata, tramite il proprio link personale.",
+    `Informativa privacy: ${origine}/privacy.html`,
+  ].join('\n');
+}
+
+/** Corpo in testo semplice dell'email all'admin (esportato per i test). */
+export function corpoNotificaAdmin(notifica: Notifica, origine: string): string {
+  return [
+    notifica.messaggioAdmin ?? '',
+    '',
+    ...notifica.dettagli.map((riga) => `  ${riga}`),
+    '',
+    '—',
+    'Notifica automatica del sistema prenotazioni del Palazzetto dello Sport,',
+    'Cardano Skating S.R.L. S.S.D. Rispondendo a questa email si scrive direttamente alla società.',
     `Informativa privacy: ${origine}/privacy.html`,
   ].join('\n');
 }
@@ -128,25 +194,49 @@ async function eseguiInvio(env: Bindings, origine: string, notifica: Notifica): 
     console.error('notifiche: EMAIL_MITTENTE o EMAIL_ADMIN non configurati, invio saltato');
     return;
   }
+  // Società "di casa": stessa email dell'admin, quindi è la stessa persona
+  // che gestisce sia la società sia le prenotazioni — nessuna email.
+  if (notifica.societa.email.toLowerCase() === env.EMAIL_ADMIN.toLowerCase()) return;
 
-  const corpo: Record<string, unknown> = {
-    sender: { name: NOME_MITTENTE, email: env.EMAIL_MITTENTE },
-    to: [{ email: notifica.societa.email, name: notifica.societa.nome }],
-    replyTo: { email: env.EMAIL_ADMIN },
-    subject: `${PREFISSO_OGGETTO} ${notifica.oggetto}`,
-    textContent: corpoNotifica(notifica, origine),
-  };
-  // L'admin è in copia su ogni notifica, salvo quando è lui stesso il
-  // destinatario (società di casa): Brevo rifiuta lo stesso indirizzo
-  // presente sia in "to" sia in "cc".
-  if (notifica.societa.email.toLowerCase() !== env.EMAIL_ADMIN.toLowerCase()) {
-    corpo.cc = [{ email: env.EMAIL_ADMIN }];
+  await inviaEmailBrevo(
+    env,
+    {
+      sender: { name: NOME_MITTENTE, email: env.EMAIL_MITTENTE },
+      to: [{ email: notifica.societa.email, name: notifica.societa.nome }],
+      replyTo: { email: env.EMAIL_ADMIN },
+      subject: `${PREFISSO_OGGETTO} ${notifica.oggetto}`,
+      textContent: corpoNotifica(notifica, origine),
+    },
+    `"${notifica.oggetto}" per ${notifica.societa.nome}`,
+  );
+
+  // Solo eventi avviati dalle società: email all'admin con testo dedicato.
+  if (notifica.messaggioAdmin) {
+    const oggettoAdmin = notifica.oggettoAdmin ?? notifica.oggetto;
+    await inviaEmailBrevo(
+      env,
+      {
+        sender: { name: NOME_MITTENTE, email: env.EMAIL_MITTENTE },
+        to: [{ email: env.EMAIL_ADMIN }],
+        // Rispondendo alla notifica l'admin scrive direttamente alla società.
+        replyTo: { email: notifica.societa.email, name: notifica.societa.nome },
+        subject: `${PREFISSO_OGGETTO} ${oggettoAdmin}`,
+        textContent: corpoNotificaAdmin(notifica, origine),
+      },
+      `"${oggettoAdmin}" per l'amministratore (società ${notifica.societa.nome})`,
+    );
   }
+}
 
+/**
+ * Singola chiamata all'API Brevo, con gestione errori autonoma: il fallimento
+ * di un invio non deve impedire quello successivo né propagarsi a waitUntil.
+ */
+async function inviaEmailBrevo(env: Bindings, corpo: Record<string, unknown>, descrizioneAudit: string): Promise<void> {
   try {
     const risposta = await fetch(URL_API_BREVO, {
       method: 'POST',
-      headers: { 'api-key': env.BREVO_API_KEY, 'content-type': 'application/json', accept: 'application/json' },
+      headers: { 'api-key': env.BREVO_API_KEY!, 'content-type': 'application/json', accept: 'application/json' },
       body: JSON.stringify(corpo),
       signal: AbortSignal.timeout(TIMEOUT_INVIO_MS),
     });
@@ -156,7 +246,7 @@ async function eseguiInvio(env: Bindings, origine: string, notifica: Notifica): 
     // e nome società a capire quale notifica va rispedita a mano.
     console.error('notifiche: invio fallito', errore);
     try {
-      await scriviAudit(env.DB, 'notifica_fallita', `"${notifica.oggetto}" per ${notifica.societa.nome}`, 'sistema');
+      await scriviAudit(env.DB, 'notifica_fallita', descrizioneAudit, 'sistema');
     } catch {
       // Anche l'audit è best effort: mai propagare errori da waitUntil.
     }
@@ -171,8 +261,10 @@ async function eseguiInvio(env: Bindings, origine: string, notifica: Notifica): 
 export function notificaRichiestaInviata(c: ContestoNotifica, societa: SocietaDaNotificare, richiesta: EstremiRichiesta): void {
   inviaNotifica(c, {
     oggetto: `Richiesta di prenotazione inviata — ${dataItaliana(richiesta.data)}`,
+    oggettoAdmin: `Richiesta di prenotazione ricevuta — ${dataItaliana(richiesta.data)}`,
     messaggio: "la richiesta di prenotazione è stata inviata e attende l'approvazione dell'amministratore.",
-    dettagli: righeRichiesta(richiesta),
+    messaggioAdmin: `La società ${societa.nome} ha inviato una richiesta di prenotazione, in attesa di approvazione.`,
+    dettagli: [...righeRichiesta(richiesta), ...righeNote(richiesta.note)],
     societa,
   });
 }
@@ -181,8 +273,10 @@ export function notificaRichiestaInviata(c: ContestoNotifica, societa: SocietaDa
 export function notificaRicorrenzaInviata(c: ContestoNotifica, societa: SocietaDaNotificare, ricorrenza: EstremiRicorrenza): void {
   inviaNotifica(c, {
     oggetto: `Richiesta ricorrente inviata — dal ${dataItaliana(ricorrenza.valida_dal)}`,
+    oggettoAdmin: `Richiesta ricorrente ricevuta — dal ${dataItaliana(ricorrenza.valida_dal)}`,
     messaggio: "la richiesta di prenotazione ricorrente è stata inviata e attende l'approvazione dell'amministratore.",
-    dettagli: righeRicorrenza(ricorrenza),
+    messaggioAdmin: `La società ${societa.nome} ha inviato una richiesta di prenotazione ricorrente, in attesa di approvazione.`,
+    dettagli: [...righeRicorrenza(ricorrenza), ...righeNote(ricorrenza.note)],
     societa,
   });
 }
@@ -202,6 +296,9 @@ export function notificaRichiestaRitirata(
     messaggio: eAnnullamento
       ? 'la richiesta di annullamento è stata ritirata dalla società: la prenotazione resta confermata.'
       : 'la richiesta di prenotazione è stata ritirata dalla società.',
+    messaggioAdmin: eAnnullamento
+      ? `La società ${societa.nome} ha ritirato la richiesta di annullamento: la prenotazione resta confermata.`
+      : `La società ${societa.nome} ha ritirato la richiesta di prenotazione.`,
     dettagli: righeRichiesta(richiesta),
     societa,
   });
@@ -211,8 +308,10 @@ export function notificaRichiestaRitirata(
 export function notificaAnnullamentoRichiesto(c: ContestoNotifica, societa: SocietaDaNotificare, richiesta: EstremiRichiesta): void {
   inviaNotifica(c, {
     oggetto: `Richiesta di annullamento inviata — ${dataItaliana(richiesta.data)}`,
+    oggettoAdmin: `Richiesta di annullamento ricevuta — ${dataItaliana(richiesta.data)}`,
     messaggio:
       "è stata inviata la richiesta di annullamento della prenotazione. Gli slot restano prenotati finché l'amministratore non la conferma.",
+    messaggioAdmin: `La società ${societa.nome} ha richiesto l'annullamento di una prenotazione approvata. Gli slot restano prenotati finché la richiesta non viene decisa.`,
     dettagli: righeRichiesta(richiesta),
     societa,
   });
@@ -223,6 +322,7 @@ export function notificaRicorrenzaRitirata(c: ContestoNotifica, societa: Societa
   inviaNotifica(c, {
     oggetto: `Richiesta ricorrente ritirata — dal ${dataItaliana(ricorrenza.valida_dal)}`,
     messaggio: 'la richiesta di prenotazione ricorrente è stata ritirata dalla società.',
+    messaggioAdmin: `La società ${societa.nome} ha ritirato la richiesta di prenotazione ricorrente.`,
     dettagli: righeRicorrenza(ricorrenza),
     societa,
   });
