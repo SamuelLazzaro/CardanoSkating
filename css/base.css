@@ -96,6 +96,25 @@
 	--t-reveal: 0.65s ease;
 	--t-tap: 0.25s ease;
 
+	/* pulse ring — hover/press feedback of the boxed buttons and of the
+	   hamburger bars (see "Pulse ring" in components.css). Defaults are sized
+	   for a button; a component with a different scale overrides the spreads
+	   on its own selector, e.g. .hamburger for its 3px bars */
+	/* brand orange (--c-orange) with alpha; the two must share the same RGB,
+	   the second is what the ring fades to */
+	--pulse-color: rgba(255, 136, 0, 0.8);
+	--pulse-color-faded: rgba(255, 136, 0, 0);
+	--pulse-hover-spread: 18px;
+	--pulse-hover-duration: 1.4s;
+	/* ring shown while the element is held down */
+	--pulse-press-spread: 4px;
+	/* how far and how long the ring swells on release */
+	--pulse-click-spread: 28px;
+	--pulse-click-duration: 0.45s;
+	/* components with a border set this to minus their border width, so the
+	   ring starts at the outer edge of the border and not at the padding box */
+	--pulse-ring-inset: 0px;
+
 	/* shared "speed" angle for buttons, underlines, ticks */
 	--skew: -8deg;
 
