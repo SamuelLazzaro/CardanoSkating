@@ -225,6 +225,10 @@
     color: var(--c-black);
 }
 
+.map-consent-btn {
+	border: 0px;
+}
+
 /* ==========================================================================
    Pulse ring — hover and press feedback shared by two kinds of host:
 
