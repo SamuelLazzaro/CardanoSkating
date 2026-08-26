@@ -107,6 +107,61 @@ export function espandiSlot(data, oraInizio, oraFine) {
   return chiavi;
 }
 
+/*
+ * Splits the slots a società owns in one week into two sets, so the area
+ * calendar can paint confirmed bookings and undecided requests differently:
+ *
+ *  - approvati: the admin said yes, the slot is booked;
+ *  - inAttesa:  the request exists but nobody decided yet. Painting these
+ *               is what stops the società from asking for the very same slot
+ *               again, since the server-side conflict check only knows about
+ *               APPROVED bookings and would accept the duplicate.
+ *
+ * Two sources feed inAttesa, because a pending request can live in either
+ * table: a single richiesta with stato 'in_attesa', and a pending ricorrenza,
+ * which holds no richieste rows at all until it is approved and therefore has
+ * to be expanded here from the series definition.
+ */
+
+/**
+ * @param {{tipo: string, stato: string, data: string, ora_inizio: string, ora_fine: string}[]} richieste - the società's richieste
+ * @param {{stato: string, giorno_settimana: number, ora_inizio: string, ora_fine: string, valida_dal: string, valida_al: string}[]} ricorrenze - the società's ricorrenze
+ * @param {string} lunedi - Monday of the week to classify, 'YYYY-MM-DD'
+ * @returns {{approvati: Set<string>, inAttesa: Set<string>}} slot keys of that week
+ */
+export function slotSocietaSettimana(richieste, ricorrenze, lunedi) {
+  const fineSettimana = aggiungiGiorni(lunedi, 7);
+  const approvati = new Set();
+  const inAttesa = new Set();
+
+  for (const richiesta of richieste) {
+    // Only booking requests hold slots. An annullamento request is skipped
+    // whatever its state: once approved its referenced booking has just been
+    // freed, and while pending that booking is still fully valid, so its
+    // slots must keep showing as approved rather than as undecided.
+    if (richiesta.tipo !== 'nuova') continue;
+    if (richiesta.stato !== 'approvata' && richiesta.stato !== 'in_attesa') continue;
+    if (richiesta.data < lunedi || richiesta.data >= fineSettimana) continue;
+    const destinazione = richiesta.stato === 'approvata' ? approvati : inAttesa;
+    for (const chiave of espandiSlot(richiesta.data, richiesta.ora_inizio, richiesta.ora_fine)) {
+      destinazione.add(chiave);
+    }
+  }
+
+  for (const ricorrenza of ricorrenze) {
+    if (ricorrenza.stato !== 'in_attesa') continue;
+    // 0 = lunedì in the project convention and lunedi is a Monday, so the
+    // occurrence falling in this week is exactly that many days later.
+    const giorno = aggiungiGiorni(lunedi, ricorrenza.giorno_settimana);
+    if (giorno < ricorrenza.valida_dal || giorno > ricorrenza.valida_al) continue;
+    for (const chiave of espandiSlot(giorno, ricorrenza.ora_inizio, ricorrenza.ora_fine)) {
+      inAttesa.add(chiave);
+    }
+  }
+
+  return { approvati, inAttesa };
+}
+
 /**
  * @param {number} valore - number to format
  * @param {number} decimali - fixed decimal digits

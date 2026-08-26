@@ -162,6 +162,12 @@
     border-color: var(--occupato);
 }
 
+/* faded variant of the above: a booked slot already in the past */
+.quadretto-occupato-passato {
+    background: var(--occupato-passato);
+    border-color: var(--occupato-passato);
+}
+
 .quadretto-passato {
     background: var(--passato);
 }
@@ -169,6 +175,11 @@
 .quadretto-mio {
     background: var(--accento);
     border-color: var(--accento);
+}
+
+.quadretto-in-attesa {
+    background: var(--in-attesa);
+    border-color: var(--in-attesa);
 }
 
 /* ------------------------------------------------------- messaggi stato */
@@ -632,6 +643,19 @@ fieldset.campo {
 
 .slot.mio.passato {
     background: var(--mio-passato);
+}
+
+/* own request the admin has not decided yet (area società only): yellow, so
+   the società sees at a glance which slots it has already asked for and does
+   not ask for them a second time. The yellow stays fixed even when the
+   società has its own color, because here the message is "undecided", not
+   "whose" — see the .con-colore rules below for the approved ones. */
+.slot.in-attesa {
+    background: var(--in-attesa);
+}
+
+.slot.in-attesa.passato {
+    background: var(--in-attesa-passato);
 }
 
 /* --------------------------------------------------- colori per società */

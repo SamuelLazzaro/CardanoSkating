@@ -43,6 +43,8 @@
     --occupato: #ff0000;          /* charcoal, echoes the site dark surfaces */
     --occupato-passato: #ff8c00;
     --mio-passato: #ffd2a1;       /* faded orange for own past slots */
+    --in-attesa: #ffd400;         /* own request still awaiting a decision */
+    --in-attesa-passato: #ffeeb0; /* faded yellow for past pending requests */
     --passato: #edebe7;
     --oggi: #fff8ef;              /* pale orange wash on today's column */
     --ok: #2e7d54;

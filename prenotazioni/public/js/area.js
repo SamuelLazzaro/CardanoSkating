@@ -18,11 +18,11 @@ import {
   chiaveSlot,
   dataEstesa,
   eColoreEsadecimale,
-  espandiSlot,
   etichettaGiorno,
   giorniSettimana,
   lunediDellaSettimana,
   oraTesto,
+  slotSocietaSettimana,
   titoloSettimana,
 } from './utils.js';
 import {
@@ -57,6 +57,9 @@ let g_lunediArea = lunediDellaSettimana(adessoRoma().data);
 
 /** @type {object[]} cached richieste of the società (used to highlight slots) */
 let g_richieste = [];
+
+/** @type {object[]} cached ricorrenze of the società (used to highlight slots) */
+let g_ricorrenze = [];
 
 /** @type {number} counter to ignore stale calendar responses */
 let g_versioneCalendario = 0;
@@ -273,6 +276,7 @@ function mostraErroreInvio(esitoForm, errore) {
 async function caricaRichieste() {
   const dati = await ottieniRichiesteSocieta();
   g_richieste = dati.richieste;
+  g_ricorrenze = dati.ricorrenze;
   renderRichieste(dati.richieste);
   renderRicorrenze(dati.ricorrenze);
 }
@@ -504,6 +508,9 @@ async function annullaSerie(ricorrenza) {
     await annullaRicorrenza(ricorrenza.id);
     mostraMessaggio(elemento('esito-azioni'), 'Richiesta ricorrente annullata.', 'ok');
     await caricaRichieste();
+    // The series no longer waits for a decision: its slots must lose the
+    // pending highlight in the grid too.
+    await caricaCalendario();
   } catch (errore) {
     mostraMessaggio(elemento('esito-azioni'), errore.message, 'errore');
   }
@@ -520,22 +527,6 @@ function spostaSettimana(giorni) {
   caricaCalendario();
 }
 
-/** @returns {Set<string>} slot keys of the società's approved bookings in the shown week */
-function mieiSlotSettimana() {
-  const fineSettimana = aggiungiGiorni(g_lunediArea, 7);
-  const chiavi = new Set();
-  for (const richiesta of g_richieste) {
-    // Only real bookings hold slots: an approved annullamento request is the
-    // opposite (its referenced booking has just been freed).
-    if (richiesta.tipo !== 'nuova' || richiesta.stato !== 'approvata') continue;
-    if (richiesta.data < g_lunediArea || richiesta.data >= fineSettimana) continue;
-    for (const chiave of espandiSlot(richiesta.data, richiesta.ora_inizio, richiesta.ora_fine)) {
-      chiavi.add(chiave);
-    }
-  }
-  return chiavi;
-}
-
 /** @returns {Promise<void>} loads and renders the calendar week */
 async function caricaCalendario() {
   const versione = ++g_versioneCalendario;
@@ -546,7 +537,8 @@ async function caricaCalendario() {
   try {
     const dati = await ottieniCalendario(g_lunediArea);
     if (versione !== g_versioneCalendario) return;
-    renderCalendario(new Set(dati.slot_occupati), mieiSlotSettimana());
+    const miei = slotSocietaSettimana(g_richieste, g_ricorrenze, g_lunediArea);
+    renderCalendario(new Set(dati.slot_occupati), miei.approvati, miei.inAttesa);
     mostraMessaggio(statoCalendario, '');
   } catch (errore) {
     if (versione !== g_versioneCalendario) return;
@@ -556,10 +548,11 @@ async function caricaCalendario() {
 
 /**
  * @param {Set<string>} occupati - all occupied slot keys of the week
- * @param {Set<string>} miei - slot keys belonging to this società
+ * @param {Set<string>} miei - slot keys of this società's approved bookings
+ * @param {Set<string>} inAttesa - slot keys of this società's pending requests
  * @returns {void}
  */
-function renderCalendario(occupati, miei) {
+function renderCalendario(occupati, miei, inAttesa) {
   const adesso = adessoRoma();
   const chiaveAdesso = chiaveSlot(adesso.data, Math.floor(adesso.minuti / PASSO_MIN) * PASSO_MIN);
 
@@ -570,20 +563,31 @@ function renderCalendario(occupati, miei) {
       const chiave = chiaveSlot(giorno, minuti);
       const mio = miei.has(chiave);
       const occupato = occupati.has(chiave);
+      const richiesto = inAttesa.has(chiave);
+      /*
+       * One state per cell, in decreasing priority. "occupato" comes before
+       * "richiesto" on purpose: when somebody else's booking was approved
+       * after this società sent its request, the slot really is gone, so the
+       * cell must not suggest otherwise — the tooltip mentions both.
+       */
       let descrizione = 'libero';
       if (mio) {
         cella.classList.add('mio');
         descrizione = 'la tua prenotazione';
       } else if (occupato) {
         cella.classList.add('occupato');
-        descrizione = 'occupato';
+        descrizione = richiesto ? 'occupato · hai una richiesta in attesa su questo slot' : 'occupato';
+      } else if (richiesto) {
+        cella.classList.add('in-attesa');
+        descrizione = 'la tua richiesta, in attesa di approvazione';
       }
       const passato = chiave < chiaveAdesso;
       if (passato) cella.classList.add('passato');
       if (giorno === adesso.data) cella.classList.add('colonna-oggi');
       // Only a free future slot can be requested, so only there the "+"
-      // shortcut makes sense: elsewhere the popup would be born rejected.
-      if (!occupato && !mio && !passato) aggiungiBottoneSlot(cella, giorno, minuti);
+      // shortcut makes sense: elsewhere the popup would be born rejected —
+      // or, on a slot already requested, would duplicate a pending request.
+      if (!occupato && !mio && !richiesto && !passato) aggiungiBottoneSlot(cella, giorno, minuti);
       const etichetta = etichettaGiorno(giorno);
       cella.title = `${etichetta.nomeGiorno} ${etichetta.dataBreve} · ${oraTesto(minuti)}–${oraTesto(minuti + PASSO_MIN)} · ${descrizione}`;
     },
