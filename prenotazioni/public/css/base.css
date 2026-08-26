@@ -58,6 +58,8 @@
     --raggio: 8px;
     --t-veloce: 0.15s ease; /* hover micro-interactions */
     --t-tap: 0.25s ease;    /* tap feedback ramp-in (see .is-tapped below) */
+    /* stacking of the sticky calendar cells: day headers, corner one above */
+    --z-cal-giorno: 5;
 }
 
 * {

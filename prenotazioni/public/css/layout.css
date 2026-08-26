@@ -91,8 +91,9 @@
     bottom: 0;
     display: flex;
     background: var(--nero);
-    /* above the page content (the sticky calendar labels use z-index 1);
-       the <dialog> popups live in the browser top layer, so above this */
+    /* above the page content: the sticky calendar cells stop at
+       --z-cal-giorno + 1 (corner cell, see components.css); the <dialog>
+       popups live in the browser top layer, so above this */
     z-index: 10;
     /* keep the bar clear of the iOS home indicator */
     padding-bottom: env(safe-area-inset-bottom);

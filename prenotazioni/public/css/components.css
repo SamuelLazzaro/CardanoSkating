@@ -535,6 +535,7 @@ fieldset.campo {
 /* --------------------------------------------------------------- griglia */
 
 .scorri-griglia {
+    max-height: 60dvh;
     overflow-x: auto;
     background: var(--superficie);
     border: 1px solid var(--bordo);
@@ -553,9 +554,10 @@ fieldset.campo {
 .cal-angolo {
     border-bottom: 2px solid var(--bordo-forte);
     position: sticky;
+    top: 0;
     left: 0;
     background: var(--superficie);
-    z-index: 1;
+    z-index: calc(var(--z-cal-giorno) + 1);
 }
 
 .cal-giorno {
@@ -568,6 +570,10 @@ fieldset.campo {
     border-bottom: 2px solid var(--bordo-forte);
     border-left: 1px solid var(--bordo);
     text-transform: capitalize;
+    z-index: var(--z-cal-giorno);
+    position: sticky;
+    top: 0;
+    background: var(--superficie);
 }
 
 .cal-giorno-data {
