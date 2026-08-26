@@ -25,29 +25,21 @@
 	right: 0;
 }
 
+/* hover and press feedback (orange fill + pulse ring) come from the shared
+   .btn-pulse rules in components.css, so no :hover / .is-tapped of its own */
 .btn-back {
+    /* .btn-pulse ring anchor, pulled out by the border width */
+    --pulse-ring-inset: -1px;
+    position: relative;
     padding: 9px 18px;
-    border: 1px solid var(--c-border);
+    border: 1px solid var(--c-orange);
 	border-radius: 5px;
     color: var(--c-orange);
     font-size: 0.85rem;
     font-weight: 600;
     letter-spacing: 0.04em;
     text-decoration: none;
-    transition: border-color var(--t-hover), color var(--t-hover);
-}
-
-@media (pointer: fine) {
-    .btn-back:hover {
-        border-color: var(--c-orange);
-        color: var(--c-orange-bright);
-    }
-}
-
-/* touch counterpart of the hover above (see the .is-tapped utility in base.css) */
-.btn-back.is-tapped {
-    border-color: var(--c-orange);
-    color: var(--c-orange-bright);
+    transition: var(--pulse-fill-transition);
 }
 
 /* ==========================================================================

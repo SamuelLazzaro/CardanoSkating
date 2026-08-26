@@ -64,8 +64,8 @@
 	--c-orange-bright: #ff9900;
 	/* hover / glow variant */
 	--glow-orange: 0 0 24px rgba(243, 146, 0, 0.45);
-	/* barely-there orange wash for the hover/tap state of ghost buttons */
-	--c-orange-tint: rgba(243, 146, 0, 0.14);
+	/* drop shadow lifting the two FABs off the page */
+	--fab-shadow: 0 6px 22px rgba(0, 0, 0, 0.55);
 
 	/* typography */
 	--font-display: "Anton", "Arial Narrow", sans-serif;
@@ -77,6 +77,8 @@
 	/* layout */
 	--scrollbar-size: 8px;
 	--topbar-h: 72px;
+	/* the language and cookie FABs share one diameter */
+	--fab-size: 52px;
 	--container-w: 1140px;
 	--pad-page: 24px;
 	--section-pad-y: 80px;

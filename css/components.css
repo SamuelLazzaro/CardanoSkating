@@ -9,6 +9,9 @@
    running its action (the shared part of the utility lives in base.css).
    Values used by both states are kept in a custom property scoped to the
    component, so the two cannot drift apart.
+   The "boxed" buttons are the exception: they carry no per-component hover
+   or tap rule and take all their feedback from the shared .btn-pulse ring
+   (Buttons section below).
    ========================================================================== */
 
 /* ==========================================================================
@@ -117,7 +120,7 @@
     gap: 14px;
     padding: 9px 0;
     font-family: var(--font-display);
-    font-size: 1.4rem;
+    font-size: 1.2rem;
     letter-spacing: 0.06em;
     text-transform: uppercase;
     text-decoration: none;
@@ -200,6 +203,8 @@
    Buttons — skewed "speed" look
    ========================================================================== */
 .btn {
+    /* anchors the .btn-pulse rings */
+    position: relative;
     display: inline-block;
     padding: 14px 34px;
     font-family: var(--font-display);
@@ -208,7 +213,9 @@
     text-transform: uppercase;
     text-decoration: none;
     /* transform: skewX(var(--skew)); */
-    transition: box-shadow 0.25s ease, background-color 0.25s ease;
+    /* no transition of its own: nothing on the button box changes on hover
+       any more, and a .btn transition would override the .reveal one on
+       the hero CTA (same specificity, later file) */
 	border-radius: var(--border-radius-common);
 }
 
@@ -222,16 +229,125 @@
     color: var(--c-black);
 }
 
-@media (pointer: fine) {
-    .btn-primary:hover {
-        background: var(--c-orange-bright);
-        box-shadow: var(--glow-orange);
+/* ==========================================================================
+   Button pulse — hover and press feedback shared by every "boxed" button
+   (.btn-primary, .cookie-btn, .fab-cookie, .fab-lang, and .btn-back of
+   policy.css), opted in with the .btn-pulse class in the markup. Two layers:
+
+   1. fill — while hovered or pressed the button turns solid orange with
+      black text/icon, the look .btn-primary has at rest (for it the fill is
+      a no-op, which is why it needs no transition of its own). The others
+      declare `transition: var(--pulse-fill-transition)` themselves: putting
+      it on .btn-pulse would override the .reveal transition of the hero CTA
+      (same specificity, later file).
+   2. ring — an orange box-shadow ring on two pseudo-elements laid over the
+      button box:
+
+     ::before  hover (fine pointers only): a ring keeps swelling out of the
+               edge and fading, in a loop, for as long as the pointer stays
+     ::after   press: a thin ring snaps on while the button is held down
+               (:active, or .is-tapped on touch) and, on release, swells and
+               fades out once — the "click" pulse
+
+   The click pulse is a transition and not a keyframe animation on purpose:
+   :active ends at mouseup and .is-tapped is dropped after TAP_FEEDBACK_MS
+   (150 ms), both far shorter than the pulse itself, so an animation bound
+   to those states would be cut off mid-way. A transition *towards* the
+   resting state instead starts exactly when the pressed state ends and runs
+   to completion on its own.
+
+   Both rings are invisible at rest (no shadow, or zero alpha), so the
+   pseudo-elements cost nothing while idle. pointer-events: none keeps them
+   out of hit testing; border-radius: inherit makes the ring follow the
+   button shape (rounded rectangle or FAB circle); --pulse-ring-inset lets
+   bordered buttons pull the ring out to their outer edge. The host must be
+   positioned (.btn and .cookie-btn are relative, the FABs are fixed).
+   ========================================================================== */
+.btn-pulse {
+    /* fill shared by :hover, :active and .is-tapped */
+    --pulse-fill-bg: var(--c-orange);
+    --pulse-fill-text: var(--c-black);
+    --pulse-fill-transition: background-color var(--t-hover), color var(--t-hover), border-color var(--t-hover);
+    /* brand orange (--c-orange) with alpha; the two must share the same RGB,
+       the second is what the ring fades to */
+    --pulse-color: rgba(255, 136, 0, 0.8);
+    --pulse-color-faded: rgba(255, 136, 0, 0);
+    --pulse-hover-spread: 18px;
+    --pulse-hover-duration: 1.4s;
+    /* ring shown while the button is held down */
+    --pulse-press-spread: 4px;
+    /* how far and how long the ring swells on release */
+    --pulse-click-spread: 28px;
+    --pulse-click-duration: 0.45s;
+    /* components with a border set this to minus their border width, so the
+       ring starts at the outer edge of the border and not at the padding box */
+    --pulse-ring-inset: 0px;
+}
+
+.btn-pulse::before,
+.btn-pulse::after {
+    content: "";
+    position: absolute;
+    inset: var(--pulse-ring-inset);
+    border-radius: inherit;
+    pointer-events: none;
+}
+
+/* hover ring: no shadow at rest. The transition only matters on mouse-out,
+   easing the ring from wherever the loop was back to nothing instead of
+   letting it vanish abruptly */
+.btn-pulse::before {
+    transition: box-shadow var(--t-hover);
+}
+
+/* press ring: at rest fully swollen and transparent, i.e. invisible. The
+   pressed rule further down is a tight opaque ring; going from there back to
+   this rest state is the transition that draws the click pulse */
+.btn-pulse::after {
+    box-shadow: 0 0 0 var(--pulse-click-spread) var(--pulse-color-faded);
+    transition: box-shadow var(--pulse-click-duration) ease-out;
+}
+
+@keyframes btn-pulse-hover {
+    0% {
+        box-shadow: 0 0 0 0 var(--pulse-color);
+    }
+
+    /* fully faded at 70%: the last 30% is the pause between two pings */
+    70%,
+    100% {
+        box-shadow: 0 0 0 var(--pulse-hover-spread) var(--pulse-color-faded);
     }
 }
 
-.btn-primary.is-tapped {
-    background: var(--c-orange-bright);
-    box-shadow: var(--glow-orange);
+@media (pointer: fine) {
+    .btn-pulse:hover {
+        background-color: var(--pulse-fill-bg);
+        border-color: var(--pulse-fill-bg);
+        color: var(--pulse-fill-text);
+    }
+
+    .btn-pulse:hover::before {
+        animation: btn-pulse-hover var(--pulse-hover-duration) ease-out infinite;
+    }
+}
+
+/* pressed. :active covers mouse, keyboard (Space held) and the finger-down
+   phase of a tap; .is-tapped then holds the state for TAP_FEEDBACK_MS before
+   the tap's action runs (see base.css) */
+.btn-pulse:active,
+.btn-pulse.is-tapped {
+    background-color: var(--pulse-fill-bg);
+    border-color: var(--pulse-fill-bg);
+    color: var(--pulse-fill-text);
+}
+
+/* the press ring snaps on with no transition, so it shows up at once and
+   only the release is animated */
+.btn-pulse:active::after,
+.btn-pulse.is-tapped::after {
+    box-shadow: 0 0 0 var(--pulse-press-spread) var(--pulse-color);
+    transition: none;
 }
 
 /* ==========================================================================
@@ -545,8 +661,8 @@
 }
 
 .contact-icon {
-    width: 42px;
-    height: 42px;
+    width: 32px;
+    height: 32px;
     margin-bottom: 12px;
     color: var(--c-orange);
 }
@@ -714,6 +830,10 @@
 }
 
 .cookie-btn {
+    /* .btn-pulse ring anchor; the negative inset is the border width, so
+       the ring starts at the outer edge of the border */
+    --pulse-ring-inset: -2px;
+    position: relative;
     padding: 12px 26px;
     background: transparent;
     border: 2px solid var(--c-orange);
@@ -723,7 +843,7 @@
     letter-spacing: 0.08em;
     text-transform: uppercase;
     cursor: pointer;
-    transition: background-color 0.25s ease, color 0.25s ease, box-shadow 0.25s ease;
+    transition: var(--pulse-fill-transition);
 	border-radius: var(--border-radius-common);
 }
 
@@ -731,22 +851,10 @@
     .cookie-policy-link:hover {
         color: var(--c-orange-bright);
     }
-
-    .cookie-btn:hover {
-        background: var(--c-orange-tint);
-        color: var(--c-orange-bright);
-        border-color: var(--c-orange-bright);
-    }
 }
 
 .cookie-policy-link.is-tapped {
     color: var(--c-orange-bright);
-}
-
-.cookie-btn.is-tapped {
-    background: var(--c-orange-tint);
-    color: var(--c-orange-bright);
-    border-color: var(--c-orange-bright);
 }
 
 @media (min-width: 760px) {
@@ -775,6 +883,8 @@
    banner while it is open (--cookie-banner-h is published by cookie.js).
    ========================================================================== */
 .fab-cookie {
+    /* .btn-pulse ring: pulled out by the border width, to the outer edge */
+    --pulse-ring-inset: -2px;
     position: fixed;
     left: 22px;
     bottom: 22px;
@@ -782,37 +892,27 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 46px;
-    height: 46px;
+    width: var(--fab-size);
+    height: var(--fab-size);
     padding: 0;
-    border: 2px solid var(--c-border);
+    border: 2px solid var(--c-orange);
     border-radius: 50%;
     background: var(--c-black-alt);
-    color: var(--c-gray);
+    color: var(--c-orange);
     cursor: pointer;
-    box-shadow: 0 6px 22px rgba(0, 0, 0, 0.55);
-    transition: border-color 0.25s ease, color 0.25s ease;
+    box-shadow: var(--fab-shadow);
+    transition: var(--pulse-fill-transition);
 }
 
 .fab-cookie[hidden] {
     display: none;
 }
 
+/* the inline SVG uses stroke="currentColor": orange at rest, black while the
+   .btn-pulse fill is on, with the same colour transition as the button */
 .fab-cookie svg {
-    width: 22px;
-    height: 22px;
-}
-
-@media (pointer: fine) {
-    .fab-cookie:hover {
-        border-color: var(--c-orange);
-        color: var(--c-orange);
-    }
-}
-
-.fab-cookie.is-tapped {
-    border-color: var(--c-orange);
-    color: var(--c-orange);
+    width: 24px;
+    height: 24px;
 }
 
 body.cookie-banner-open .fab-lang {
@@ -941,12 +1041,14 @@ body.cookie-banner-open .fab-lang {
    Language FAB
    ========================================================================== */
 .fab-lang {
+    /* .btn-pulse ring: pulled out by the border width, to the outer edge */
+    --pulse-ring-inset: -2px;
     position: fixed;
     right: calc(22px + var(--scrollbar-comp));
     bottom: 22px;
     z-index: 130;
-    width: 58px;
-    height: 58px;
+    width: var(--fab-size);
+    height: var(--fab-size);
     border: 2px solid var(--c-orange);
     border-radius: 50%;
     background: var(--c-black-alt);
@@ -955,22 +1057,8 @@ body.cookie-banner-open .fab-lang {
     font-size: 1.15rem;
     letter-spacing: 0.05em;
     cursor: pointer;
-    box-shadow: 0 6px 22px rgba(0, 0, 0, 0.55);
-    transition: background-color 0.25s ease, color 0.25s ease, box-shadow 0.25s ease;
-}
-
-@media (pointer: fine) {
-    .fab-lang:hover {
-        background: var(--c-orange);
-        color: var(--c-black);
-        box-shadow: var(--glow-orange);
-    }
-}
-
-.fab-lang.is-tapped {
-    background: var(--c-orange);
-    color: var(--c-black);
-    box-shadow: var(--glow-orange);
+    box-shadow: var(--fab-shadow);
+    transition: var(--pulse-fill-transition);
 }
 
 /* ==========================================================================
@@ -979,5 +1067,20 @@ body.cookie-banner-open .fab-lang {
 @media (prefers-reduced-motion: reduce) {
     .nav-panel {
         transition: none;
+    }
+
+    /* button pulse: the press ring just appears and goes, no swelling */
+    .btn-pulse::before,
+    .btn-pulse::after {
+        transition: none;
+    }
+}
+
+/* button pulse: a still glow stands in for the looping ring. Only where a
+   hover exists, for the same reason every :hover sits in (pointer: fine) */
+@media (prefers-reduced-motion: reduce) and (pointer: fine) {
+    .btn-pulse:hover::before {
+        animation: none;
+        box-shadow: var(--glow-orange);
     }
 }
