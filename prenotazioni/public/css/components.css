@@ -162,14 +162,6 @@
     border-color: var(--occupato);
 }
 
-/* faded variant of the above: the same thin wash a past booked cell carries,
-   so the square keeps describing what the grid actually shows. The border
-   stays the neutral one, as in .quadretto-passato: the wash alone is too pale
-   to read as a square. */
-.quadretto-occupato-passato {
-    background: color-mix(in srgb, var(--occupato) 12%, transparent);
-}
-
 .quadretto-passato {
     background: var(--passato);
 }
@@ -586,6 +578,7 @@ fieldset.campo {
 
 .cal-giorno.oggi {
     color: var(--accento-testo);
+    border: solid 2px;
 }
 
 .cal-giorno.oggi .cal-giorno-data {
@@ -620,10 +613,6 @@ fieldset.campo {
 
 .slot.inizio-ora {
     border-top: 1px solid var(--bordo);
-}
-
-.slot.colonna-oggi {
-    background: var(--oggi);
 }
 
 .slot.passato {
