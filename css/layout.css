@@ -45,8 +45,10 @@
 .brand-name {
     display: flex;
     flex-direction: column;
-    /* monospace: CARDANO and SKATING are both 7 chars, so the two
-       lines render at exactly the same width */
+	align-items: center;
+    /* stencil display face: CARDANO and SKATING are both 7 chars, so
+       the two lines come out close in width even though the font is
+       proportional */
     font-family: var(--font-brand);
     font-weight: 700;
     font-size: 1.05rem;
