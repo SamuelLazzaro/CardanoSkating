@@ -162,10 +162,12 @@
     border-color: var(--occupato);
 }
 
-/* faded variant of the above: a booked slot already in the past */
+/* faded variant of the above: the same thin wash a past booked cell carries,
+   so the square keeps describing what the grid actually shows. The border
+   stays the neutral one, as in .quadretto-passato: the wash alone is too pale
+   to read as a square. */
 .quadretto-occupato-passato {
-    background: var(--occupato-passato);
-    border-color: var(--occupato-passato);
+    background: color-mix(in srgb, var(--occupato) 12%, transparent);
 }
 
 .quadretto-passato {
@@ -628,72 +630,59 @@ fieldset.campo {
     background: var(--passato);
 }
 
-.slot.occupato {
-    background: var(--occupato);
+/*
+ * Every "taken" slot — booked by this società, booked by somebody else, or
+ * still waiting for a decision — shares one shape: a translucent wash of the
+ * state color plus a solid bar on its left edge. The bar is an inset shadow
+ * and not a border, so the grid lines drawn with real borders stay untouched.
+ *
+ * Each state only declares its own --colore-slot, so the shape is written
+ * once and the states cannot drift apart. The .passato variants just thin the
+ * wash out and keep the bar: a past slot reads as faded without changing hue.
+ */
+.slot.mio,
+.slot.occupato,
+.slot.in-attesa {
+    background: color-mix(in srgb, var(--colore-slot) 30%, transparent);
+    box-shadow: inset 3px 0 0 var(--colore-slot);
 }
 
-.slot.occupato.passato {
-    background: var(--occupato-passato);
+.slot.mio.passato,
+.slot.occupato.passato,
+.slot.in-attesa.passato {
+    background: color-mix(in srgb, var(--colore-slot) 12%, transparent);
 }
 
 /* slots belonging to the logged-in società (area) or highlighted (admin) */
 .slot.mio {
-    background: var(--accento);
+    --colore-slot: var(--accento);
 }
 
-.slot.mio.passato {
-    background: var(--mio-passato);
+.slot.occupato {
+    --colore-slot: var(--occupato);
 }
 
 /* own request the admin has not decided yet (area società only): yellow, so
    the società sees at a glance which slots it has already asked for and does
    not ask for them a second time. The yellow stays fixed even when the
    società has its own color, because here the message is "undecided", not
-   "whose" — see the .con-colore rules below for the approved ones. */
+   "whose" — see the .con-colore rule below for the approved ones. */
 .slot.in-attesa {
-    background: var(--in-attesa);
-}
-
-.slot.in-attesa.passato {
-    background: var(--in-attesa-passato);
+    --colore-slot: var(--in-attesa);
 }
 
 /* --------------------------------------------------- colori per società */
 
-/* solid bar on the left edge of a colored cell: an inset shadow, so the
-   grid lines drawn with real borders stay untouched (shared by the admin
-   .occupato.colorato cells and the area .mio cells) */
-.slot {
-    --spia-colore: inset 3px 0 0 var(--colore-societa);
-}
-
-/* admin calendar: booked cells tinted with the società color — translucent
-   fill plus the solid bar */
+/* admin calendar: a booked cell carries the color of the società that booked
+   it (--colore-societa set inline on the cell by js/admin.js) */
 .slot.occupato.colorato {
-    background: color-mix(in srgb, var(--colore-societa) 25%, transparent);
-    box-shadow: var(--spia-colore);
-}
-
-.slot.occupato.colorato.passato {
-    background: color-mix(in srgb, var(--colore-societa) 12%, transparent);
-}
-
-/* over the light tinted background the block label switches from white
-   (used on the solid --occupato fill) to the normal text color */
-.slot.colorato .slot-nome,
-.slot.colorato .slot-attivita {
-    color: var(--testo);
+    --colore-slot: var(--colore-societa);
 }
 
 /* area società: own bookings and matching legend square use the società
    color when the profile provides one (.con-colore set by js/area.js) */
 .con-colore .slot.mio {
-    background: color-mix(in srgb, var(--colore-societa) 30%, transparent);
-    box-shadow: var(--spia-colore);
-}
-
-.con-colore .slot.mio.passato {
-    background: color-mix(in srgb, var(--colore-societa) 14%, transparent);
+    --colore-slot: var(--colore-societa);
 }
 
 .con-colore .quadretto-mio {
@@ -723,11 +712,14 @@ fieldset.campo {
     pointer-events: none;
 }
 
+/* Block label of a booked cell (admin view). Every booked cell now carries a
+   light translucent wash, so the label is always dark text — no white variant
+   is needed any more. */
 .slot-nome,
 .slot-attivita {
     display: block;
     max-width: 100%;
-    color: #fff;
+    color: var(--testo);
     padding: 0 0.2rem;
     overflow: hidden;
     white-space: nowrap;

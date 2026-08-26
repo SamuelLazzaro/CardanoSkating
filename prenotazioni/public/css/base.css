@@ -40,11 +40,11 @@
     --accento-tinta: #fff3e5;     /* pale orange wash for hover backgrounds */
     --velo-accento: rgba(255, 136, 0, 0.18); /* orange wash for hovers on dark surfaces */
     --testo-tenue-scuro: #b5b5b5; /* muted gray on the dark surfaces (header, nav) */
-    --occupato: #ff0000;          /* charcoal, echoes the site dark surfaces */
-    --occupato-passato: #ff8c00;
-    --mio-passato: #ffd2a1;       /* faded orange for own past slots */
+    /* calendar slot states: each one is washed out and given a left bar by the
+       .slot rules in components.css, so only the base hue lives here. Past
+       slots reuse the same hue with a thinner wash — no separate token. */
+    --occupato: #ff0000;          /* booked by somebody else */
     --in-attesa: #ffd400;         /* own request still awaiting a decision */
-    --in-attesa-passato: #ffeeb0; /* faded yellow for past pending requests */
     --passato: #edebe7;
     --oggi: #fff8ef;              /* pale orange wash on today's column */
     --ok: #2e7d54;
