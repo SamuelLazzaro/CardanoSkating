@@ -38,6 +38,8 @@
     --accento-testo: #a35100;     /* links / colored text (5.6:1 on white) */
     --accento-testo-scuro: #7d3e00; /* hover state of colored text */
     --accento-tinta: #fff3e5;     /* pale orange wash for hover backgrounds */
+    --velo-accento: rgba(255, 136, 0, 0.18); /* orange wash for hovers on dark surfaces */
+    --testo-tenue-scuro: #b5b5b5; /* muted gray on the dark surfaces (header, nav) */
     --occupato: #ff0000;          /* charcoal, echoes the site dark surfaces */
     --occupato-passato: #ff8c00;
     --mio-passato: #ffd2a1;       /* faded orange for own past slots */
@@ -45,6 +47,10 @@
     --oggi: #fff8ef;              /* pale orange wash on today's column */
     --ok: #2e7d54;
     --errore: #a8442f;
+
+    /* layout widths: single column, and column + section sidebar (desktop) */
+    --larghezza-pagina: 960px;
+    --larghezza-con-nav: 1180px;
 
     /* shape & motion */
     --raggio: 8px;

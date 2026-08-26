@@ -1,8 +1,10 @@
 /*
  * admin.js — entry point of the admin panel. Shows the login form until an
- * admin session cookie is present, then: pending richieste/ricorrenze with
- * approve/reject, full weekly calendar with società names and per-date
- * cancellation, direct bookings, and società management (create, edit,
+ * admin session cookie is present, then three sections behind the nav
+ * (js/navigazione.js): Home with the full weekly calendar (società names,
+ * per-date cancellation, direct bookings) and the monthly report; Notifiche
+ * with the pending richieste/ricorrenze to approve/reject, counted by the
+ * bell badge; Società with the società management (create, edit,
  * suspend/reactivate, personal-link regeneration).
  */
 import { avviaTapFeedback } from './tap-feedback.js';
@@ -51,6 +53,7 @@ import {
   preparaScorciatoiaSlot,
   preparaSelectOrari,
 } from './ui.js';
+import { aggiornaBadgeNotifiche, preparaNavigazione } from './navigazione.js';
 
 // First thing on every page: its capture listener must precede all others.
 avviaTapFeedback();
@@ -88,6 +91,7 @@ async function avvia() {
 
 /** @returns {void} registers all static event listeners once */
 function preparaEventi() {
+  preparaNavigazione(elemento('nav-sezioni'));
   preparaSelectOrari(elemento('dir-inizio'), elemento('dir-fine'), '10:00', '11:00');
   const oggi = adessoRoma().data;
   const campoData = elemento('dir-data');
@@ -159,6 +163,7 @@ async function caricaPannello() {
   elemento('vista-caricamento').hidden = true;
   elemento('bottone-esci').hidden = false;
   elemento('vista-admin').hidden = false;
+  elemento('nav-sezioni').hidden = false;
   await caricaCalendario();
   await caricaReport();
 }
@@ -179,6 +184,13 @@ async function caricaInAttesa() {
   const [richieste, ricorrenze] = await Promise.all([ottieniRichiesteAdmin(), ottieniRicorrenzeAdmin()]);
   renderRichiesteAttesa(richieste.richieste);
   renderRicorrenzeAttesa(ricorrenze.ricorrenze);
+  // The bell badge mirrors this section: anything still waiting for a
+  // decision. Every caller of caricaInAttesa (login, approve/reject,
+  // suspension cascade) therefore keeps the counter up to date for free.
+  aggiornaBadgeNotifiche(
+    elemento('badge-notifiche'),
+    richieste.richieste.length + ricorrenze.ricorrenze.length,
+  );
 }
 
 /**

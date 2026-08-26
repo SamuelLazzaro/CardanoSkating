@@ -421,6 +421,28 @@ fieldset.campo {
     color: #5b4a8a;
 }
 
+/*
+ * Pending-requests counter on the bell of the section nav (admin page only):
+ * white number on a brand-orange rectangle, anchored to the top-right corner
+ * of the icon (.nav-icona in css/layout.css is the positioning context).
+ * aggiornaBadgeNotifiche() (js/navigazione.js) sets the number at login/page
+ * load and after every approve/reject, and hides it when nothing is waiting.
+ */
+.badge-notifiche {
+    position: absolute;
+    top: -0.3rem;
+    right: -0.55rem;
+    min-width: 1.05rem;
+    padding: 0 0.25rem;
+    border-radius: 4px;
+    background: var(--accento);
+    color: var(--c-white);
+    font-size: 0.68rem;
+    font-weight: 600;
+    line-height: 1.05rem;
+    text-align: center;
+}
+
 /* -------------------------------------------------------- report mensile */
 
 .report-selettore {

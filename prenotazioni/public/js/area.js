@@ -44,6 +44,7 @@ import {
   preparaDialogo,
   preparaScorciatoiaSlot,
 } from './ui.js';
+import { preparaNavigazione } from './navigazione.js';
 
 // First thing on every page: its capture listener must precede all others.
 avviaTapFeedback();
@@ -91,12 +92,14 @@ async function avvia() {
     vistaArea.style.setProperty('--colore-societa', profilo.societa.colore);
   }
 
+  preparaNavigazione(elemento('nav-sezioni'));
   preparaForm();
   await caricaRichieste();
   await caricaCalendario();
 
   elemento('vista-caricamento').hidden = true;
   elemento('vista-area').hidden = false;
+  elemento('nav-sezioni').hidden = false;
 }
 
 /* ------------------------------------------------------------------ form */

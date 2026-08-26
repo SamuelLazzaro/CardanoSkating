@@ -11,7 +11,7 @@
 }
 
 .testata-interno {
-    max-width: 960px;
+    max-width: var(--larghezza-pagina);
     margin: 0 auto;
     padding: 1.1rem 1rem;
     display: flex;
@@ -31,7 +31,7 @@
 .sottotitolo {
     margin: 0.1rem 0 0;
     font-size: 0.85rem;
-    color: #b5b5b5;
+    color: var(--testo-tenue-scuro);
 }
 
 .testata-nav {
@@ -44,7 +44,7 @@
 .testata-nav button {
     /* shared between :hover, :focus-visible and .is-tapped; orange wash on
        the dark header, same ghost-button pattern as the main site */
-    --nav-fondo-attivo: rgba(255, 136, 0, 0.18);
+    --nav-fondo-attivo: var(--velo-accento);
     font: inherit;
     color: #fff;
     background: none;
@@ -74,16 +74,102 @@
     background: var(--nav-fondo-attivo);
 }
 
+/* ------------------------------------------------- navigazione sezioni */
+
+/*
+ * Section navigation of the admin and area pages (Home / Notifiche /
+ * Società): the same <nav class="nav-sezioni"> renders as a fixed bottom bar
+ * on small screens (mobile-first base styles below) and as a sticky left
+ * sidebar on desktop (min-width media query at the end of the file). It
+ * starts hidden and js/admin.js / js/area.js reveal it together with the
+ * authenticated view; js/navigazione.js wires the buttons to the sections.
+ */
+.nav-sezioni {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    background: var(--nero);
+    /* above the page content (the sticky calendar labels use z-index 1);
+       the <dialog> popups live in the browser top layer, so above this */
+    z-index: 10;
+    /* keep the bar clear of the iOS home indicator */
+    padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* the display: flex above would defeat the hidden attribute (author styles
+   win over the UA [hidden] rule): restore it explicitly */
+.nav-sezioni[hidden] {
+    display: none;
+}
+
+/* room at the page end, so the fixed bar never covers the last content */
+body:has(.nav-sezioni:not([hidden])) {
+    padding-bottom: 4.5rem;
+}
+
+.nav-voce {
+    /* shared between :hover, :focus-visible and .is-tapped */
+    --nav-voce-fondo-attivo: var(--velo-accento);
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.15rem;
+    padding: 0.5rem 0.25rem 0.55rem;
+    font: inherit;
+    font-size: 0.7rem;
+    color: var(--testo-tenue-scuro);
+    background: none;
+    border: none;
+    cursor: pointer;
+    transition: background-color var(--t-veloce), color var(--t-veloce);
+}
+
+.nav-voce svg {
+    /* the inline SVG uses stroke="currentColor": the icon inherits the
+       button text color and its color transition */
+    display: block;
+    width: 22px;
+    height: 22px;
+}
+
+.nav-voce.attiva {
+    color: var(--accento);
+}
+
+@media (pointer: fine) {
+    .nav-voce:hover {
+        background: var(--nav-voce-fondo-attivo);
+    }
+}
+
+.nav-voce.is-tapped {
+    background: var(--nav-voce-fondo-attivo);
+}
+
+.nav-voce:focus-visible {
+    background: var(--nav-voce-fondo-attivo);
+}
+
+/* wrapper around the bell icon: positioning anchor of .badge-notifiche
+   (see css/components.css) */
+.nav-icona {
+    position: relative;
+    display: inline-flex;
+}
+
 /* ------------------------------------------------------------ struttura */
 
 .contenitore {
-    max-width: 960px;
+    max-width: var(--larghezza-pagina);
     margin: 0 auto;
     padding: 1.25rem 1rem 2rem;
 }
 
 .pie {
-    max-width: 960px;
+    max-width: var(--larghezza-pagina);
     margin: 0 auto;
     padding: 0 1rem 2rem;
     color: var(--testo-tenue);
@@ -123,5 +209,74 @@
 
     .titolo-settimana {
         font-size: 0.95rem;
+    }
+}
+
+/*
+ * Desktop: the section nav leaves the bottom of the screen and becomes a
+ * sticky sidebar on the left of the content. .disposizione (the wrapper
+ * around nav + main) turns into the flex row that hosts the pair; on small
+ * screens it stays a plain block and the base rules above apply.
+ */
+@media (min-width: 900px) {
+    .disposizione {
+        display: flex;
+        align-items: flex-start;
+        gap: 1.25rem;
+        max-width: var(--larghezza-con-nav);
+        margin: 0 auto;
+        padding: 0 1rem;
+    }
+
+    /* the header follows the wider layout of the pages that have the nav,
+       so its edges line up with the sidebar and the content column */
+    body:has(.disposizione) .testata-interno {
+        max-width: var(--larghezza-con-nav);
+    }
+
+    .nav-sezioni {
+        position: sticky;
+        top: 1.25rem;
+        left: auto;
+        right: auto;
+        bottom: auto;
+        flex-direction: column;
+        width: 11.5rem;
+        flex-shrink: 0;
+        /* same vertical offset as the .contenitore top padding */
+        margin-top: 1.25rem;
+        padding: 0.4rem;
+        border-radius: var(--raggio);
+    }
+
+    /* the bottom bar is gone: no need to keep the page end clear */
+    body:has(.nav-sezioni:not([hidden])) {
+        padding-bottom: 0;
+    }
+
+    .nav-voce {
+        flex: none;
+        flex-direction: row;
+        justify-content: flex-start;
+        gap: 0.6rem;
+        padding: 0.55rem 0.75rem;
+        font-size: 0.9rem;
+        border-radius: var(--raggio);
+    }
+
+    .nav-voce svg {
+        width: 19px;
+        height: 19px;
+    }
+
+    /* inside the flex wrapper the main column gives up its own centering
+       (auto margins still center it in the space left by the sidebar) and
+       its horizontal padding, provided by the wrapper */
+    .disposizione .contenitore {
+        flex: 1;
+        min-width: 0;
+        margin: 0 auto;
+        padding-left: 0;
+        padding-right: 0;
     }
 }
