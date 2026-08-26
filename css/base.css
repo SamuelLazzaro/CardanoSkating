@@ -285,13 +285,11 @@ html {
    every component: `all` covers whatever properties the component's tap
    rule touches, and !important is needed because several components declare
    their transition on a selector more specific than a single class
-   (e.g. .footer-contact a). The class is dropped after TAP_FEEDBACK_MS,
-   while this transition is still mid-flight: the effect peaks partway
-   through and then eases back, which reads as a soft pulse rather than a
-   full state change. How far it gets is TAP_FEEDBACK_MS against --t-tap,
-   read on an ease curve — which front-loads, so 150 ms out of 250 ms is
-   already ~88% of the way. The way back is ruled by the component's own
-   transition again, the class being gone by then. */
+   (e.g. .footer-contact a). The class is dropped after TAP_FEEDBACK_MS
+   (300 ms), just after this transition (250 ms) has landed: the state shows
+   in full for a moment, then eases back under the component's own
+   transition, the class being gone by then. The pulse-ring hosts add a
+   ring animation sized to that same window, see components.css. */
 .is-tapped {
 	transition: all var(--t-tap) !important;
 }

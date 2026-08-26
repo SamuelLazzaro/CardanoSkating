@@ -13,7 +13,10 @@
  *      stopImmediatePropagation() holds back the site's own handlers, which
  *      are all registered on the elements themselves
  *   2. TAP_FEEDBACK_CLASS is added to the tapped element, which the CSS
- *      styles like the desktop :hover state of that component
+ *      styles like the desktop :hover state of that component; the pulse
+ *      ring hosts (css/components.css) also play their click pulse, sized
+ *      to last exactly TAP_FEEDBACK_MS, which this module publishes to the
+ *      CSS as a custom property
  *   3. after TAP_FEEDBACK_MS the class is removed and the click is replayed
  *      with element.click(), which performs the default action and runs
  *      every handler exactly as if step 1 had never happened
@@ -24,7 +27,12 @@
  * correctly with either input.
  */
 
-import { TAP_FEEDBACK_CLASS, TAP_FEEDBACK_MS, TAP_FEEDBACK_SELECTOR } from "./constants.js";
+import {
+    TAP_FEEDBACK_CLASS,
+    TAP_FEEDBACK_DURATION_PROP,
+    TAP_FEEDBACK_MS,
+    TAP_FEEDBACK_SELECTOR
+} from "./constants.js";
 
 /** @type {boolean} true when the last pointer pressed down was a finger */
 let g_lastPointerWasTouch = false;
@@ -102,6 +110,13 @@ function onClickCapture(clickEvent) {
  * @returns {void}
  */
 export function initTapFeedback() {
+    /*
+     * The pulse ring of a tapped element must play out inside the feedback
+     * window, so the stylesheet needs to know its length: publish it once
+     * here and JS stays the only place where the number is defined.
+     */
+    document.documentElement.style.setProperty(TAP_FEEDBACK_DURATION_PROP, `${TAP_FEEDBACK_MS}ms`);
+
     document.addEventListener("pointerdown", (pointerEvent) => {
         g_lastPointerWasTouch = pointerEvent.pointerType === "touch";
     }, { capture: true, passive: true });

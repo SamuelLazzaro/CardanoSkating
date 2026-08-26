@@ -249,15 +249,24 @@
      ::before  hover (fine pointers only): a ring keeps swelling out of the
                edge and fading, in a loop, for as long as the pointer stays
      ::after   press: a thin ring snaps on while the host is held down
-               (:active, or .is-tapped on touch) and, on release, swells and
-               fades out once — the "click" pulse
+               (:active) and, on release, swells and fades out once — the
+               "click" pulse. On touch (.is-tapped) the same swell plays
+               during the feedback window, see below.
 
-   The click pulse is a transition and not a keyframe animation on purpose:
-   :active ends at mouseup and .is-tapped is dropped after TAP_FEEDBACK_MS
-   (150 ms), both far shorter than the pulse itself, so an animation bound
-   to those states would be cut off mid-way. A transition *towards* the
-   resting state instead starts exactly when the pressed state ends and runs
-   to completion on its own.
+   Mouse and keyboard (:active): the click pulse is a transition and not a
+   keyframe animation on purpose. :active ends at mouseup, far sooner than
+   the pulse itself, so an animation bound to it would be cut off mid-way; a
+   transition *towards* the resting state instead starts exactly when the
+   press ends and runs to completion on its own.
+
+   Touch (.is-tapped): the opposite. js/tap-feedback.js drops the class in
+   the same tick in which it replays the click, so a pulse starting at that
+   moment would run together with the action — and be cut short by whatever
+   the action does (closing the cookie banner, scrolling to a section,
+   leaving the page). Here the pulse is a keyframe animation that plays
+   *during* the feedback window and lasts exactly TAP_FEEDBACK_MS, which
+   tap-feedback.js publishes as --tap-feedback-duration: it ends, invisible,
+   right when the action runs.
 
    Both rings are invisible at rest (no shadow, or zero alpha), so the
    pseudo-elements cost nothing while idle. pointer-events: none keeps them
@@ -315,7 +324,9 @@
 }
 
 @media (pointer: fine) {
-    .btn-pulse:hover {
+    /* hovered, or held down with the mouse or with Space on a focused button */
+    .btn-pulse:hover,
+    .btn-pulse:active {
         background-color: var(--pulse-fill-bg);
         border-color: var(--pulse-fill-bg);
         color: var(--pulse-fill-text);
@@ -325,26 +336,40 @@
     .hamburger:hover .hamburger-bar::before {
         animation: pulse-ring-hover var(--pulse-hover-duration) ease-out infinite;
     }
+
+    /* the press ring snaps on with no transition, so it shows up at once and
+       only the release is animated */
+    .btn-pulse:active::after,
+    .hamburger:active .hamburger-bar::after {
+        box-shadow: 0 0 0 var(--pulse-press-spread) var(--pulse-color);
+        transition: none;
+    }
 }
 
-/* pressed. :active covers mouse, keyboard (Space held) and the finger-down
-   phase of a tap; .is-tapped then holds the state for TAP_FEEDBACK_MS before
-   the tap's action runs (see base.css) */
-.btn-pulse:active,
+/* touch: .is-tapped holds the fill for TAP_FEEDBACK_MS before the tap's
+   action runs (ramp-in shared by every tapped element, see base.css)... */
 .btn-pulse.is-tapped {
     background-color: var(--pulse-fill-bg);
     border-color: var(--pulse-fill-bg);
     color: var(--pulse-fill-text);
 }
 
-/* the press ring snaps on with no transition, so it shows up at once and
-   only the release is animated */
-.btn-pulse:active::after,
+/* ...while the ring plays its whole pulse inside that same window (see the
+   header). `forwards` keeps the faded end state through the frame or two
+   between the end of the animation and the removal of the class */
+@keyframes pulse-ring-tap {
+    from {
+        box-shadow: 0 0 0 var(--pulse-press-spread) var(--pulse-color);
+    }
+
+    to {
+        box-shadow: 0 0 0 var(--pulse-click-spread) var(--pulse-color-faded);
+    }
+}
+
 .btn-pulse.is-tapped::after,
-.hamburger:active .hamburger-bar::after,
 .hamburger.is-tapped .hamburger-bar::after {
-    box-shadow: 0 0 0 var(--pulse-press-spread) var(--pulse-color);
-    transition: none;
+    animation: pulse-ring-tap var(--tap-feedback-duration) ease-out forwards;
 }
 
 /* ==========================================================================
@@ -1072,6 +1097,13 @@ body.cookie-banner-open .fab-lang {
     .hamburger-bar::before,
     .hamburger-bar::after {
         transition: none;
+    }
+
+    /* touch: a still press ring for the length of the feedback window */
+    .btn-pulse.is-tapped::after,
+    .hamburger.is-tapped .hamburger-bar::after {
+        animation: none;
+        box-shadow: 0 0 0 var(--pulse-press-spread) var(--pulse-color);
     }
 }
 

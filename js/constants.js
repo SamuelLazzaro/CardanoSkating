@@ -24,9 +24,15 @@ export const SCROLLEND_FALLBACK_MS = 1500;
 
 /**
  * @type {number} how long (ms) the tap feedback stays on screen before the
- * tapped element's own action runs
+ * tapped element's own action runs. It is also the length of the touch
+ * pulse ring ("Pulse ring" in css/components.css): the pulse has to be over
+ * before the action can hide, move or replace the element, so
+ * tap-feedback.js publishes this value to the CSS as TAP_FEEDBACK_DURATION_PROP.
  */
-export const TAP_FEEDBACK_MS = 150;
+export const TAP_FEEDBACK_MS = 300;
+
+/** @type {string} CSS custom property through which TAP_FEEDBACK_MS reaches the stylesheets */
+export const TAP_FEEDBACK_DURATION_PROP = "--tap-feedback-duration";
 
 /** @type {string} class carrying the tap feedback style (see base.css) */
 export const TAP_FEEDBACK_CLASS = "is-tapped";
