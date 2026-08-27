@@ -3,14 +3,15 @@
    section headings, timeline, cards, gallery, sponsor plates, contact cards,
    lightbox, language FAB.
    All :hover rules are wrapped in @media (pointer: fine) so they never
-   stick on touch devices. Right below each of those blocks sits the touch
-   counterpart: the same look bound to .is-tapped, the class
-   js/tap-feedback.js puts on a tapped element for TAP_FEEDBACK_MS before
-   running its action (the shared part of the utility lives in base.css).
-   Values used by both states are kept in a custom property scoped to the
-   component, so the two cannot drift apart.
+   stick on touch devices. Right below each of those blocks sits its :active
+   twin, outside the media query: the same look while the element is held
+   down, which is what a touch screen (no hover) shows on a tap, and what a
+   mouse or the Space key shows on a press. The twin carries the same
+   declarations and rides the component's own transition, so it comes and
+   goes exactly like the hover does. Values used by both states are kept in
+   a custom property scoped to the component, so the two cannot drift apart.
    The "boxed" buttons and the hamburger bars are the exception: they carry
-   no per-component hover or tap rule and take all their feedback from the
+   no per-component hover or press rule and take all their feedback from the
    shared pulse ring ("Pulse ring" section below).
    ========================================================================== */
 
@@ -177,22 +178,19 @@
 	}
 }
 
-/* touch counterparts of the hover block above (see base.css). Nested
-   elements need to restate the tap transition: .is-tapped only changes the
-   transition of the element the class lands on, not those of its
-   descendants. */
-.nav-link.is-tapped {
+/* press twins of the hover block above (see the file header) */
+.nav-link:active {
     color: var(--c-orange);
     transform: translateX(var(--nav-link-hover-shift));
 }
 
-.nav-social a.is-tapped {
+.nav-social a:active {
     transform: translateY(var(--nav-social-hover-lift));
 }
 
-.nav-social a.is-tapped svg {
+.nav-social a:active svg {
     color: var(--c-orange) !important;
-    transition: all var(--t-tap);
+    transition: color 0.55s ease;
 }
 
 /* ==========================================================================
@@ -252,25 +250,18 @@
 
      ::before  hover (fine pointers only): a ring keeps swelling out of the
                edge and fading, in a loop, for as long as the pointer stays
-     ::after   press: a thin ring snaps on while the host is held down
-               (:active) and, on release, swells and fades out once — the
-               "click" pulse. On touch (.is-tapped) the same swell plays
-               during the feedback window, see below.
+     ::after   press (:active, any input): a thin ring snaps on while the
+               host is held down — mouse button, finger or Space key — and,
+               on release, swells and fades out once: the "click" pulse.
 
-   Mouse and keyboard (:active): the click pulse is a transition and not a
-   keyframe animation on purpose. :active ends at mouseup, far sooner than
-   the pulse itself, so an animation bound to it would be cut off mid-way; a
-   transition *towards* the resting state instead starts exactly when the
-   press ends and runs to completion on its own.
-
-   Touch (.is-tapped): the opposite. js/tap-feedback.js drops the class in
-   the same tick in which it replays the click, so a pulse starting at that
-   moment would run together with the action — and be cut short by whatever
-   the action does (closing the cookie banner, scrolling to a section,
-   leaving the page). Here the pulse is a keyframe animation that plays
-   *during* the feedback window and lasts exactly TAP_FEEDBACK_MS, which
-   tap-feedback.js publishes as --tap-feedback-duration: it ends, invisible,
-   right when the action runs.
+   The click pulse is a transition and not a keyframe animation on purpose.
+   :active ends on release, far sooner than the pulse itself, so an animation
+   bound to it would be cut off mid-way; a transition *towards* the resting
+   state instead starts exactly when the press ends and runs to completion
+   on its own. Whatever the click then does (closing the cookie banner,
+   scrolling to a section, leaving the page) happens while the pulse is
+   still playing: where the host survives the action the pulse is seen in
+   full, where it does not the action itself is the feedback.
 
    Both rings are invisible at rest (no shadow, or zero alpha), so the
    pseudo-elements cost nothing while idle. pointer-events: none keeps them
@@ -281,7 +272,7 @@
    are fixed).
    ========================================================================== */
 .btn-pulse {
-    /* fill shared by :hover, :active and .is-tapped */
+    /* fill shared by :hover and :active */
     --pulse-fill-bg: var(--c-orange);
     --pulse-fill-text: var(--c-black);
     --pulse-fill-transition: background-color var(--t-hover), color var(--t-hover), border-color var(--t-hover);
@@ -328,9 +319,7 @@
 }
 
 @media (pointer: fine) {
-    /* hovered, or held down with the mouse or with Space on a focused button */
-    .btn-pulse:hover,
-    .btn-pulse:active {
+    .btn-pulse:hover {
         background-color: var(--pulse-fill-bg);
         border-color: var(--pulse-fill-bg);
         color: var(--pulse-fill-text);
@@ -340,40 +329,22 @@
     .hamburger:hover .hamburger-bar::before {
         animation: pulse-ring-hover var(--pulse-hover-duration) ease-out infinite;
     }
-
-    /* the press ring snaps on with no transition, so it shows up at once and
-       only the release is animated */
-    .btn-pulse:active::after,
-    .hamburger:active .hamburger-bar::after {
-        box-shadow: 0 0 0 var(--pulse-press-spread) var(--pulse-color);
-        transition: none;
-    }
 }
 
-/* touch: .is-tapped holds the fill for TAP_FEEDBACK_MS before the tap's
-   action runs (ramp-in shared by every tapped element, see base.css)... */
-.btn-pulse.is-tapped {
+/* held down with the mouse, a finger or Space on a focused button: the same
+   fill as the hover, outside the media query so that touch gets it too */
+.btn-pulse:active {
     background-color: var(--pulse-fill-bg);
     border-color: var(--pulse-fill-bg);
     color: var(--pulse-fill-text);
 }
 
-/* ...while the ring plays its whole pulse inside that same window (see the
-   header). `forwards` keeps the faded end state through the frame or two
-   between the end of the animation and the removal of the class */
-@keyframes pulse-ring-tap {
-    from {
-        box-shadow: 0 0 0 var(--pulse-press-spread) var(--pulse-color);
-    }
-
-    to {
-        box-shadow: 0 0 0 var(--pulse-click-spread) var(--pulse-color-faded);
-    }
-}
-
-.btn-pulse.is-tapped::after,
-.hamburger.is-tapped .hamburger-bar::after {
-    animation: pulse-ring-tap var(--tap-feedback-duration) ease-out forwards;
+/* the press ring snaps on with no transition, so it shows up at once and
+   only the release is animated */
+.btn-pulse:active::after,
+.hamburger:active .hamburger-bar::after {
+    box-shadow: 0 0 0 var(--pulse-press-spread) var(--pulse-color);
+    transition: none;
 }
 
 /* ==========================================================================
@@ -563,7 +534,7 @@
 /* ==========================================================================
    Prenotazione palazzetto — intro text + contact line for requesting the
    personal booking link by email. The photo buttons reuse .gallery-item
-   (lightbox, hover and .is-tapped included) and the mailto link inherits
+   (lightbox, hover and :active included) and the mailto link inherits
    the global link color, so no new hover styles here.
    ========================================================================== */
 .booking-text,
@@ -606,10 +577,9 @@
     }
 }
 
-.gallery-item.is-tapped img {
+.gallery-item:active img {
     transform: scale(var(--gallery-hover-zoom));
     filter: brightness(var(--gallery-hover-brightness));
-    transition: all var(--t-tap);
 }
 
 /* ==========================================================================
@@ -648,7 +618,7 @@
     }
 }
 
-.sponsor-item.is-tapped {
+.sponsor-item:active {
 	cursor: pointer;
 	/* filter: grayscale(0); */
 	/* opacity: 1; */
@@ -714,7 +684,7 @@
     }
 }
 
-.contact-card.is-tapped {
+.contact-card:active {
     transform: translateY(var(--contact-card-hover-lift));
     border-color: var(--c-orange);
     box-shadow: var(--glow-orange);
@@ -798,7 +768,7 @@
     }
 }
 
-.map-consent-external.is-tapped {
+.map-consent-external:active {
     color: var(--c-orange);
 }
 
@@ -879,7 +849,7 @@
     }
 }
 
-.cookie-policy-link.is-tapped {
+.cookie-policy-link:active {
     color: var(--c-orange-bright);
 }
 
@@ -1005,10 +975,10 @@ body.cookie-banner-open .fab-lang {
     }
 }
 
-.footer-contact a.is-tapped,
-.footer-credit a.is-tapped,
-.footer-legal a.is-tapped,
-.footer-cookie-prefs.is-tapped {
+.footer-contact a:active,
+.footer-credit a:active,
+.footer-legal a:active,
+.footer-cookie-prefs:active {
     color: var(--c-orange);
 }
 
@@ -1059,7 +1029,7 @@ body.cookie-banner-open .fab-lang {
     }
 }
 
-.lightbox-close.is-tapped {
+.lightbox-close:active {
     color: var(--c-orange);
 }
 
@@ -1101,13 +1071,6 @@ body.cookie-banner-open .fab-lang {
     .hamburger-bar::before,
     .hamburger-bar::after {
         transition: none;
-    }
-
-    /* touch: a still press ring for the length of the feedback window */
-    .btn-pulse.is-tapped::after,
-    .hamburger.is-tapped .hamburger-bar::after {
-        animation: none;
-        box-shadow: 0 0 0 var(--pulse-press-spread) var(--pulse-color);
     }
 }
 

@@ -26,7 +26,7 @@
 }
 
 /* hover and press feedback (orange fill + pulse ring) come from the shared
-   .btn-pulse rules in components.css, so no :hover / .is-tapped of its own */
+   .btn-pulse rules in components.css, so no :hover / :active of its own */
 .btn-back {
     /* .btn-pulse ring anchor, pulled out by the border width */
     --pulse-ring-inset: -1px;

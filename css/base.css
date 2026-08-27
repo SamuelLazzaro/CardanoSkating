@@ -94,7 +94,6 @@
 	--t-fade: 0.35s ease;
 	--t-zoom: 0.45s ease;
 	--t-reveal: 0.65s ease;
-	--t-tap: 0.25s ease;
 
 	/* pulse ring — hover/press feedback of the boxed buttons and of the
 	   hamburger bars (see "Pulse ring" in components.css). Defaults are sized
@@ -129,6 +128,9 @@
 }
 
 /* ----- Reset / base ----- */
+/* the browser's own grey flash on tap is switched off: the press feedback
+   of every clickable element is the :active twin of its hover rule, see the
+   header of components.css */
 * {
 	-webkit-tap-highlight-color: transparent;
 }
@@ -269,29 +271,6 @@ html {
 
 .reveal.no-anim {
 	transition: none;
-}
-
-/* ==========================================================================
-   Touch tap feedback utility
-   Touch screens have no :hover and the native tap highlight is switched off
-   above, so a tap would give no confirmation that the intended element was
-   hit. js/tap-feedback.js therefore adds .is-tapped to the tapped element,
-   waits TAP_FEEDBACK_MS and only then runs the click action. What
-   the class looks like is up to each component: the rules sit next to the
-   component's @media (pointer: fine) block, so touch shows the same accent
-   the pointer does.
-
-   The state comes in with a transition of its own (--t-tap), the same for
-   every component: `all` covers whatever properties the component's tap
-   rule touches, and !important is needed because several components declare
-   their transition on a selector more specific than a single class
-   (e.g. .footer-contact a). The class is dropped after TAP_FEEDBACK_MS
-   (300 ms), just after this transition (250 ms) has landed: the state shows
-   in full for a moment, then eases back under the component's own
-   transition, the class being gone by then. The pulse-ring hosts add a
-   ring animation sized to that same window, see components.css. */
-.is-tapped {
-	transition: all var(--t-tap) !important;
 }
 
 /* ==========================================================================
