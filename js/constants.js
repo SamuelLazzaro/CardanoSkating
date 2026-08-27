@@ -20,6 +20,29 @@ export const NAV_OVERLAY_FADE_MS = 350;
  */
 export const SCROLLEND_FALLBACK_MS = 1500;
 
+/* ----- touch tap feedback (see tap-feedback.js) ----- */
+
+/**
+ * @type {number} how long (ms) the tap feedback stays on screen before the
+ * tapped element's own action runs. It is also the length of the touch
+ * pulse ring ("Pulse ring" in css/components.css): the pulse has to be over
+ * before the action can hide, move or replace the element, so
+ * tap-feedback.js publishes this value to the CSS as TAP_FEEDBACK_DURATION_PROP.
+ */
+export const TAP_FEEDBACK_MS = 300;
+
+/** @type {string} CSS custom property through which TAP_FEEDBACK_MS reaches the stylesheets */
+export const TAP_FEEDBACK_DURATION_PROP = "--tap-feedback-duration";
+
+/** @type {string} class carrying the tap feedback style (see base.css) */
+export const TAP_FEEDBACK_CLASS = "is-tapped";
+
+/**
+ * @type {string} elements whose taps deserve the feedback: everything that
+ * performs an action when activated. A tap anywhere else is left alone.
+ */
+export const TAP_FEEDBACK_SELECTOR = 'a[href], button, [role="button"]';
+
 /* ----- GDPR consent (see cookie.js) ----- */
 
 /** @type {string} localStorage key recording the banner answer ("accepted" | "rejected") */
