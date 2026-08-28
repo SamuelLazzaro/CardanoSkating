@@ -453,6 +453,21 @@ export function notificaPrenotazioneDiretta(c: ContestoNotifica, societa: Societ
   });
 }
 
+/** Admin: prenotazione diretta ricorrente registrata e già materializzata nelle date elencate. */
+export function notificaPrenotazioneDirettaRicorrente(
+  c: ContestoNotifica,
+  societa: SocietaDaNotificare,
+  ricorrenza: EstremiRicorrenza,
+  date: string[],
+): void {
+  inviaNotifica(c, {
+    oggetto: `Nuova prenotazione ricorrente registrata — dal ${dataItaliana(ricorrenza.valida_dal)}`,
+    messaggio: "l'amministratore ha registrato una prenotazione ricorrente a nome della società: le date elencate sono ora prenotate.",
+    dettagli: [...righeRicorrenza(ricorrenza), `Date prenotate: ${date.map(dataItaliana).join(', ')}`],
+    societa,
+  });
+}
+
 /** Admin: società sospesa, con il riepilogo della cascata di annullamenti. */
 export function notificaSospensione(
   c: ContestoNotifica,

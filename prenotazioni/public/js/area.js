@@ -7,7 +7,6 @@ import { avviaTapFeedback } from './tap-feedback.js';
 import {
   APERTURA_MIN,
   CHIUSURA_MIN,
-  MAX_GIORNI_FINESTRA_RICORRENZA,
   PASSO_MIN,
   TITOLO_PREDEFINITO,
 } from './constants.js';
@@ -16,15 +15,12 @@ import {
   aggiungiGiorni,
   chiaveSlot,
   dataEstesa,
-  domenicaDellaSettimana,
   eColoreEsadecimale,
   elencoGiorni,
   etichettaGiorno,
   giorniGrigliaMese,
   giorniSettimana,
-  giornoSettimana,
   minutiDaOra,
-  occorrenzeRicorrenza,
   oraTesto,
   raggruppaSlotInFasce,
   slotSocietaIntervallo,
@@ -55,6 +51,7 @@ import {
   preparaScorciatoiaSlot,
 } from './ui.js';
 import { creaVistaCalendario } from './vista-calendario.js';
+import { preparaFormRipetizione } from './form-ripetizione.js';
 import { preparaNavigazione } from './navigazione.js';
 
 // First thing on every page: its capture listener must precede all others.
@@ -62,6 +59,9 @@ avviaTapFeedback();
 
 /** @type {(id: string) => HTMLElement} */
 const elemento = (id) => document.getElementById(id);
+
+/** @type {import('./form-ripetizione.js').FormRipetizione|null} repetition block of the request form */
+let g_ripetizione = null;
 
 /**
  * Default time of the request form. The "+" of a day cell in the monthly view
@@ -165,18 +165,15 @@ function preparaForm() {
   campoData.min = oggi;
   campoData.max = aggiungiGiorni(oggi, 365);
   campoData.value = aggiungiGiorni(oggi, 1);
-  campoData.addEventListener('change', aggiornaRipetizione);
 
-  const casellaRipeti = elemento('campo-ripeti');
-  casellaRipeti.addEventListener('change', () => {
-    elemento('blocco-fino-al').hidden = !casellaRipeti.checked;
-    elemento('campo-fino-al').required = casellaRipeti.checked;
-    aggiornaRipetizione();
+  g_ripetizione = preparaFormRipetizione({
+    campoData,
+    contenitoreGiorni: elemento('scelta-giorni'),
+    casellaRipeti: elemento('campo-ripeti'),
+    bloccoFinoAl: elemento('blocco-fino-al'),
+    campoFinoAl: elemento('campo-fino-al'),
+    anteprima: elemento('anteprima-date'),
   });
-  elemento('campo-fino-al').addEventListener('input', aggiornaAnteprimaDate);
-  for (const casella of caselleGiorni()) casella.addEventListener('change', aggiornaAnteprimaDate);
-  // The date is preset above without firing 'change': lock its weekday now.
-  aggiornaRipetizione();
 
   preparaDialogo(
     elemento('dialogo-richiesta'),
@@ -221,107 +218,10 @@ function apriRichiestaPerSlot(giorno, minuti) {
   elemento('campo-fine').value = oraTesto(minuti + PASSO_MIN);
   // The date was written programmatically, which fires no 'change' event:
   // everything tied to it (limits, locked weekday, preview) is refreshed by hand.
-  aggiornaRipetizione();
+  g_ripetizione.aggiorna();
   // A stale error from a previous attempt must not greet the reopened dialog.
   mostraMessaggio(elemento('esito-form'), '');
   elemento('dialogo-richiesta').showModal();
-}
-
-/** @returns {HTMLInputElement[]} the seven weekday checkboxes, in weekday order */
-function caselleGiorni() {
-  return [...document.querySelectorAll('#scelta-giorni input[name="giorni"]')];
-}
-
-/** @returns {number[]} weekdays currently selected (0 = lunedì), locked one included */
-function giorniSelezionati() {
-  return caselleGiorni()
-    .filter((casella) => casella.checked)
-    .map((casella) => Number(casella.value));
-}
-
-/** @returns {void} refreshes everything that depends on the chosen date */
-function aggiornaRipetizione() {
-  aggiornaLimitiRipetizione();
-  aggiornaGiornoObbligatorio();
-  aggiornaAnteprimaDate();
-}
-
-/** @returns {void} keeps the "fino al" limits tied to the chosen date */
-function aggiornaLimitiRipetizione() {
-  const dataScelta = elemento('campo-data').value;
-  const campoFinoAl = elemento('campo-fino-al');
-  if (!dataScelta) return;
-  campoFinoAl.min = aggiungiGiorni(dataScelta, 7);
-  campoFinoAl.max = aggiungiGiorni(dataScelta, MAX_GIORNI_FINESTRA_RICORRENZA);
-  if (campoFinoAl.value && (campoFinoAl.value < campoFinoAl.min || campoFinoAl.value > campoFinoAl.max)) {
-    campoFinoAl.value = campoFinoAl.max;
-  }
-}
-
-/**
- * Keeps the weekday of the chosen date checked and locked: that date is the
- * first occurrence, so its weekday always belongs to the series (the server
- * adds it anyway). When the date moves to another weekday, the previously
- * locked chip is handed back to the user exactly as it was before the lock,
- * so an explicit choice is never lost by merely changing the date.
- * @returns {void}
- */
-function aggiornaGiornoObbligatorio() {
-  const dataScelta = elemento('campo-data').value;
-  if (!dataScelta) return;
-  const giornoObbligatorio = giornoSettimana(dataScelta);
-  for (const casella of caselleGiorni()) {
-    const eObbligatoria = Number(casella.value) === giornoObbligatorio;
-    if (eObbligatoria && !casella.disabled) {
-      casella.dataset.sceltaPrima = String(casella.checked);
-      casella.checked = true;
-      casella.disabled = true;
-    } else if (!eObbligatoria && casella.disabled) {
-      casella.checked = casella.dataset.sceltaPrima === 'true';
-      delete casella.dataset.sceltaPrima;
-      casella.disabled = false;
-    }
-  }
-}
-
-/**
- * Live preview of the dates the request will cover, computed with the same
- * rules as the server: it is a series only when the weekly repetition is on
- * or more than one weekday is selected; without repetition the extra days
- * stop at the Sunday of the chosen week. Otherwise the preview stays hidden.
- * @returns {void}
- */
-function aggiornaAnteprimaDate() {
-  const anteprima = elemento('anteprima-date');
-  const dataScelta = elemento('campo-data').value;
-  const giorni = giorniSelezionati();
-  const ripeti = elemento('campo-ripeti').checked;
-  const finoAl = elemento('campo-fino-al').value;
-  const eRicorrente = ripeti || giorni.length > 1;
-  if (!dataScelta || !eRicorrente || (ripeti && !finoAl)) {
-    anteprima.hidden = true;
-    return;
-  }
-  const validaAl = ripeti ? finoAl : domenicaDellaSettimana(dataScelta);
-  const date = occorrenzeRicorrenza(dataScelta, validaAl, giorni);
-  const elenco = date.map((data) => {
-    const etichetta = etichettaGiorno(data);
-    return `${etichetta.nomeGiorno} ${etichetta.dataBreve}`;
-  });
-  anteprima.textContent = `Date richieste (${date.length}): ${elenco.join(', ')}`;
-  anteprima.hidden = false;
-}
-
-/** @returns {void} clears the extra weekdays, keeping only the locked one */
-function azzeraGiorni() {
-  for (const casella of caselleGiorni()) {
-    if (casella.disabled) {
-      casella.dataset.sceltaPrima = 'false';
-    } else {
-      casella.checked = false;
-    }
-  }
-  aggiornaAnteprimaDate();
 }
 
 /**
@@ -342,18 +242,12 @@ async function inviaForm(evento) {
     mostraMessaggio(esitoForm, 'Scegli una data', 'errore');
     return;
   }
-  if (elemento('campo-ripeti').checked) {
-    const finoAl = elemento('campo-fino-al').value;
-    if (!finoAl) {
-      mostraMessaggio(esitoForm, 'Scegli fino a quando ripetere la richiesta', 'errore');
-      return;
-    }
-    corpo.ripeti_fino_al = finoAl;
+  const erroreRipetizione = g_ripetizione.erroreCampi();
+  if (erroreRipetizione !== null) {
+    mostraMessaggio(esitoForm, erroreRipetizione, 'errore');
+    return;
   }
-  // Only the extra weekdays make the request different from a plain one: the
-  // weekday of the date itself is implied server-side.
-  const giorni = giorniSelezionati();
-  if (giorni.length > 1) corpo.giorni = giorni;
+  Object.assign(corpo, g_ripetizione.campiRichiesta());
 
   const bottone = elemento('bottone-invia');
   bottone.disabled = true;
@@ -371,10 +265,7 @@ async function inviaForm(evento) {
     }
     elemento('campo-titolo').value = TITOLO_PREDEFINITO;
     elemento('campo-note').value = '';
-    elemento('campo-ripeti').checked = false;
-    elemento('blocco-fino-al').hidden = true;
-    elemento('campo-fino-al').required = false;
-    azzeraGiorni();
+    g_ripetizione.azzera();
     await caricaRichieste();
     await caricaCalendario();
   } catch (errore) {

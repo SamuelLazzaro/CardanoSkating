@@ -1,4 +1,5 @@
 import type { Context } from 'hono';
+import { giornoSettimana } from './slots';
 
 /**
  * Legge il corpo JSON della richiesta. Ritorna null (→ 400 nel chiamante)
@@ -46,7 +47,7 @@ export function titoloAttivita(valore: unknown): string | null {
  * e senza doppioni, o null (→ 400 nel chiamante) se il formato non è quello
  * atteso. L'array vuoto è valido: "nessun giorno oltre a quello della data".
  */
-export function giorniSettimana(valore: unknown): number[] | null {
+function giorniSettimana(valore: unknown): number[] | null {
   if (!Array.isArray(valore) || valore.length > 7) return null;
   const giorni = new Set<number>();
   for (const giorno of valore) {
@@ -54,6 +55,18 @@ export function giorniSettimana(valore: unknown): number[] | null {
     giorni.add(giorno);
   }
   return [...giorni].sort((a, b) => a - b);
+}
+
+/**
+ * Giorni della settimana di una ricorrenza dal corpo della richiesta (campo
+ * facoltativo `giorni`) più, sempre, il giorno della prima data: quella data
+ * è la prima occorrenza. Condivisa dalle route società e admin. Ritorna null
+ * (→ 400 nel chiamante) se il campo è presente ma malformato.
+ */
+export function giorniRicorrenza(valore: unknown, data: string): number[] | null {
+  const giorniAggiuntivi = valore === undefined ? [] : giorniSettimana(valore);
+  if (giorniAggiuntivi === null) return null;
+  return [...new Set([...giorniAggiuntivi, giornoSettimana(data)])].sort((a, b) => a - b);
 }
 
 /** Limiti di lunghezza della motivazione di una decisione admin: il minimo

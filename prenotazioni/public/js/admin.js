@@ -60,6 +60,7 @@ import {
   preparaSelectOrari,
 } from './ui.js';
 import { creaVistaCalendario } from './vista-calendario.js';
+import { preparaFormRipetizione } from './form-ripetizione.js';
 import { aggiornaBadgeNotifiche, preparaNavigazione } from './navigazione.js';
 
 // First thing on every page: its capture listener must precede all others.
@@ -87,6 +88,9 @@ let g_versioneCalendario = 0;
 
 /** @type {object|null} società being edited in the form, null = create mode */
 let g_societaInModifica = null;
+
+/** @type {import('./form-ripetizione.js').FormRipetizione|null} repetition block of the direct booking form */
+let g_ripetizione = null;
 
 /* ------------------------------------------------------------------ init */
 
@@ -116,6 +120,17 @@ function preparaEventi() {
   campoData.min = oggi;
   campoData.max = aggiungiGiorni(oggi, 365);
   campoData.value = aggiungiGiorni(oggi, 1);
+
+  // Same repetition block as the società request form: weekday chips, weekly
+  // repetition and live preview of the dates that will be booked.
+  g_ripetizione = preparaFormRipetizione({
+    campoData,
+    contenitoreGiorni: elemento('dir-scelta-giorni'),
+    casellaRipeti: elemento('dir-ripeti'),
+    bloccoFinoAl: elemento('dir-blocco-fino-al'),
+    campoFinoAl: elemento('dir-fino-al'),
+    anteprima: elemento('dir-anteprima-date'),
+  });
 
   preparaDialogo(
     elemento('dialogo-diretta'),
@@ -675,6 +690,9 @@ function apriDirettaPerSlot(giorno, minuti) {
   elemento('dir-data').value = giorno;
   elemento('dir-inizio').value = oraTesto(minuti);
   elemento('dir-fine').value = oraTesto(minuti + PASSO_MIN);
+  // The date was written programmatically, which fires no 'change' event:
+  // everything tied to it (limits, locked weekday, preview) is refreshed by hand.
+  g_ripetizione.aggiorna();
   // A stale error from a previous attempt must not greet the reopened dialog.
   mostraMessaggio(elemento('esito-form'), '');
   elemento('dialogo-diretta').showModal();
@@ -686,28 +704,47 @@ function apriDirettaPerSlot(giorno, minuti) {
  */
 async function prenotaDiretta(evento) {
   evento.preventDefault();
+  const esitoForm = elemento('esito-form');
+  const erroreRipetizione = g_ripetizione.erroreCampi();
+  if (erroreRipetizione !== null) {
+    mostraMessaggio(esitoForm, erroreRipetizione, 'errore');
+    return;
+  }
+  const corpo = {
+    societa_id: Number(elemento('dir-societa').value),
+    titolo: elemento('dir-titolo').value.trim(),
+    data: elemento('dir-data').value,
+    ora_inizio: elemento('dir-inizio').value,
+    ora_fine: elemento('dir-fine').value,
+    note: elemento('dir-note').value.trim(),
+    ...g_ripetizione.campiRichiesta(),
+  };
+
   const bottone = elemento('bottone-diretta');
   bottone.disabled = true;
   try {
-    const risposta = await creaPrenotazioneDiretta({
-      societa_id: Number(elemento('dir-societa').value),
-      titolo: elemento('dir-titolo').value.trim(),
-      data: elemento('dir-data').value,
-      ora_inizio: elemento('dir-inizio').value,
-      ora_fine: elemento('dir-fine').value,
-      note: elemento('dir-note').value.trim(),
-    });
+    const risposta = await creaPrenotazioneDiretta(corpo);
     // Success closes the popup: the confirmation goes to the page-level
     // status next to the calendar, where it stays readable.
     elemento('dialogo-diretta').close();
-    mostraMessaggio(elemento('esito-diretta'), `Prenotazione registrata (${risposta.slot_inseriti} slot).`, 'ok');
+    if (risposta.tipo === 'ricorrenza') {
+      const dateLeggibili = risposta.occorrenze.map(dataEstesa).join(', ');
+      mostraMessaggio(
+        elemento('esito-diretta'),
+        `Prenotazione ricorrente registrata: ${risposta.occorrenze.length} date (${dateLeggibili}), ${risposta.slot_inseriti} slot.`,
+        'ok',
+      );
+    } else {
+      mostraMessaggio(elemento('esito-diretta'), `Prenotazione registrata (${risposta.slot_inseriti} slot).`, 'ok');
+    }
     elemento('dir-titolo').value = TITOLO_PREDEFINITO;
     elemento('dir-note').value = '';
+    g_ripetizione.azzera();
     await caricaCalendario();
   } catch (errore) {
     // Errors (e.g. slot conflicts) stay inside the popup, so the admin can
     // adjust date or time without reopening it.
-    mostraMessaggio(elemento('esito-form'), messaggioConflitti(errore), 'errore');
+    mostraMessaggio(esitoForm, messaggioConflitti(errore), 'errore');
   } finally {
     bottone.disabled = false;
   }

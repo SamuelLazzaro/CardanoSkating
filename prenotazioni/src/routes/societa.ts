@@ -2,12 +2,8 @@ import { Hono } from 'hono';
 import type { Bindings, RichiestaRow, RicorrenzaRow, VariabiliSocieta } from '../tipi';
 import {
   aggiungiGiorni,
-  domenicaDellaSettimana,
+  fineRicorrenza,
   giorniInTesto,
-  giornoSettimana,
-  isDataValida,
-  MAX_GIORNI_FINESTRA_RICORRENZA,
-  MAX_SETTIMANE_RICORRENZA,
   occorrenzeRicorrenza,
   oraRoma,
   raggruppaSlotInFasce,
@@ -17,7 +13,7 @@ import {
 } from '../slots';
 import { cancellaCookieSessione, COOKIE_SOCIETA, richiedeSocieta } from '../auth';
 import { eAnnullamentoDuplicato, slotOccupati } from '../conflitti';
-import { giorniSettimana, intero, leggiJson, MAX_TITOLO, scriviAudit, stmtAudit, testo, titoloAttivita } from '../util';
+import { giorniRicorrenza, intero, leggiJson, MAX_TITOLO, scriviAudit, stmtAudit, testo, titoloAttivita } from '../util';
 import {
   notificaAnnullamentoRichiesto,
   notificaRichiestaInviata,
@@ -118,38 +114,20 @@ societa.post('/richieste', async (c) => {
     return c.json({ errore: 'Non è possibile prenotare oltre un anno in anticipo' }, 400);
   }
 
-  // Giorni aggiuntivi della settimana (facoltativi); quello della data scelta
-  // viene sempre incluso, perché quella data è la prima occorrenza.
-  const giorniAggiuntivi = corpo.giorni === undefined ? [] : giorniSettimana(corpo.giorni);
-  if (giorniAggiuntivi === null) {
+  // Giorni della settimana richiesti (il giorno della data scelta è sempre
+  // incluso) e fine del periodo: stesse regole della prenotazione diretta
+  // ricorrente dell'admin (vedi util.giorniRicorrenza e slots.fineRicorrenza).
+  const giorni = giorniRicorrenza(corpo.giorni, data);
+  if (giorni === null) {
     return c.json({ errore: 'Giorni della settimana non validi (attesi numeri da 0 = lunedì a 6 = domenica)' }, 400);
   }
-  const giorni = [...new Set([...giorniAggiuntivi, giornoSettimana(data)])].sort((a, b) => a - b);
 
   const ripetiFinoAl = typeof corpo.ripeti_fino_al === 'string' ? corpo.ripeti_fino_al.trim() : '';
   const eRicorrente = ripetiFinoAl !== '' || giorni.length > 1;
   if (eRicorrente) {
-    // Fine del periodo: la data indicata dalla società oppure, senza
-    // ripetizione settimanale, la domenica della settimana della prima data
-    // (gli altri giorni richiesti valgono solo per quella settimana).
-    let validaAl: string;
-    if (ripetiFinoAl !== '') {
-      if (!isDataValida(ripetiFinoAl) || ripetiFinoAl <= data) {
-        return c.json({ errore: 'La data di fine ripetizione deve essere una data successiva alla prima' }, 400);
-      }
-      // Cap di progetto: finestra di MAX_SETTIMANE_RICORRENZA settimane piene,
-      // così il batch di materializzazione resta piccolo (vedi routes/admin.ts).
-      const massimo = aggiungiGiorni(data, MAX_GIORNI_FINESTRA_RICORRENZA);
-      if (ripetiFinoAl > massimo) {
-        return c.json(
-          { errore: `La ripetizione settimanale può coprire al massimo ${MAX_SETTIMANE_RICORRENZA} settimane (fino al ${massimo})` },
-          400,
-        );
-      }
-      validaAl = ripetiFinoAl;
-    } else {
-      validaAl = domenicaDellaSettimana(data);
-    }
+    const fine = fineRicorrenza(data, ripetiFinoAl);
+    if ('errore' in fine) return c.json({ errore: fine.errore }, 400);
+    const validaAl = fine.validaAl;
 
     const occorrenze = occorrenzeRicorrenza(data, validaAl, giorni);
     // Tutto o niente: se anche un solo slot di una sola occorrenza è già

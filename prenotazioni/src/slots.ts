@@ -172,6 +172,27 @@ export function ricorrenzaConGiorni<T extends { giorni: string }>(riga: T): Omit
 }
 
 /**
+ * Fine del periodo di una ricorrenza, dai campi del form (condivisa dalle
+ * route società e admin): la data di "ripeti fino al" — che deve essere una
+ * data valida, successiva alla prima e dentro la finestra di
+ * MAX_SETTIMANE_RICORRENZA settimane piene — oppure, senza ripetizione
+ * settimanale, la domenica della settimana della prima data (gli altri giorni
+ * richiesti valgono solo per quella settimana). In caso di errore ritorna il
+ * messaggio da mostrare all'utente.
+ */
+export function fineRicorrenza(data: string, ripetiFinoAl: string): { validaAl: string } | { errore: string } {
+  if (ripetiFinoAl === '') return { validaAl: domenicaDellaSettimana(data) };
+  if (!isDataValida(ripetiFinoAl) || ripetiFinoAl <= data) {
+    return { errore: 'La data di fine ripetizione deve essere una data successiva alla prima' };
+  }
+  const massimo = aggiungiGiorni(data, MAX_GIORNI_FINESTRA_RICORRENZA);
+  if (ripetiFinoAl > massimo) {
+    return { errore: `La ripetizione settimanale può coprire al massimo ${MAX_SETTIMANE_RICORRENZA} settimane (fino al ${massimo})` };
+  }
+  return { validaAl: ripetiFinoAl };
+}
+
+/**
  * Date delle occorrenze di una ricorrenza: tutti i giorni tra validaDal e
  * validaAl (inclusi) il cui giorno della settimana è tra quelli richiesti,
  * in ordine cronologico. Con un solo giorno richiesto equivale a "ogni 7

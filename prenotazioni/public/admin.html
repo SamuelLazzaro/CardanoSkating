@@ -208,6 +208,32 @@
               <label for="dir-note">Note (facoltative)</label>
               <textarea id="dir-note" maxlength="500" rows="2"></textarea>
             </div>
+            <fieldset class="campo">
+              <legend>Ripetizione</legend>
+              <div class="campo">
+                <span class="etichetta-gruppo" id="dir-etichetta-giorni">Stesso orario anche in altri giorni della settimana</span>
+                <div class="scelta-giorni" id="dir-scelta-giorni" role="group" aria-labelledby="dir-etichetta-giorni">
+                  <label class="giorno-scelta"><input type="checkbox" name="giorni" value="0"><span>Lun</span></label>
+                  <label class="giorno-scelta"><input type="checkbox" name="giorni" value="1"><span>Mar</span></label>
+                  <label class="giorno-scelta"><input type="checkbox" name="giorni" value="2"><span>Mer</span></label>
+                  <label class="giorno-scelta"><input type="checkbox" name="giorni" value="3"><span>Gio</span></label>
+                  <label class="giorno-scelta"><input type="checkbox" name="giorni" value="4"><span>Ven</span></label>
+                  <label class="giorno-scelta"><input type="checkbox" name="giorni" value="5"><span>Sab</span></label>
+                  <label class="giorno-scelta"><input type="checkbox" name="giorni" value="6"><span>Dom</span></label>
+                </div>
+                <p class="suggerimento">Il giorno della data scelta è sempre incluso. Senza ripetizione settimanale gli altri giorni valgono solo per quella settimana.</p>
+              </div>
+              <label class="etichetta-check">
+                <input type="checkbox" id="dir-ripeti">
+                Ripeti ogni settimana
+              </label>
+              <div class="campo" id="dir-blocco-fino-al" hidden>
+                <label for="dir-fino-al">fino al (incluso)</label>
+                <input type="date" id="dir-fino-al">
+                <p class="suggerimento">Una prenotazione ricorrente può coprire al massimo 4 settimane.</p>
+              </div>
+              <p class="suggerimento anteprima-date" id="dir-anteprima-date" role="status" hidden></p>
+            </fieldset>
             <div>
               <button type="submit" class="btn btn-primario" id="bottone-diretta">Prenota</button>
             </div>

@@ -236,8 +236,11 @@ export function ottieniCalendarioAdminMese(mese) {
 }
 
 /**
- * @param {{societa_id: number, titolo?: string, data: string, ora_inizio: string, ora_fine: string, note?: string}} corpo
- * @returns {Promise<{ok: boolean, richiesta_id: number, slot_inseriti: number}>}
+ * Direct booking, immediately approved. With `giorni` (extra weekdays, 0 =
+ * lunedì) and/or `ripeti_fino_al` it becomes a recurring booking: the answer
+ * then carries the series id and the booked dates instead of richiesta_id.
+ * @param {{societa_id: number, titolo?: string, data: string, ora_inizio: string, ora_fine: string, note?: string, ripeti_fino_al?: string, giorni?: number[]}} corpo
+ * @returns {Promise<{ok: boolean, tipo: 'richiesta'|'ricorrenza', richiesta_id?: number, ricorrenza_id?: number, occorrenze?: string[], slot_inseriti: number}>}
  */
 export function creaPrenotazioneDiretta(corpo) {
   return richiestaJson('/api/admin/prenotazioni', { method: 'POST', body: JSON.stringify(corpo) });

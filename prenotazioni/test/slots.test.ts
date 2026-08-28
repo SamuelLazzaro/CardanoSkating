@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   aggiungiGiorni,
   domenicaDellaSettimana,
+  fineRicorrenza,
   giorniDaTesto,
   giorniInTesto,
   giornoSettimana,
@@ -120,6 +121,23 @@ describe('occorrenzeRicorrenza', () => {
 
   it('senza giorni richiesti non produce date', () => {
     expect(occorrenzeRicorrenza('2030-01-07', '2030-01-20', [])).toEqual([]);
+  });
+});
+
+describe('fineRicorrenza', () => {
+  // 2030-01-09 è un mercoledì.
+  it('senza ripetizione settimanale chiude alla domenica della stessa settimana', () => {
+    expect(fineRicorrenza('2030-01-09', '')).toEqual({ validaAl: '2030-01-13' });
+  });
+
+  it('accetta una fine dentro le 4 settimane piene (27 giorni dopo la prima data)', () => {
+    expect(fineRicorrenza('2030-01-09', '2030-02-05')).toEqual({ validaAl: '2030-02-05' });
+  });
+
+  it('rifiuta una fine non valida, non successiva alla prima data o oltre la finestra', () => {
+    expect(fineRicorrenza('2030-01-09', '09/02/2030')).toHaveProperty('errore');
+    expect(fineRicorrenza('2030-01-09', '2030-01-09')).toHaveProperty('errore');
+    expect(fineRicorrenza('2030-01-09', '2030-02-06')).toHaveProperty('errore'); // 28 giorni dopo
   });
 });
 

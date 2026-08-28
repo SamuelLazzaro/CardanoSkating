@@ -165,7 +165,9 @@ Consiglio: fai un backup prima di ogni `migrate:remote`.
   l'intera serie con una sola decisione; all'approvazione le occorrenze
   vengono materializzate in un unico batch atomico come richieste
   indipendenti, così una singola data si può annullare senza rompere la
-  serie.
+  serie. Anche la prenotazione diretta dell'admin può essere ricorrente, con
+  le stesse regole: la serie nasce già approvata e viene materializzata
+  subito, nello stesso batch.
 - **Annullamenti** (migrazione `0005`): una richiesta ancora in attesa può
   essere ritirata direttamente dalla società; una prenotazione approvata
   futura invece si annulla solo con una richiesta di tipo `annullamento`

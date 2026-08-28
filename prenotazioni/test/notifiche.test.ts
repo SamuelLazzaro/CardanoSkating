@@ -312,6 +312,32 @@ describe('invio notifiche', () => {
     expect(cattura.corpi()[0].textContent).toContain('Giorno: ogni lunedì, dalle 10:00 alle 11:00');
   });
 
+  it('la prenotazione diretta ricorrente notifica solo la società, con giorni e date prenotate', async () => {
+    const { id: societaId } = await creaSocietaConToken();
+    // Una sola intercettazione: azione dell'admin, quindi nessuna email all'admin.
+    const cattura = intercettaBrevo();
+
+    // 2027-03-08 è un lunedì; più il mercoledì, per due settimane.
+    const risposta = await postConContesto('/api/admin/prenotazioni', await cookieAdmin(), {
+      societa_id: societaId,
+      data: '2027-03-08',
+      ora_inizio: '10:00',
+      ora_fine: '11:00',
+      giorni: [2],
+      ripeti_fino_al: '2027-03-21',
+    });
+    expect(risposta.status).toBe(201);
+
+    const corpo = cattura.corpo();
+    expect(corpo).not.toBeNull();
+    expect(corpo!.to[0].email).toBe('test@example.com');
+    expect(corpo!.subject).toContain('Nuova prenotazione ricorrente registrata');
+    expect(corpo!.textContent).toContain("l'amministratore ha registrato una prenotazione ricorrente");
+    expect(corpo!.textContent).toContain('Giorni: ogni lunedì e mercoledì, dalle 10:00 alle 11:00');
+    expect(corpo!.textContent).toContain('Date prenotate: 08/03/2027, 10/03/2027, 15/03/2027, 17/03/2027');
+    expect(await conteggioNotificheFallite()).toBe(0);
+  });
+
   it("l'approvazione non ripete le note della richiesta", async () => {
     const { id: societaId } = await creaSocietaConToken();
     const esito = await env.DB
