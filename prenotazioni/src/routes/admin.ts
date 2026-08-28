@@ -3,9 +3,8 @@ import type { Bindings, RichiestaRow, RicorrenzaRow, StatoRichiesta } from '../t
 import {
   aggiungiGiorni,
   giorniDaTesto,
-  isDataValida,
+  intervalloCalendario,
   isMeseValido,
-  lunediDellaSettimana,
   MAX_OCCORRENZE_RICORRENZA,
   meseSuccessivo,
   occorrenzeRicorrenza,
@@ -667,18 +666,14 @@ admin.post('/societa/:id/rigenera-token', async (c) => {
 // Calendario completo e prenotazioni dirette
 // ---------------------------------------------------------------------------
 
+/**
+ * Calendario dell'admin: come quello pubblico accetta `settimana=AAAA-MM-GG`
+ * oppure `mese=AAAA-MM` (griglia mensile, settimane intere), ma ogni slot porta
+ * anche società, colore e titolo dell'attività.
+ */
 admin.get('/calendario', async (c) => {
-  const parametro = c.req.query('settimana');
-  let riferimento: string;
-  if (parametro === undefined || parametro === '') {
-    riferimento = oraRoma(new Date()).data;
-  } else if (isDataValida(parametro)) {
-    riferimento = parametro;
-  } else {
-    return c.json({ errore: 'Parametro settimana non valido (formato atteso AAAA-MM-GG)' }, 400);
-  }
-  const lunedi = lunediDellaSettimana(riferimento);
-  const lunediSuccessivo = aggiungiGiorni(lunedi, 7);
+  const intervallo = intervalloCalendario(c.req.query('settimana'), c.req.query('mese'), new Date());
+  if (intervallo.tipo === 'errore') return c.json({ errore: intervallo.messaggio }, 400);
   const { results } = await c.env.DB
     .prepare(
       `SELECT p.slot_key, p.societa_id, s.nome AS societa, s.colore, p.richiesta_id, r.titolo
@@ -687,9 +682,12 @@ admin.get('/calendario', async (c) => {
        JOIN richieste r ON r.id = p.richiesta_id
        WHERE p.slot_key >= ?1 AND p.slot_key < ?2 ORDER BY p.slot_key`,
     )
-    .bind(`${lunedi}_0000`, `${lunediSuccessivo}_0000`)
+    .bind(`${intervallo.dal}_0000`, `${aggiungiGiorni(intervallo.al, 1)}_0000`)
     .all();
-  return c.json({ settimana: lunedi, prenotazioni: results });
+  if (intervallo.tipo === 'mese') {
+    return c.json({ mese: intervallo.mese, dal: intervallo.dal, al: intervallo.al, prenotazioni: results });
+  }
+  return c.json({ settimana: intervallo.lunedi, prenotazioni: results });
 });
 
 /**

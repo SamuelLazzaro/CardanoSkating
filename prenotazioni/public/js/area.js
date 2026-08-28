@@ -20,13 +20,15 @@ import {
   eColoreEsadecimale,
   elencoGiorni,
   etichettaGiorno,
+  giorniGrigliaMese,
   giorniSettimana,
   giornoSettimana,
-  lunediDellaSettimana,
+  minutiDaOra,
   occorrenzeRicorrenza,
   oraTesto,
+  raggruppaSlotInFasce,
+  slotSocietaIntervallo,
   slotSocietaSettimana,
-  titoloSettimana,
 } from './utils.js';
 import {
   annullaRicorrenza,
@@ -34,19 +36,25 @@ import {
   esciSocieta,
   inviaRichiestaPrenotazione,
   ottieniCalendario,
+  ottieniCalendarioMese,
   ottieniProfiloSocieta,
   ottieniRichiesteSocieta,
   richiediAnnullamento,
 } from './api.js';
 import {
+  aggiungiBottoneGiorno,
   aggiungiBottoneSlot,
   costruisciGriglia,
+  costruisciGrigliaMese,
   creaBadge,
+  creaVoceMese,
   mostraMessaggio,
   mostraMessaggioConElenco,
   preparaDialogo,
+  preparaDrillDownGiorno,
   preparaScorciatoiaSlot,
 } from './ui.js';
+import { creaVistaCalendario } from './vista-calendario.js';
 import { preparaNavigazione } from './navigazione.js';
 
 // First thing on every page: its capture listener must precede all others.
@@ -55,8 +63,31 @@ avviaTapFeedback();
 /** @type {(id: string) => HTMLElement} */
 const elemento = (id) => document.getElementById(id);
 
-/** @type {string} Monday of the week shown in the calendar panel */
-let g_lunediArea = lunediDellaSettimana(adessoRoma().data);
+/**
+ * Default time of the request form. The "+" of a day cell in the monthly view
+ * opens the popup on that start time, since a day — unlike a half-hour slot —
+ * says nothing about the time.
+ * @type {string}
+ */
+const ORA_PREDEFINITA = '18:00';
+
+/** @type {string} default end time of the request form, 'HH:MM' */
+const ORA_FINE_PREDEFINITA = '19:00';
+
+/**
+ * Texts of a monthly view entry, per state of its slots. They mirror the three
+ * states of the weekly grid: the area calendar never names the other società,
+ * so somebody else's booking stays a plain "Occupato".
+ * @type {Record<string, {etichetta: string, descrizione: string}>}
+ */
+const VOCI_MESE = {
+  mio: { etichetta: 'Tua prenotazione', descrizione: 'la tua prenotazione' },
+  occupato: { etichetta: 'Occupato', descrizione: 'occupato' },
+  'in-attesa': { etichetta: 'In attesa', descrizione: 'la tua richiesta, in attesa di approvazione' },
+};
+
+/** @type {object|null} week/month state of the calendar panel (js/vista-calendario.js) */
+let g_vistaCalendario = null;
 
 /** @type {object[]} cached richieste of the società (used to highlight slots) */
 let g_richieste = [];
@@ -118,8 +149,8 @@ function preparaForm() {
     selettoreInizio.append(new Option(oraTesto(minuti), oraTesto(minuti)));
     selettoreFine.append(new Option(oraTesto(minuti + PASSO_MIN), oraTesto(minuti + PASSO_MIN)));
   }
-  selettoreInizio.value = '18:00';
-  selettoreFine.value = '19:00';
+  selettoreInizio.value = ORA_PREDEFINITA;
+  selettoreFine.value = ORA_FINE_PREDEFINITA;
 
   // Keep the interval consistent: the end must always follow the start.
   selettoreInizio.addEventListener('change', () => {
@@ -155,19 +186,25 @@ function preparaForm() {
   // A stale error from a previous attempt must not greet the reopened dialog.
   elemento('bottone-nuova-prenotazione').addEventListener('click', () => mostraMessaggio(elemento('esito-form'), ''));
 
-  // "+" shortcut on the free slots of the calendar: one delegated listener,
-  // registered before the first render because the container already exists.
+  // "+" shortcut on the free cells of the calendar and drill-down from a day
+  // of the monthly grid: delegated listeners, registered before the first
+  // render because the container already exists.
   preparaScorciatoiaSlot(elemento('cal-griglia'), apriRichiestaPerSlot);
+  preparaDrillDownGiorno(elemento('cal-griglia'), (giorno) => g_vistaCalendario.apriSettimana(giorno));
+
+  // Week/month switch and navigation of the calendar panel.
+  g_vistaCalendario = creaVistaCalendario({
+    titolo: elemento('cal-titolo'),
+    precedente: elemento('cal-precedente'),
+    successiva: elemento('cal-successiva'),
+    oggi: elemento('cal-oggi'),
+    vistaSettimana: elemento('cal-vista-settimana'),
+    vistaMese: elemento('cal-vista-mese'),
+  }, mostraCalendario);
 
   elemento('form-richiesta').addEventListener('submit', inviaForm);
   elemento('bottone-esci').addEventListener('click', esci);
   elemento('bottone-copia').addEventListener('click', copiaLinkIcs);
-  elemento('cal-precedente').addEventListener('click', () => spostaSettimana(-7));
-  elemento('cal-successiva').addEventListener('click', () => spostaSettimana(7));
-  elemento('cal-oggi').addEventListener('click', () => {
-    g_lunediArea = lunediDellaSettimana(adessoRoma().data);
-    caricaCalendario();
-  });
 }
 
 /**
@@ -615,27 +652,42 @@ async function annullaSerie(ricorrenza) {
 
 /* ------------------------------------------------------------- calendario */
 
-/**
- * @param {number} giorni - +7 or -7
- * @returns {void}
- */
-function spostaSettimana(giorni) {
-  g_lunediArea = aggiungiGiorni(g_lunediArea, giorni);
-  caricaCalendario();
+/** @returns {Promise<void>} reloads the interval currently on screen */
+function caricaCalendario() {
+  return g_vistaCalendario.aggiorna();
 }
 
-/** @returns {Promise<void>} loads and renders the calendar week */
-async function caricaCalendario() {
+/**
+ * Loads and renders the interval the toolbar asks for, a week or a month. The
+ * public API answers with the occupied slots only, anonymous by design: the
+ * società's own slots are recognized here, from the richieste and ricorrenze
+ * already in memory. Stale responses are dropped, so fast navigation always
+ * ends on the interval the user last asked for.
+ * @param {{vista: 'settimana'|'mese', lunedi: string, mese: string}} intervallo
+ * @returns {Promise<void>}
+ */
+async function mostraCalendario(intervallo) {
   const versione = ++g_versioneCalendario;
-  elemento('cal-titolo').textContent = titoloSettimana(g_lunediArea);
-  elemento('cal-oggi').disabled = g_lunediArea === lunediDellaSettimana(adessoRoma().data);
+  const eMese = intervallo.vista === 'mese';
   const statoCalendario = elemento('cal-stato');
   mostraMessaggio(statoCalendario, 'Caricamento…');
   try {
-    const dati = await ottieniCalendario(g_lunediArea);
+    const dati = eMese
+      ? await ottieniCalendarioMese(intervallo.mese)
+      : await ottieniCalendario(intervallo.lunedi);
     if (versione !== g_versioneCalendario) return;
-    const miei = slotSocietaSettimana(g_richieste, g_ricorrenze, g_lunediArea);
-    renderCalendario(new Set(dati.slot_occupati), miei.approvati, miei.inAttesa);
+    const occupati = new Set(dati.slot_occupati);
+    elemento('cal-griglia').setAttribute(
+      'aria-label',
+      eMese ? 'Calendario mensile con le prenotazioni di ogni giorno' : 'Calendario settimanale degli slot da 30 minuti',
+    );
+    if (eMese) {
+      const miei = slotSocietaIntervallo(g_richieste, g_ricorrenze, dati.dal, dati.al);
+      renderCalendarioMese(intervallo.mese, occupati, miei.approvati, miei.inAttesa);
+    } else {
+      const miei = slotSocietaSettimana(g_richieste, g_ricorrenze, intervallo.lunedi);
+      renderCalendarioSettimana(intervallo.lunedi, occupati, miei.approvati, miei.inAttesa);
+    }
     mostraMessaggio(statoCalendario, '');
   } catch (errore) {
     if (versione !== g_versioneCalendario) return;
@@ -644,18 +696,19 @@ async function caricaCalendario() {
 }
 
 /**
+ * @param {string} lunedi - Monday of the week to draw, 'YYYY-MM-DD'
  * @param {Set<string>} occupati - all occupied slot keys of the week
  * @param {Set<string>} miei - slot keys of this società's approved bookings
  * @param {Set<string>} inAttesa - slot keys of this società's pending requests
  * @returns {void}
  */
-function renderCalendario(occupati, miei, inAttesa) {
+function renderCalendarioSettimana(lunedi, occupati, miei, inAttesa) {
   const adesso = adessoRoma();
   const chiaveAdesso = chiaveSlot(adesso.data, Math.floor(adesso.minuti / PASSO_MIN) * PASSO_MIN);
 
   costruisciGriglia(
     elemento('cal-griglia'),
-    giorniSettimana(g_lunediArea),
+    giorniSettimana(lunedi),
     (cella, giorno, minuti) => {
       const chiave = chiaveSlot(giorno, minuti);
       const mio = miei.has(chiave);
@@ -692,6 +745,81 @@ function renderCalendario(occupati, miei, inAttesa) {
       if (giorno === adesso.data) testata.classList.add('oggi');
     },
   );
+}
+
+/**
+ * Compresses the taken slots of the shown grid into the entries of the monthly
+ * view. Every slot is classified exactly as the weekly grid classifies its
+ * cells — own booking first, then somebody else's, then own undecided request —
+ * so it belongs to one entry only; then each group is compressed into
+ * continuous time ranges, turning "18:00, 18:30, 19:00" into one "18:00–19:30".
+ * @param {Set<string>} occupati - all occupied slot keys of the grid
+ * @param {Set<string>} miei - slot keys of this società's approved bookings
+ * @param {Set<string>} inAttesa - slot keys of this società's pending requests
+ * @returns {{data: string, oraInizio: string, oraFine: string, stato: string}[]} entries in chronological order
+ */
+function fasceDelMese(occupati, miei, inAttesa) {
+  /** @type {Record<string, string[]>} slot keys by state, same keys as VOCI_MESE */
+  const perStato = { mio: [], occupato: [], 'in-attesa': [] };
+  for (const chiave of new Set([...occupati, ...miei, ...inAttesa])) {
+    if (miei.has(chiave)) {
+      perStato.mio.push(chiave);
+    } else if (occupati.has(chiave)) {
+      perStato.occupato.push(chiave);
+    } else {
+      perStato['in-attesa'].push(chiave);
+    }
+  }
+
+  const fasce = [];
+  for (const [stato, chiavi] of Object.entries(perStato)) {
+    for (const fascia of raggruppaSlotInFasce(chiavi)) fasce.push({ ...fascia, stato });
+  }
+  return fasce.sort((a, b) => (a.data + a.oraInizio).localeCompare(b.data + b.oraInizio));
+}
+
+/**
+ * Renders the monthly view: one entry per booking inside the cell of its day.
+ * The other società stay anonymous here, exactly as in the weekly view: their
+ * bookings are plain "Occupato" entries, while the società's own ones carry its
+ * color (or the yellow of an undecided request). A day with more entries than
+ * its cell can show scrolls inside the cell (see .mese-voci).
+ * @param {string} mese - month to draw, 'YYYY-MM'
+ * @param {Set<string>} occupati - all occupied slot keys of the grid
+ * @param {Set<string>} miei - slot keys of this società's approved bookings
+ * @param {Set<string>} inAttesa - slot keys of this società's pending requests
+ * @returns {void}
+ */
+function renderCalendarioMese(mese, occupati, miei, inAttesa) {
+  /** @type {Map<string, object[]>} entries of the grid, by date */
+  const perGiorno = new Map();
+  for (const fascia of fasceDelMese(occupati, miei, inAttesa)) {
+    const delGiorno = perGiorno.get(fascia.data);
+    if (delGiorno === undefined) {
+      perGiorno.set(fascia.data, [fascia]);
+    } else {
+      delGiorno.push(fascia);
+    }
+  }
+
+  const oggi = adessoRoma().data;
+  costruisciGrigliaMese(elemento('cal-griglia'), mese, giorniGrigliaMese(mese), (cella, voci, giorno) => {
+    if (giorno < oggi) cella.classList.add('passato');
+    if (giorno === oggi) cella.classList.add('oggi');
+    for (const fascia of perGiorno.get(giorno) ?? []) {
+      const orario = `${fascia.oraInizio}–${fascia.oraFine}`;
+      const testi = VOCI_MESE[fascia.stato];
+      voci.append(creaVoceMese({
+        orario,
+        etichetta: testi.etichetta,
+        stato: fascia.stato,
+        descrizione: `${dataEstesa(giorno)} · ${orario} · ${testi.descrizione}`,
+      }));
+    }
+    // Only a day that is not over can host a new request, so only there the
+    // "+" shortcut makes sense.
+    if (giorno >= oggi) aggiungiBottoneGiorno(cella, giorno, minutiDaOra(ORA_PREDEFINITA));
+  });
 }
 
 /* ---------------------------------------------------------------- azioni */

@@ -199,6 +199,58 @@ export function meseSuccessivo(mese: string): string {
   return `${anno}-${String(numeroMese + 1).padStart(2, '0')}`;
 }
 
+/**
+ * Primo e ultimo giorno della griglia mensile del calendario: non il mese
+ * secco, ma le settimane intere che lo contengono (dal lunedì della settimana
+ * del giorno 1 alla domenica della settimana dell'ultimo giorno). Sono le
+ * stesse celle che il frontend disegna, quindi una sola query copre anche i
+ * giorni di riempimento delle settimane a cavallo. Copre da 4 a 6 settimane.
+ */
+export function intervalloGrigliaMese(mese: string): { dal: string; al: string } {
+  const primoGiorno = `${mese}-01`;
+  const ultimoGiorno = aggiungiGiorni(`${meseSuccessivo(mese)}-01`, -1);
+  return { dal: lunediDellaSettimana(primoGiorno), al: domenicaDellaSettimana(ultimoGiorno) };
+}
+
+/**
+ * Intervallo di date mostrato da un calendario, risolto dai parametri della
+ * query string: `mese=AAAA-MM` per la vista mensile, `settimana=AAAA-MM-GG`
+ * (una data qualsiasi della settimana) per quella settimanale, nessuno dei due
+ * per la settimana corrente. In entrambi i casi `dal`/`al` sono gli estremi
+ * inclusi, così il chiamante costruisce il range di slot_key allo stesso modo.
+ */
+export type IntervalloCalendario =
+  | { tipo: 'settimana'; lunedi: string; dal: string; al: string }
+  | { tipo: 'mese'; mese: string; dal: string; al: string }
+  | { tipo: 'errore'; messaggio: string };
+
+/**
+ * Risolve i parametri di un endpoint di calendario nell'intervallo da leggere.
+ * `mese` ha la precedenza su `settimana`: il frontend ne invia sempre uno solo.
+ */
+export function intervalloCalendario(
+  settimana: string | undefined,
+  mese: string | undefined,
+  istante: Date,
+): IntervalloCalendario {
+  if (mese !== undefined && mese !== '') {
+    if (!isMeseValido(mese)) return { tipo: 'errore', messaggio: 'Parametro mese non valido (formato atteso AAAA-MM)' };
+    const { dal, al } = intervalloGrigliaMese(mese);
+    return { tipo: 'mese', mese, dal, al };
+  }
+
+  let riferimento: string;
+  if (settimana === undefined || settimana === '') {
+    riferimento = oraRoma(istante).data;
+  } else if (isDataValida(settimana)) {
+    riferimento = settimana;
+  } else {
+    return { tipo: 'errore', messaggio: 'Parametro settimana non valido (formato atteso AAAA-MM-GG)' };
+  }
+  const lunedi = lunediDellaSettimana(riferimento);
+  return { tipo: 'settimana', lunedi, dal: lunedi, al: aggiungiGiorni(lunedi, 6) };
+}
+
 /** Converte un istante assoluto in data e ora civili italiane. */
 export function oraRoma(istante: Date): { data: string; ora: string } {
   const parti = new Intl.DateTimeFormat('it-IT', {

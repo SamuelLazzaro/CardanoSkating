@@ -18,12 +18,12 @@ import {
   elencoGiorni,
   etichettaGiorno,
   formattaSlotKey,
+  giorniGrigliaMese,
   giorniSettimana,
-  lunediDellaSettimana,
   minutiDaOra,
   numeroItaliano,
   oraTesto,
-  titoloSettimana,
+  raggruppaPrenotazioni,
 } from './utils.js';
 import {
   accediAdmin,
@@ -35,6 +35,7 @@ import {
   creaSocietaAdmin,
   esciAdmin,
   ottieniCalendarioAdmin,
+  ottieniCalendarioAdminMese,
   ottieniElencoSocieta,
   ottieniReport,
   ottieniRichiesteAdmin,
@@ -46,14 +47,19 @@ import {
   sospendiSocieta,
 } from './api.js';
 import {
+  aggiungiBottoneGiorno,
   aggiungiBottoneSlot,
   costruisciGriglia,
+  costruisciGrigliaMese,
   creaBadge,
+  creaVoceMese,
   mostraMessaggio,
   preparaDialogo,
+  preparaDrillDownGiorno,
   preparaScorciatoiaSlot,
   preparaSelectOrari,
 } from './ui.js';
+import { creaVistaCalendario } from './vista-calendario.js';
 import { aggiornaBadgeNotifiche, preparaNavigazione } from './navigazione.js';
 
 // First thing on every page: its capture listener must precede all others.
@@ -62,8 +68,19 @@ avviaTapFeedback();
 /** @type {(id: string) => HTMLElement} */
 const elemento = (id) => document.getElementById(id);
 
-/** @type {string} Monday of the week shown in the admin calendar */
-let g_lunediAdmin = lunediDellaSettimana(adessoRoma().data);
+/**
+ * Default time of the direct booking form. The "+" of a day cell in the
+ * monthly view opens the popup on that start time, since a day — unlike a
+ * half-hour slot — says nothing about the time.
+ * @type {string}
+ */
+const ORA_PREDEFINITA = '10:00';
+
+/** @type {string} default end time of the direct booking form, 'HH:MM' */
+const ORA_FINE_PREDEFINITA = '11:00';
+
+/** @type {object|null} week/month state of the calendar panel (js/vista-calendario.js) */
+let g_vistaCalendario = null;
 
 /** @type {number} counter to ignore stale calendar responses */
 let g_versioneCalendario = 0;
@@ -93,7 +110,7 @@ async function avvia() {
 /** @returns {void} registers all static event listeners once */
 function preparaEventi() {
   preparaNavigazione(elemento('nav-sezioni'));
-  preparaSelectOrari(elemento('dir-inizio'), elemento('dir-fine'), '10:00', '11:00');
+  preparaSelectOrari(elemento('dir-inizio'), elemento('dir-fine'), ORA_PREDEFINITA, ORA_FINE_PREDEFINITA);
   const oggi = adessoRoma().data;
   const campoData = elemento('dir-data');
   campoData.min = oggi;
@@ -117,20 +134,26 @@ function preparaEventi() {
   // discarding any leftover edit state from a previous opening.
   elemento('bottone-nuova-societa').addEventListener('click', () => impostaFormSocieta(null));
 
-  // "+" shortcut on the free slots of the calendar: one delegated listener,
-  // registered before the first render because the container already exists.
+  // "+" shortcut on the free cells of the calendar and drill-down from a day
+  // of the monthly grid: delegated listeners, registered before the first
+  // render because the container already exists.
   preparaScorciatoiaSlot(elemento('cal-griglia'), apriDirettaPerSlot);
+  preparaDrillDownGiorno(elemento('cal-griglia'), (giorno) => g_vistaCalendario.apriSettimana(giorno));
+
+  // Week/month switch and navigation of the calendar panel.
+  g_vistaCalendario = creaVistaCalendario({
+    titolo: elemento('cal-titolo'),
+    precedente: elemento('cal-precedente'),
+    successiva: elemento('cal-successiva'),
+    oggi: elemento('cal-oggi'),
+    vistaSettimana: elemento('cal-vista-settimana'),
+    vistaMese: elemento('cal-vista-mese'),
+  }, mostraCalendario);
 
   elemento('form-login').addEventListener('submit', accedi);
   elemento('bottone-esci').addEventListener('click', esci);
   elemento('form-diretta').addEventListener('submit', prenotaDiretta);
   elemento('form-societa').addEventListener('submit', salvaSocieta);
-  elemento('cal-precedente').addEventListener('click', () => spostaSettimana(-7));
-  elemento('cal-successiva').addEventListener('click', () => spostaSettimana(7));
-  elemento('cal-oggi').addEventListener('click', () => {
-    g_lunediAdmin = lunediDellaSettimana(adessoRoma().data);
-    caricaCalendario();
-  });
 
   elemento('report-mese').value = oggi.slice(0, 7);
   elemento('report-mese').addEventListener('change', caricaReport);
@@ -379,27 +402,39 @@ async function decidiRicorrenza(ricorrenza, approvare) {
 
 /* -------------------------------------------------------------- calendario */
 
-/**
- * @param {number} giorni - +7 or -7
- * @returns {void}
- */
-function spostaSettimana(giorni) {
-  g_lunediAdmin = aggiungiGiorni(g_lunediAdmin, giorni);
-  caricaCalendario();
+/** @returns {Promise<void>} reloads the interval currently on screen */
+function caricaCalendario() {
+  return g_vistaCalendario.aggiorna();
 }
 
-/** @returns {Promise<void>} loads and renders the admin week (grid + list) */
-async function caricaCalendario() {
+/**
+ * Loads and renders the interval the toolbar asks for — a week or a month —
+ * plus the list of its bookings. Stale responses are dropped, so fast
+ * navigation always ends on the interval the user last asked for.
+ * @param {{vista: 'settimana'|'mese', lunedi: string, mese: string}} intervallo
+ * @returns {Promise<void>}
+ */
+async function mostraCalendario(intervallo) {
   const versione = ++g_versioneCalendario;
-  elemento('cal-titolo').textContent = titoloSettimana(g_lunediAdmin);
-  elemento('cal-oggi').disabled = g_lunediAdmin === lunediDellaSettimana(adessoRoma().data);
+  const eMese = intervallo.vista === 'mese';
   const statoCalendario = elemento('cal-stato');
   mostraMessaggio(statoCalendario, 'Caricamento…');
   try {
-    const dati = await ottieniCalendarioAdmin(g_lunediAdmin);
+    const dati = eMese
+      ? await ottieniCalendarioAdminMese(intervallo.mese)
+      : await ottieniCalendarioAdmin(intervallo.lunedi);
     if (versione !== g_versioneCalendario) return;
-    renderCalendario(dati.prenotazioni);
-    renderPrenotazioniSettimana(dati.prenotazioni);
+    elemento('cal-griglia').setAttribute(
+      'aria-label',
+      `Calendario ${eMese ? 'mensile' : 'settimanale'} con i nomi delle società`,
+    );
+    renderLegendaCalendario(dati.prenotazioni);
+    if (eMese) {
+      renderCalendarioMese(intervallo.mese, dati.prenotazioni);
+    } else {
+      renderCalendarioSettimana(intervallo.lunedi, dati.prenotazioni);
+    }
+    renderElencoPrenotazioni(dati.prenotazioni, eMese);
     mostraMessaggio(statoCalendario, '');
   } catch (errore) {
     if (versione !== g_versioneCalendario) return;
@@ -448,19 +483,19 @@ function renderLegendaCalendario(prenotazioni) {
 }
 
 /**
+ * @param {string} lunedi - Monday of the week to draw, 'YYYY-MM-DD'
  * @param {{slot_key: string, societa: string, colore: string, richiesta_id: number, titolo: string}[]} prenotazioni
  * @returns {void}
  */
-function renderCalendario(prenotazioni) {
+function renderCalendarioSettimana(lunedi, prenotazioni) {
   /** @type {Map<string, {societa: string, colore: string, richiesta_id: number, titolo: string}>} */
   const perChiave = new Map(prenotazioni.map((p) => [p.slot_key, p]));
   const adesso = adessoRoma();
   const chiaveAdesso = chiaveSlot(adesso.data, Math.floor(adesso.minuti / PASSO_MIN) * PASSO_MIN);
 
-  renderLegendaCalendario(prenotazioni);
   costruisciGriglia(
     elemento('cal-griglia'),
-    giorniSettimana(g_lunediAdmin),
+    giorniSettimana(lunedi),
     (cella, giorno, minuti) => {
       const chiave = chiaveSlot(giorno, minuti);
       const prenotazione = perChiave.get(chiave);
@@ -518,56 +553,90 @@ function renderCalendario(prenotazioni) {
 }
 
 /**
- * Groups the week's slots by richiesta (one richiesta = one date) and renders
- * the list with the per-date cancel action.
- * @param {{slot_key: string, societa: string, richiesta_id: number, titolo: string}[]} prenotazioni
+ * Renders the monthly view: one entry per booking inside the cell of its day,
+ * painted with the color of the società that booked it. A day with more
+ * bookings than its cell can show scrolls inside the cell (see .mese-voci).
+ * @param {string} mese - month to draw, 'YYYY-MM'
+ * @param {{slot_key: string, societa_id: number, societa: string, colore: string, richiesta_id: number, titolo: string}[]} prenotazioni
  * @returns {void}
  */
-function renderPrenotazioniSettimana(prenotazioni) {
-  /** @type {Map<number, {societa: string, titolo: string, chiavi: string[]}>} */
-  const gruppi = new Map();
-  for (const prenotazione of prenotazioni) {
-    const gruppo = gruppi.get(prenotazione.richiesta_id)
-      ?? { societa: prenotazione.societa, titolo: prenotazione.titolo, chiavi: [] };
-    gruppo.chiavi.push(prenotazione.slot_key);
-    gruppi.set(prenotazione.richiesta_id, gruppo);
+function renderCalendarioMese(mese, prenotazioni) {
+  /** @type {Map<string, object[]>} bookings of the grid, by date */
+  const perGiorno = new Map();
+  // Chronological order in, chronological order out: every cell lists its
+  // bookings from the earliest to the latest.
+  for (const blocco of raggruppaPrenotazioni(prenotazioni)) {
+    const delGiorno = perGiorno.get(blocco.data);
+    if (delGiorno === undefined) {
+      perGiorno.set(blocco.data, [blocco]);
+    } else {
+      delGiorno.push(blocco);
+    }
   }
+
+  const oggi = adessoRoma().data;
+  costruisciGrigliaMese(elemento('cal-griglia'), mese, giorniGrigliaMese(mese), (cella, voci, giorno) => {
+    if (giorno < oggi) cella.classList.add('passato');
+    if (giorno === oggi) cella.classList.add('oggi');
+    for (const blocco of perGiorno.get(giorno) ?? []) {
+      const orario = `${blocco.oraInizio}–${blocco.oraFine}`;
+      voci.append(creaVoceMese({
+        orario,
+        etichetta: blocco.societa,
+        stato: 'occupato',
+        colore: blocco.colore,
+        descrizione: `${dataEstesa(giorno)} · ${orario} · ${blocco.societa} · ${blocco.titolo}`,
+      }));
+    }
+    // Only a day that is not over can host a new booking, so only there the
+    // "+" shortcut makes sense: elsewhere the popup would be born rejected.
+    if (giorno >= oggi) aggiungiBottoneGiorno(cella, giorno, minutiDaOra(ORA_PREDEFINITA));
+  });
+}
+
+/**
+ * Renders the list of the bookings of the shown interval, with the per-date
+ * cancel action. Title and empty message follow the view, because the list
+ * always mirrors what the calendar above it is showing.
+ * @param {{slot_key: string, societa: string, richiesta_id: number, titolo: string}[]} prenotazioni
+ * @param {boolean} eMese - true when the monthly view is on screen
+ * @returns {void}
+ */
+function renderElencoPrenotazioni(prenotazioni, eMese) {
+  elemento('cal-titolo-lista').textContent = eMese ? 'Prenotazioni del mese' : 'Prenotazioni della settimana';
+  elemento('vuoto-prenotazioni').textContent = eMese
+    ? 'Nessuna prenotazione in questo mese.'
+    : 'Nessuna prenotazione in questa settimana.';
 
   const oggi = adessoRoma().data;
   const lista = elemento('lista-prenotazioni');
   lista.textContent = '';
-  const ordinati = [...gruppi.entries()].sort((a, b) => a[1].chiavi[0].localeCompare(b[1].chiavi[0]));
-  for (const [richiestaId, gruppo] of ordinati) {
-    const chiavi = gruppo.chiavi.sort();
-    const [data, orarioInizio] = chiavi[0].split('_');
-    const oraInizio = `${orarioInizio.slice(0, 2)}:${orarioInizio.slice(2)}`;
-    const ultimoOrario = chiavi[chiavi.length - 1].split('_')[1];
-    const oraFine = oraTesto(minutiDaOra(`${ultimoOrario.slice(0, 2)}:${ultimoOrario.slice(2)}`) + PASSO_MIN);
-
+  const blocchi = raggruppaPrenotazioni(prenotazioni);
+  for (const blocco of blocchi) {
     const riga = document.createElement('li');
     const info = document.createElement('div');
     info.className = 'riga-info';
     const nome = document.createElement('strong');
-    nome.textContent = gruppo.societa;
+    nome.textContent = blocco.societa;
     const attivita = document.createElement('span');
     attivita.className = 'testo-tenue';
-    attivita.textContent = gruppo.titolo;
+    attivita.textContent = blocco.titolo;
     const quando = document.createElement('span');
-    quando.textContent = `${dataEstesa(data)} · ${oraInizio}–${oraFine}`;
+    quando.textContent = `${dataEstesa(blocco.data)} · ${blocco.oraInizio}–${blocco.oraFine}`;
     info.append(nome, attivita, quando);
     riga.append(info);
 
-    if (data >= oggi) {
+    if (blocco.data >= oggi) {
       const bottone = document.createElement('button');
       bottone.type = 'button';
       bottone.className = 'btn btn-pericolo btn-piccolo';
       bottone.textContent = 'Annulla';
-      bottone.addEventListener('click', () => annullaData(richiestaId, gruppo.societa, data, oraInizio, oraFine));
+      bottone.addEventListener('click', () => annullaData(blocco.richiestaId, blocco.societa, blocco.data, blocco.oraInizio, blocco.oraFine));
       riga.append(bottone);
     }
     lista.append(riga);
   }
-  elemento('vuoto-prenotazioni').hidden = gruppi.size > 0;
+  elemento('vuoto-prenotazioni').hidden = blocchi.length > 0;
 }
 
 /**

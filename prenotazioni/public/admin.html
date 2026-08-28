@@ -73,7 +73,7 @@
         <div id="sezione-home">
           <section class="pannello">
             <div class="pannello-testata">
-              <h2>Calendario settimanale</h2>
+              <h2>Calendario</h2>
               <button type="button" class="btn btn-primario btn-con-icona" id="bottone-nuova-prenotazione">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <line x1="12" y1="5" x2="12" y2="19"></line>
@@ -83,7 +83,11 @@
               </button>
             </div>
             <p id="esito-diretta" class="stato" role="status" hidden></p>
-            <div class="toolbar" aria-label="Navigazione tra le settimane">
+            <div class="selettore-vista" role="group" aria-label="Tipo di visualizzazione del calendario">
+              <button id="cal-vista-settimana" class="btn btn-piccolo btn-vista" type="button" aria-pressed="true">Settimana</button>
+              <button id="cal-vista-mese" class="btn btn-piccolo btn-vista" type="button" aria-pressed="false">Mese</button>
+            </div>
+            <div class="toolbar" aria-label="Navigazione del calendario">
               <button id="cal-precedente" class="btn btn-freccia" type="button" aria-label="Settimana precedente">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <polyline points="15 6 9 12 15 18"></polyline>
@@ -104,7 +108,7 @@
             <div class="scorri-griglia">
               <div id="cal-griglia" class="calendario" aria-label="Calendario settimanale con i nomi delle società"></div>
             </div>
-            <h3>Prenotazioni della settimana</h3>
+            <h3 id="cal-titolo-lista">Prenotazioni della settimana</h3>
             <p id="esito-cal" class="stato" role="status" hidden></p>
             <ul id="lista-prenotazioni" class="lista"></ul>
             <p id="vuoto-prenotazioni" class="vuoto" hidden>Nessuna prenotazione in questa settimana.</p>

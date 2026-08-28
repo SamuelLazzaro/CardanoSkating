@@ -122,6 +122,39 @@
     flex-shrink: 0;
 }
 
+/* Settimana/Mese switch of the calendar panels: two toggle buttons joined into
+   a segmented control. The pressed one is styled through aria-pressed, so the
+   state lives in the attribute the assistive technologies read (js/vista-
+   calendario.js keeps it in sync) and no extra class is needed. */
+.selettore-vista {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 0.6rem;
+}
+
+.selettore-vista .btn:first-child {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+}
+
+.selettore-vista .btn:last-child {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    /* the two buttons share one border instead of drawing two */
+    margin-left: -1px;
+}
+
+/* same fill as .btn-primario, including the darker hover/tap fill inherited
+   from .btn through these two custom properties */
+.btn-vista[aria-pressed="true"] {
+    --btn-fondo-attivo: var(--accento-scuro);
+    --btn-bordo-attivo: var(--accento-scuro);
+    background: var(--accento);
+    border-color: var(--accento);
+    color: var(--c-white);
+    font-weight: 600;
+}
+
 .riga-azioni {
     display: flex;
     gap: 0.4rem;
@@ -693,6 +726,8 @@ fieldset.campo {
  * still waiting for a decision — shares one shape: a translucent wash of the
  * state color plus a solid bar on its left edge. The bar is an inset shadow
  * and not a border, so the grid lines drawn with real borders stay untouched.
+ * The entries of the monthly view (.mese-voce) reuse the same shape and the
+ * same states, so the two views cannot drift apart.
  *
  * Each state only declares its own --colore-slot, so the shape is written
  * once and the states cannot drift apart. The .passato variants just thin the
@@ -700,23 +735,27 @@ fieldset.campo {
  */
 .slot.mio,
 .slot.occupato,
-.slot.in-attesa {
+.slot.in-attesa,
+.mese-voce {
     background: color-mix(in srgb, var(--colore-slot) 30%, transparent);
     box-shadow: inset 3px 0 0 var(--colore-slot);
 }
 
 .slot.mio.passato,
 .slot.occupato.passato,
-.slot.in-attesa.passato {
+.slot.in-attesa.passato,
+.mese-giorno.passato .mese-voce {
     background: color-mix(in srgb, var(--colore-slot) 12%, transparent);
 }
 
 /* slots belonging to the logged-in società (area) or highlighted (admin) */
-.slot.mio {
+.slot.mio,
+.mese-voce.mio {
     --colore-slot: var(--accento);
 }
 
-.slot.occupato {
+.slot.occupato,
+.mese-voce.occupato {
     --colore-slot: var(--occupato);
 }
 
@@ -725,21 +764,25 @@ fieldset.campo {
    not ask for them a second time. The yellow stays fixed even when the
    società has its own color, because here the message is "undecided", not
    "whose" — see the .con-colore rule below for the approved ones. */
-.slot.in-attesa {
+.slot.in-attesa,
+.mese-voce.in-attesa {
     --colore-slot: var(--in-attesa);
 }
 
 /* --------------------------------------------------- colori per società */
 
-/* admin calendar: a booked cell carries the color of the società that booked
-   it (--colore-societa set inline on the cell by js/admin.js) */
-.slot.occupato.colorato {
+/* admin calendar: a booked cell (weekly view) or entry (monthly view) carries
+   the color of the società that booked it (--colore-societa set inline by
+   js/admin.js and js/ui.js) */
+.slot.occupato.colorato,
+.mese-voce.colorato {
     --colore-slot: var(--colore-societa);
 }
 
 /* area società: own bookings and matching legend square use the società
    color when the profile provides one (.con-colore set by js/area.js) */
-.con-colore .slot.mio {
+.con-colore .slot.mio,
+.con-colore .mese-voce.mio {
     --colore-slot: var(--colore-societa);
 }
 
@@ -798,6 +841,158 @@ fieldset.campo {
     opacity: 0.85;
 }
 
+/* ---------------------------------------------------------- vista mensile */
+
+/*
+ * Monthly grid: seven columns of whole weeks, one cell per day. Every cell is
+ * exactly as tall as --altezza-giorno, so the rows stay even however busy a day
+ * is: the entries live in .mese-voci, which scrolls inside the cell when they
+ * do not all fit. min-width keeps the seven columns readable on a phone, where
+ * the container (.scorri-griglia) scrolls horizontally as it already does for
+ * the weekly grid.
+ */
+.calendario-mese {
+    --altezza-giorno: 92px;
+    display: grid;
+    grid-template-columns: repeat(7, minmax(100px, 1fr));
+    min-width: 700px;
+}
+
+/* the monthly grid is about one screen tall, so it drops the vertical scroll
+   of the weekly one: nesting it with the per-day scrollbars reads badly */
+.scorri-griglia:has(.calendario-mese) {
+    max-height: none;
+}
+
+/* weekday names, sticky like the day headers of the weekly grid */
+.cal-giorno-nome {
+    padding: 0.45rem 0.3rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-align: center;
+    text-transform: capitalize;
+    border-bottom: 2px solid var(--bordo-forte);
+    border-left: 1px solid var(--bordo);
+    position: sticky;
+    top: 0;
+    background: var(--superficie);
+    z-index: var(--z-cal-giorno);
+}
+
+.mese-giorno {
+    /* anchor of the absolutely positioned "+" shortcut */
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    height: var(--altezza-giorno);
+    padding: 0.2rem;
+    background: var(--superficie);
+    border-left: 1px solid var(--bordo);
+    border-top: 1px solid var(--bordo);
+    overflow: hidden;
+}
+
+.mese-giorno.passato {
+    background: var(--passato);
+}
+
+.mese-giorno.oggi {
+    background: var(--oggi);
+}
+
+/* days of the neighbouring months, drawn only to keep the weeks whole */
+.mese-giorno.fuori-mese {
+    background: var(--fondo);
+}
+
+.mese-giorno.fuori-mese .mese-numero {
+    color: var(--testo-tenue);
+}
+
+/* day number: a button, because clicking it opens the week that day belongs to */
+.mese-numero {
+    /* shared by :hover, .is-tapped and :focus-visible, so the three states
+       cannot drift apart */
+    --numero-fondo-attivo: var(--accento-scuro);
+    align-self: flex-start;
+    flex-shrink: 0;
+    font: inherit;
+    font-size: 0.78rem;
+    font-weight: 600;
+    line-height: 1.3;
+    color: var(--testo);
+    background: none;
+    border: none;
+    border-radius: 999px;
+    padding: 0 0.35rem;
+    cursor: pointer;
+    transition: background-color var(--t-veloce), color var(--t-veloce);
+}
+
+.mese-giorno.oggi .mese-numero {
+    background: var(--accento);
+    color: var(--c-white);
+}
+
+@media (pointer: fine) {
+    .mese-numero:hover {
+        background: var(--numero-fondo-attivo);
+        color: var(--c-white);
+    }
+}
+
+/* touch twin of the :hover above (see .is-tapped in base.css), plus the
+   keyboard focus state */
+.mese-numero.is-tapped,
+.mese-numero:focus-visible {
+    background: var(--numero-fondo-attivo);
+    color: var(--c-white);
+}
+
+/* bookings of the day: the list scrolls inside the cell, so a very busy day
+   stays entirely reachable without stretching its grid row */
+.mese-voci {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    flex: 1;
+    /* without it a flex item refuses to shrink below its content height, and
+       the list would overflow the cell instead of scrolling */
+    min-height: 0;
+    overflow-y: auto;
+    /* thin bar: a cell has little width to spare */
+    scrollbar-width: thin;
+}
+
+/* one booking: wash and left bar come from the shared .mese-voce rule in the
+   slot-states section above, so an entry looks like the slots it stands for */
+.mese-voce {
+    flex-shrink: 0;
+    padding: 0.1rem 0.25rem 0.15rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.66rem;
+    line-height: 1.25;
+}
+
+.mese-voce-orario,
+.mese-voce-nome {
+    display: block;
+    max-width: 100%;
+    color: var(--testo);
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.mese-voce-orario {
+    font-weight: 600;
+}
+
+.mese-voce-nome {
+    opacity: 0.85;
+}
+
 /* ------------------------------------------- scorciatoia "+" sullo slot */
 
 /*
@@ -815,6 +1010,8 @@ fieldset.campo {
 .slot.con-aggiungi {
     position: relative;
 }
+
+/* .mese-giorno is already positioned, so a day cell needs no extra class */
 
 .btn-aggiungi-slot {
     /* shared between :hover and .is-tapped, so the two states cannot drift */
@@ -845,7 +1042,8 @@ fieldset.campo {
 }
 
 @media (pointer: fine) {
-    .slot:hover > .btn-aggiungi-slot {
+    .slot:hover > .btn-aggiungi-slot,
+    .mese-giorno:hover > .btn-aggiungi-slot {
         display: flex;
     }
 
@@ -854,8 +1052,9 @@ fieldset.campo {
     }
 }
 
-/* touch: the tapped slot shows its "+" until the next tap elsewhere */
-.slot.mostra-aggiungi > .btn-aggiungi-slot {
+/* touch: the tapped cell shows its "+" until the next tap elsewhere */
+.slot.mostra-aggiungi > .btn-aggiungi-slot,
+.mese-giorno.mostra-aggiungi > .btn-aggiungi-slot {
     display: flex;
 }
 
@@ -870,5 +1069,11 @@ fieldset.campo {
 @media (max-width: 640px) {
     .calendario {
         grid-template-columns: 3rem repeat(7, minmax(56px, 1fr));
+    }
+
+    /* slightly shorter rows: on a phone the whole month has to stay within a
+       screen or two, the columns already scroll horizontally */
+    .calendario-mese {
+        --altezza-giorno: 82px;
     }
 }

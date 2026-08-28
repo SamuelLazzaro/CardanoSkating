@@ -36,6 +36,16 @@ export function ottieniCalendario(lunedi) {
   return richiestaJson(`/api/calendario?settimana=${lunedi}`);
 }
 
+/**
+ * Occupied slots of a whole monthly grid (whole weeks, spill-over days
+ * included): one call per month instead of one per week.
+ * @param {string} mese - requested month, 'YYYY-MM'
+ * @returns {Promise<{mese: string, dal: string, al: string, slot_occupati: string[]}>}
+ */
+export function ottieniCalendarioMese(mese) {
+  return richiestaJson(`/api/calendario?mese=${mese}`);
+}
+
 /** @returns {Promise<{societa: object, link_ics: string}>} */
 export function ottieniProfiloSocieta() {
   return richiestaJson('/api/societa/me');
@@ -215,6 +225,14 @@ export function rigeneraTokenSocieta(idSocieta) {
  */
 export function ottieniCalendarioAdmin(lunedi) {
   return richiestaJson(`/api/admin/calendario?settimana=${lunedi}`);
+}
+
+/**
+ * @param {string} mese - requested month, 'YYYY-MM'
+ * @returns {Promise<{mese: string, dal: string, al: string, prenotazioni: {slot_key: string, societa_id: number, societa: string, colore: string, richiesta_id: number, titolo: string}[]}>}
+ */
+export function ottieniCalendarioAdminMese(mese) {
+  return richiestaJson(`/api/admin/calendario?mese=${mese}`);
 }
 
 /**

@@ -29,7 +29,7 @@ prenotazioni/
 │   ├── area.html         # area riservata delle società
 │   ├── admin.html        # pannello amministrazione
 │   ├── css/              # base / layout / components / main (@import)
-│   └── js/               # constants / utils / api / ui / tap-feedback + entry per pagina
+│   └── js/               # constants / utils / api / ui / vista-calendario / tap-feedback + entry per pagina
 └── test/                 # vitest + @cloudflare/vitest-pool-workers (D1 reale)
 ```
 
@@ -197,6 +197,18 @@ Consiglio: fai un backup prima di ogni `migrate:remote`.
   prenotazione in CSV per Excel italiano (BOM UTF-8, separatore `;`, numeri
   con la virgola, `Content-Disposition: attachment`). Le tariffe non
   compaiono mai nell'area società né nella parte pubblica.
+- **Vista settimanale o mensile**: nel pannello admin e nell'area società il
+  calendario si commuta con l'interruttore "Settimana / Mese". La vista mensile
+  disegna le settimane intere che contengono il mese (quindi anche i giorni di
+  riempimento, in grigio) e mette nella cella di ogni giorno una voce per
+  prenotazione — orario più nome società nel pannello admin, orario più
+  "Tua prenotazione / In attesa / Occupato" nell'area società, che resta
+  anonima come la vista settimanale — con i colori delle società. Se le voci
+  non entrano nella cella, quella cella scorre da sola. Il numero del giorno è
+  un pulsante e apre la settimana corrispondente; il "+" del giorno apre il
+  popup di prenotazione su quella data. Gli endpoint di calendario accettano
+  `?mese=AAAA-MM` (oltre a `?settimana=AAAA-MM-GG`) e servono tutta la griglia
+  con una sola query.
 - **Calendario ICS**: ogni società ha un URL `/api/ics/<token>` da importare
   in Google Calendar (Impostazioni → Aggiungi calendario → Da URL) con le
   proprie prenotazioni approvate, fuso `Europe/Rome`.
