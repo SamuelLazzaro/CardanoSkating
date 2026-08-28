@@ -118,8 +118,10 @@ npm run migrate:remote    # al database di produzione (chiede conferma)
    npm run deploy
    ```
 
-Dopo il primo deploy: entra in `/admin` e aggiorna email/referente della
-società "Cardano Skating S.R.L. S.S.D." (il seed contiene un'email segnaposto).
+Dopo il primo deploy: entra in `/admin` e verifica email/referente della
+società "Cardano Skating S.R.L. S.S.D." creata dal seed. L'email deve
+coincidere con `EMAIL_ADMIN` di `wrangler.jsonc`: è così che il sistema la
+riconosce come società "di casa" e non le invia notifiche.
 
 Per i deploy successivi basta `npm run deploy` (e `npm run migrate:remote` se
 ci sono nuove migrazioni: applicale **prima** del deploy).

@@ -86,4 +86,4 @@ CREATE UNIQUE INDEX idx_richieste_ricorrenza_data
 
 -- Società di casa, usata dall'admin per le prenotazioni dirette.
 INSERT INTO societa (nome, referente, email, token_accesso)
-VALUES ('Cardano Skating S.R.L. S.S.D.', 'Admin', 'info@cardanoskating.it', lower(hex(randomblob(16))));
+VALUES ('Cardano Skating S.R.L. S.S.D.', 'Admin', 'prenotazioni@cardanoskating.it', lower(hex(randomblob(16))));

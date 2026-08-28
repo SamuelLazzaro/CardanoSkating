@@ -23,8 +23,8 @@
 	// di Brevo è un secret: wrangler secret put BREVO_API_KEY — senza chiave
 	// configurata l'invio delle notifiche resta disattivato.
 	"vars": {
-		"EMAIL_MITTENTE": "info@cardanoskating.it",
-		"EMAIL_ADMIN": "info@cardanoskating.it"
+		"EMAIL_MITTENTE": "prenotazioni@cardanoskating.it",
+		"EMAIL_ADMIN": "prenotazioni@cardanoskating.it"
 	},
 	"d1_databases": [
 		{

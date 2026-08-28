@@ -143,8 +143,34 @@ npm run migrate:remote
 npm run deploy
 ```
 
-Dopo il primo deploy: entra in `/admin` e sostituisci l'email segnaposto della
-società "Cardano Skating S.R.L. S.S.D." creata dal seed.
+Dopo il primo deploy: entra in `/admin` e verifica email/referente della
+società "Cardano Skating S.R.L. S.S.D." creata dal seed (l'email deve
+coincidere con `EMAIL_ADMIN` di `wrangler.jsonc`, altrimenti la società di
+casa riceve le notifiche come una società esterna).
+
+### Ripartire da un database di produzione vuoto
+
+Da usare solo finché il sistema non è in uso reale (cancella TUTTI i dati).
+Svuota il DB mantenendo lo stesso `database_id`, così `wrangler.jsonc` non
+cambia; la tabella `d1_migrations` va eliminata anche lei, altrimenti wrangler
+crede che le migrazioni siano già applicate.
+
+```bash
+# 1. backup, per sicurezza → vedi "Backup del database"
+
+# 2. elimina tutte le tabelle (chiede conferma)
+npx wrangler d1 execute cardanoskating-prenotazioni --remote --command "DROP TABLE IF EXISTS prenotazioni; DROP TABLE IF EXISTS richieste; DROP TABLE IF EXISTS ricorrenze; DROP TABLE IF EXISTS rate_limit; DROP TABLE IF EXISTS audit_log; DROP TABLE IF EXISTS societa; DROP TABLE IF EXISTS d1_migrations;"
+
+# 3. ricrea lo schema (riapplica tutte le migrazioni, seed compreso)
+npm run migrate:remote
+
+# 4. pubblica il codice
+npm run deploy
+```
+
+Alternativa equivalente: `npx wrangler d1 delete cardanoskating-prenotazioni`
+seguito da `npx wrangler d1 create cardanoskating-prenotazioni` — ma il nuovo
+`database_id` va poi copiato in `wrangler.jsonc`.
 
 ### Gestire i secret di produzione
 
