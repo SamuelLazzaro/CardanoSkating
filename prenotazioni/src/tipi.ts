@@ -52,7 +52,8 @@ export type RichiestaRow = {
 export type RicorrenzaRow = {
   id: number;
   societa_id: number;
-  giorno_settimana: number;
+  /** Giorni della settimana richiesti, come salvati in DB: '0,2,4' (0 = lunedì; vedi giorniDaTesto). */
+  giorni: string;
   ora_inizio: string;
   ora_fine: string;
   valida_dal: string;

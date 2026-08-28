@@ -51,11 +51,12 @@ export type SocietaDaNotificare = { nome: string; email: string };
 type EstremiRichiesta = { data: string; ora_inizio: string; ora_fine: string; titolo?: string; note?: string | null };
 
 /**
- * Estremi di una ricorrenza settimanale (per il corpo dell'email).
+ * Estremi di una ricorrenza (per il corpo dell'email): i giorni della
+ * settimana richiesti (0 = lunedì), l'orario e il periodo.
  * `note` compare solo nelle notifiche di creazione (vedi righeNote).
  */
 type EstremiRicorrenza = {
-  giorno_settimana: number;
+  giorni: number[];
   ora_inizio: string;
   ora_fine: string;
   valida_dal: string;
@@ -134,9 +135,17 @@ function righeNote(note: string | null | undefined): string[] {
   return ['Note (scritte dalla società):', ...righeNota.map((riga) => `> ${riga}`)];
 }
 
+/** Nomi dei giorni in elenco leggibile: [0, 2, 4] → 'lunedì, mercoledì e venerdì'. */
+export function elencoGiorni(giorni: number[]): string {
+  const nomi = giorni.map((giorno) => GIORNI_SETTIMANA[giorno]);
+  if (nomi.length <= 1) return nomi.join('');
+  return `${nomi.slice(0, -1).join(', ')} e ${nomi[nomi.length - 1]}`;
+}
+
 function righeRicorrenza(ricorrenza: EstremiRicorrenza): string[] {
+  const etichettaGiorni = ricorrenza.giorni.length === 1 ? 'Giorno' : 'Giorni';
   const righe = [
-    `Giorno: ogni ${GIORNI_SETTIMANA[ricorrenza.giorno_settimana]}, dalle ${ricorrenza.ora_inizio} alle ${ricorrenza.ora_fine}`,
+    `${etichettaGiorni}: ogni ${elencoGiorni(ricorrenza.giorni)}, dalle ${ricorrenza.ora_inizio} alle ${ricorrenza.ora_fine}`,
     `Periodo: dal ${dataItaliana(ricorrenza.valida_dal)} al ${dataItaliana(ricorrenza.valida_al)}`,
   ];
   if (ricorrenza.titolo) righe.unshift(`Attività: ${ricorrenza.titolo}`);

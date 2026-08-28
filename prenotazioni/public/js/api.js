@@ -47,7 +47,7 @@ export function ottieniRichiesteSocieta() {
 }
 
 /**
- * @param {{titolo?: string, data: string, ora_inizio: string, ora_fine: string, note?: string, ripeti_fino_al?: string}} corpo
+ * @param {{titolo?: string, data: string, ora_inizio: string, ora_fine: string, note?: string, ripeti_fino_al?: string, giorni?: number[]}} corpo - giorni: extra weekdays (0 = lunedì) sharing the same time
  * @returns {Promise<{tipo: 'richiesta'|'ricorrenza', id: number, occorrenze?: string[]}>}
  */
 export function inviaRichiestaPrenotazione(corpo) {

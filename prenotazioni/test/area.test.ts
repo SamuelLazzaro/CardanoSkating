@@ -8,7 +8,7 @@
 import { describe, expect, it } from 'vitest';
 import { env } from 'cloudflare:test';
 import app from '../src/index';
-import { aggiungiGiorni, oraRoma } from '../src/slots';
+import { aggiungiGiorni, lunediDellaSettimana, oraRoma } from '../src/slots';
 import {
   cookieAdmin,
   cookieSocieta,
@@ -23,6 +23,8 @@ import {
 
 const oggi = oraRoma(new Date()).data;
 const dataFutura = aggiungiGiorni(oggi, 7);
+/** Un lunedì futuro (della settimana fra due settimane), per i test sui giorni della settimana. */
+const lunediFuturo = lunediDellaSettimana(aggiungiGiorni(oggi, 14));
 
 describe('accesso via link personale', () => {
   it('imposta il cookie di sessione e /me risponde con i dati della società', async () => {
@@ -143,6 +145,109 @@ describe('invio richieste dalla società', () => {
     ]);
     const riga = await env.DB.prepare('SELECT stato FROM ricorrenze WHERE id = ?1').bind(corpo.id).first<{ stato: string }>();
     expect(riga?.stato).toBe('in_attesa');
+  });
+
+  it('accetta una ripetizione fino a 4 settimane piene (27 giorni dopo la prima data)', async () => {
+    const { token } = await creaSocietaConToken();
+    const cookie = await cookieSocieta(token);
+    const risposta = await postJson('/api/societa/richieste', cookie, {
+      data: dataFutura,
+      ora_inizio: '18:00',
+      ora_fine: '19:00',
+      ripeti_fino_al: aggiungiGiorni(dataFutura, 27),
+    });
+    expect(risposta.status).toBe(201);
+    const corpo = (await risposta.json()) as { occorrenze: string[] };
+    expect(corpo.occorrenze.length).toBe(4);
+  });
+});
+
+describe('ricorrenze su più giorni della settimana', () => {
+  it('senza ripetizione settimanale copre gli altri giorni della stessa settimana', async () => {
+    const { token } = await creaSocietaConToken();
+    const cookie = await cookieSocieta(token);
+    // Lunedì scelto come data, più mercoledì (2) e venerdì (4).
+    const risposta = await postJson('/api/societa/richieste', cookie, {
+      data: lunediFuturo,
+      ora_inizio: '19:00',
+      ora_fine: '20:30',
+      giorni: [2, 4],
+    });
+    expect(risposta.status).toBe(201);
+    const corpo = (await risposta.json()) as { tipo: string; id: number; occorrenze: string[] };
+    expect(corpo.tipo).toBe('ricorrenza');
+    expect(corpo.occorrenze).toEqual([lunediFuturo, aggiungiGiorni(lunediFuturo, 2), aggiungiGiorni(lunediFuturo, 4)]);
+
+    // Il giorno della data scelta è incluso anche se non elencato; il periodo
+    // si chiude alla domenica della stessa settimana.
+    const riga = await env.DB
+      .prepare('SELECT giorni, valida_dal, valida_al FROM ricorrenze WHERE id = ?1')
+      .bind(corpo.id)
+      .first<{ giorni: string; valida_dal: string; valida_al: string }>();
+    expect(riga?.giorni).toBe('0,2,4');
+    expect(riga?.valida_dal).toBe(lunediFuturo);
+    expect(riga?.valida_al).toBe(aggiungiGiorni(lunediFuturo, 6));
+  });
+
+  it('con ripetizione settimanale ripete ogni giorno scelto per tutte le settimane', async () => {
+    const { token } = await creaSocietaConToken();
+    const cookie = await cookieSocieta(token);
+    // Lunedì e giovedì (3) per 4 settimane piene.
+    const risposta = await postJson('/api/societa/richieste', cookie, {
+      data: lunediFuturo,
+      ora_inizio: '19:00',
+      ora_fine: '20:30',
+      giorni: [3],
+      ripeti_fino_al: aggiungiGiorni(lunediFuturo, 27),
+    });
+    expect(risposta.status).toBe(201);
+    const corpo = (await risposta.json()) as { occorrenze: string[] };
+    expect(corpo.occorrenze).toEqual([0, 3, 7, 10, 14, 17, 21, 24].map((scarto) => aggiungiGiorni(lunediFuturo, scarto)));
+  });
+
+  it('i giorni sono esposti come array di numeri nelle liste della società', async () => {
+    const { token } = await creaSocietaConToken();
+    const cookie = await cookieSocieta(token);
+    const creazione = await postJson('/api/societa/richieste', cookie, {
+      data: lunediFuturo,
+      ora_inizio: '19:00',
+      ora_fine: '20:30',
+      giorni: [4, 2],
+    });
+    expect(creazione.status).toBe(201);
+
+    const elenco = await getConCookie('/api/societa/richieste', cookie);
+    const corpo = (await elenco.json()) as { ricorrenze: { giorni: number[] }[] };
+    expect(corpo.ricorrenze).toHaveLength(1);
+    expect(corpo.ricorrenze[0].giorni).toEqual([0, 2, 4]);
+  });
+
+  it('rifiuta giorni della settimana non validi', async () => {
+    const { token } = await creaSocietaConToken();
+    const cookie = await cookieSocieta(token);
+    const base = { data: lunediFuturo, ora_inizio: '19:00', ora_fine: '20:30' };
+
+    expect((await postJson('/api/societa/richieste', cookie, { ...base, giorni: [7] })).status).toBe(400);
+    expect((await postJson('/api/societa/richieste', cookie, { ...base, giorni: [-1] })).status).toBe(400);
+    expect((await postJson('/api/societa/richieste', cookie, { ...base, giorni: ['2'] })).status).toBe(400);
+    expect((await postJson('/api/societa/richieste', cookie, { ...base, giorni: 'mercoledì' })).status).toBe(400);
+
+    const create = await env.DB.prepare('SELECT COUNT(*) AS n FROM ricorrenze').first<{ n: number }>();
+    expect(create?.n).toBe(0);
+  });
+
+  it('un solo giorno coincidente con la data e nessuna ripetizione resta una richiesta singola', async () => {
+    const { token } = await creaSocietaConToken();
+    const cookie = await cookieSocieta(token);
+    const risposta = await postJson('/api/societa/richieste', cookie, {
+      data: lunediFuturo,
+      ora_inizio: '19:00',
+      ora_fine: '20:30',
+      giorni: [0],
+    });
+    expect(risposta.status).toBe(201);
+    const corpo = (await risposta.json()) as { tipo: string };
+    expect(corpo.tipo).toBe('richiesta');
   });
 });
 

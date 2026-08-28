@@ -2,17 +2,22 @@ import { Hono } from 'hono';
 import type { Bindings, RichiestaRow, RicorrenzaRow, VariabiliSocieta } from '../tipi';
 import {
   aggiungiGiorni,
+  domenicaDellaSettimana,
+  giorniInTesto,
   giornoSettimana,
+  isDataValida,
+  MAX_GIORNI_FINESTRA_RICORRENZA,
   MAX_SETTIMANE_RICORRENZA,
   occorrenzeRicorrenza,
   oraRoma,
   raggruppaSlotInFasce,
+  ricorrenzaConGiorni,
   slotKeys,
   validaIntervallo,
 } from '../slots';
 import { cancellaCookieSessione, COOKIE_SOCIETA, richiedeSocieta } from '../auth';
 import { eAnnullamentoDuplicato, slotOccupati } from '../conflitti';
-import { intero, leggiJson, MAX_TITOLO, scriviAudit, stmtAudit, testo, titoloAttivita } from '../util';
+import { giorniSettimana, intero, leggiJson, MAX_TITOLO, scriviAudit, stmtAudit, testo, titoloAttivita } from '../util';
 import {
   notificaAnnullamentoRichiesto,
   notificaRichiestaInviata,
@@ -67,18 +72,24 @@ societa.get('/richieste', async (c) => {
     .all<RichiestaRow>();
   const ricorrenze = await c.env.DB
     .prepare(
-      `SELECT id, giorno_settimana, ora_inizio, ora_fine, valida_dal, valida_al, stato, titolo, note, motivazione, created_at
+      `SELECT id, giorni, ora_inizio, ora_fine, valida_dal, valida_al, stato, titolo, note, motivazione, created_at
        FROM ricorrenze WHERE societa_id = ?1 ORDER BY created_at DESC LIMIT 50`,
     )
     .bind(soc.id)
     .all<RicorrenzaRow>();
-  return c.json({ richieste: richieste.results, ricorrenze: ricorrenze.results });
+  return c.json({ richieste: richieste.results, ricorrenze: ricorrenze.results.map(ricorrenzaConGiorni) });
 });
 
 /**
- * Nuova richiesta di prenotazione. Se è presente ripeti_fino_al viene creata
- * una RICORRENZA in attesa (materializzata in richieste+prenotazioni solo
- * all'approvazione dell'admin); altrimenti una richiesta singola in attesa.
+ * Nuova richiesta di prenotazione. Diventa una RICORRENZA in attesa
+ * (materializzata in richieste+prenotazioni solo all'approvazione dell'admin)
+ * se la società chiede una ripetizione settimanale (ripeti_fino_al) oppure lo
+ * stesso orario in altri giorni della settimana (giorni); altrimenti è una
+ * richiesta singola in attesa.
+ *
+ * Il giorno della settimana della data scelta fa sempre parte della
+ * ricorrenza: quella data è la prima occorrenza. Senza ripeti_fino_al gli
+ * altri giorni valgono solo per la settimana della data (fino alla domenica).
  */
 societa.post('/richieste', async (c) => {
   const soc = c.get('societa');
@@ -107,22 +118,40 @@ societa.post('/richieste', async (c) => {
     return c.json({ errore: 'Non è possibile prenotare oltre un anno in anticipo' }, 400);
   }
 
+  // Giorni aggiuntivi della settimana (facoltativi); quello della data scelta
+  // viene sempre incluso, perché quella data è la prima occorrenza.
+  const giorniAggiuntivi = corpo.giorni === undefined ? [] : giorniSettimana(corpo.giorni);
+  if (giorniAggiuntivi === null) {
+    return c.json({ errore: 'Giorni della settimana non validi (attesi numeri da 0 = lunedì a 6 = domenica)' }, 400);
+  }
+  const giorni = [...new Set([...giorniAggiuntivi, giornoSettimana(data)])].sort((a, b) => a - b);
+
   const ripetiFinoAl = typeof corpo.ripeti_fino_al === 'string' ? corpo.ripeti_fino_al.trim() : '';
-  if (ripetiFinoAl !== '') {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(ripetiFinoAl) || ripetiFinoAl <= data) {
-      return c.json({ errore: 'La data di fine ripetizione deve essere una data successiva alla prima' }, 400);
+  const eRicorrente = ripetiFinoAl !== '' || giorni.length > 1;
+  if (eRicorrente) {
+    // Fine del periodo: la data indicata dalla società oppure, senza
+    // ripetizione settimanale, la domenica della settimana della prima data
+    // (gli altri giorni richiesti valgono solo per quella settimana).
+    let validaAl: string;
+    if (ripetiFinoAl !== '') {
+      if (!isDataValida(ripetiFinoAl) || ripetiFinoAl <= data) {
+        return c.json({ errore: 'La data di fine ripetizione deve essere una data successiva alla prima' }, 400);
+      }
+      // Cap di progetto: finestra di MAX_SETTIMANE_RICORRENZA settimane piene,
+      // così il batch di materializzazione resta piccolo (vedi routes/admin.ts).
+      const massimo = aggiungiGiorni(data, MAX_GIORNI_FINESTRA_RICORRENZA);
+      if (ripetiFinoAl > massimo) {
+        return c.json(
+          { errore: `La ripetizione settimanale può coprire al massimo ${MAX_SETTIMANE_RICORRENZA} settimane (fino al ${massimo})` },
+          400,
+        );
+      }
+      validaAl = ripetiFinoAl;
+    } else {
+      validaAl = domenicaDellaSettimana(data);
     }
-    // Cap di progetto: al massimo MAX_SETTIMANE_RICORRENZA occorrenze, così
-    // il batch di materializzazione resta piccolo (vedi routes/admin.ts).
-    const massimo = aggiungiGiorni(data, (MAX_SETTIMANE_RICORRENZA - 1) * 7);
-    if (ripetiFinoAl > massimo) {
-      return c.json(
-        { errore: `La ripetizione settimanale può coprire al massimo ${MAX_SETTIMANE_RICORRENZA} settimane (fino al ${massimo})` },
-        400,
-      );
-    }
-    const giorno = giornoSettimana(data);
-    const occorrenze = occorrenzeRicorrenza(data, ripetiFinoAl, giorno);
+
+    const occorrenze = occorrenzeRicorrenza(data, validaAl, giorni);
     // Tutto o niente: se anche un solo slot di una sola occorrenza è già
     // prenotato, la ricorrenza non viene creata affatto.
     const occupatiRicorrenza = await slotOccupati(
@@ -136,21 +165,27 @@ societa.post('/richieste', async (c) => {
       );
     }
 
+    const giorniTesto = giorniInTesto(giorni);
     const esiti = await c.env.DB.batch([
       c.env.DB
         .prepare(
-          `INSERT INTO ricorrenze (societa_id, giorno_settimana, ora_inizio, ora_fine, valida_dal, valida_al, titolo, note)
+          `INSERT INTO ricorrenze (societa_id, giorni, ora_inizio, ora_fine, valida_dal, valida_al, titolo, note)
            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)`,
         )
-        .bind(soc.id, giorno, oraInizio, oraFine, data, ripetiFinoAl, titolo, note),
-      stmtAudit(c.env.DB, 'ricorrenza_creata', `${data} → ${ripetiFinoAl} ${oraInizio}-${oraFine}`, `societa:${soc.id}`),
+        .bind(soc.id, giorniTesto, oraInizio, oraFine, data, validaAl, titolo, note),
+      stmtAudit(
+        c.env.DB,
+        'ricorrenza_creata',
+        `${data} → ${validaAl} ${oraInizio}-${oraFine} (giorni ${giorniTesto})`,
+        `societa:${soc.id}`,
+      ),
     ]);
     notificaRicorrenzaInviata(c, soc, {
-      giorno_settimana: giorno,
+      giorni,
       ora_inizio: oraInizio,
       ora_fine: oraFine,
       valida_dal: data,
-      valida_al: ripetiFinoAl,
+      valida_al: validaAl,
       titolo,
       note,
     });
@@ -283,7 +318,7 @@ societa.post('/ricorrenze/:id/annulla', async (c) => {
   // stato resta nell'UPDATE, che decide da solo l'esito della chiamata.
   const ricorrenza = await c.env.DB
     .prepare(
-      `SELECT giorno_settimana, ora_inizio, ora_fine, valida_dal, valida_al, titolo
+      `SELECT giorni, ora_inizio, ora_fine, valida_dal, valida_al, titolo
        FROM ricorrenze WHERE id = ?1 AND societa_id = ?2`,
     )
     .bind(id, soc.id)
@@ -297,6 +332,6 @@ societa.post('/ricorrenze/:id/annulla', async (c) => {
     return c.json({ errore: 'Ricorrenza non trovata o non più in attesa' }, 409);
   }
   await scriviAudit(c.env.DB, 'ricorrenza_annullata', `ricorrenza ${id}`, `societa:${soc.id}`);
-  if (ricorrenza) notificaRicorrenzaRitirata(c, soc, ricorrenza);
+  if (ricorrenza) notificaRicorrenzaRitirata(c, soc, ricorrenzaConGiorni(ricorrenza));
   return c.json({ ok: true });
 });

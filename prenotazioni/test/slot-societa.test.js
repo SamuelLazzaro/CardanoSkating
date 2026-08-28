@@ -14,7 +14,7 @@ import { slotSocietaSettimana } from '../public/js/utils.js';
 /** Lunedì della settimana usata da tutti i test (24–30 agosto 2026). */
 const LUNEDI = '2026-08-24';
 
-/** Mercoledì della stessa settimana: giorno_settimana = 2 (0 = lunedì). */
+/** Mercoledì della stessa settimana: giorno 2 nella convenzione 0 = lunedì. */
 const MERCOLEDI = '2026-08-26';
 
 /**
@@ -36,7 +36,7 @@ const richiesta = (campi) => ({
  */
 const ricorrenza = (campi) => ({
   stato: 'in_attesa',
-  giorno_settimana: 2, // mercoledì
+  giorni: [2], // mercoledì
   ora_inizio: '20:00',
   ora_fine: '21:00',
   valida_dal: LUNEDI,
@@ -160,13 +160,28 @@ describe('slotSocietaSettimana — ricorrenze in attesa', () => {
   it('rispetta la convenzione 0 = lunedì .. 6 = domenica', () => {
     const { inAttesa } = slotSocietaSettimana(
       [],
-      [ricorrenza({ giorno_settimana: 0 }), ricorrenza({ giorno_settimana: 6 })],
+      [ricorrenza({ giorni: [0] }), ricorrenza({ giorni: [6] })],
       LUNEDI,
     );
     expect(ordinati(inAttesa)).toEqual([
       '2026-08-24_2000', '2026-08-24_2030', // lunedì
       '2026-08-30_2000', '2026-08-30_2030', // domenica
     ]);
+  });
+
+  it('espande una ricorrenza su più giorni su ognuno dei giorni richiesti', () => {
+    const { inAttesa } = slotSocietaSettimana([], [ricorrenza({ giorni: [0, 2, 4] })], LUNEDI);
+    expect(ordinati(inAttesa)).toEqual([
+      '2026-08-24_2000', '2026-08-24_2030', // lunedì
+      '2026-08-26_2000', '2026-08-26_2030', // mercoledì
+      '2026-08-28_2000', '2026-08-28_2030', // venerdì
+    ]);
+  });
+
+  it('nella prima settimana salta i giorni richiesti che precedono valida_dal', () => {
+    // La serie parte di mercoledì: il lunedì di quella settimana non è un'occorrenza.
+    const { inAttesa } = slotSocietaSettimana([], [ricorrenza({ giorni: [0, 2], valida_dal: MERCOLEDI })], LUNEDI);
+    expect(ordinati(inAttesa)).toEqual(['2026-08-26_2000', '2026-08-26_2030']);
   });
 
   it('salta la settimana fuori dal periodo di validità', () => {

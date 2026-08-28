@@ -75,7 +75,7 @@ describe('motivazione obbligatoria sulle ricorrenze', () => {
   it('approvazione senza motivazione: 400 e nessuna materializzazione', async () => {
     const cookie = await cookieAdmin();
     const { id: societaId } = await creaSocietaConToken();
-    const ricorrenzaId = await creaRicorrenza(societaId, 0, '18:00', '19:00', '2031-01-06', '2031-01-27');
+    const ricorrenzaId = await creaRicorrenza(societaId, [0], '18:00', '19:00', '2031-01-06', '2031-01-27');
 
     expect((await postAdmin(`/api/admin/ricorrenze/${ricorrenzaId}/approva`, cookie)).status).toBe(400);
     expect((await postAdmin(`/api/admin/ricorrenze/${ricorrenzaId}/rifiuta`, cookie)).status).toBe(400);
@@ -92,7 +92,7 @@ describe('motivazione obbligatoria sulle ricorrenze', () => {
   it("all'approvazione la motivazione viene copiata nelle richieste materializzate", async () => {
     const cookie = await cookieAdmin();
     const { id: societaId } = await creaSocietaConToken();
-    const ricorrenzaId = await creaRicorrenza(societaId, 0, '18:00', '19:00', '2031-01-06', '2031-01-27');
+    const ricorrenzaId = await creaRicorrenza(societaId, [0], '18:00', '19:00', '2031-01-06', '2031-01-27');
 
     const risposta = await postAdmin(`/api/admin/ricorrenze/${ricorrenzaId}/approva`, cookie, { motivazione: 'Ok per tutto gennaio' });
     expect(risposta.status).toBe(200);

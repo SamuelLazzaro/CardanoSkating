@@ -157,6 +157,19 @@
             </div>
             <fieldset class="campo">
               <legend>Ripetizione</legend>
+              <div class="campo">
+                <span class="etichetta-gruppo" id="etichetta-giorni">Stesso orario anche in altri giorni della settimana</span>
+                <div class="scelta-giorni" id="scelta-giorni" role="group" aria-labelledby="etichetta-giorni">
+                  <label class="giorno-scelta"><input type="checkbox" name="giorni" value="0"><span>Lun</span></label>
+                  <label class="giorno-scelta"><input type="checkbox" name="giorni" value="1"><span>Mar</span></label>
+                  <label class="giorno-scelta"><input type="checkbox" name="giorni" value="2"><span>Mer</span></label>
+                  <label class="giorno-scelta"><input type="checkbox" name="giorni" value="3"><span>Gio</span></label>
+                  <label class="giorno-scelta"><input type="checkbox" name="giorni" value="4"><span>Ven</span></label>
+                  <label class="giorno-scelta"><input type="checkbox" name="giorni" value="5"><span>Sab</span></label>
+                  <label class="giorno-scelta"><input type="checkbox" name="giorni" value="6"><span>Dom</span></label>
+                </div>
+                <p class="suggerimento">Il giorno della data scelta è sempre incluso. Senza ripetizione settimanale gli altri giorni valgono solo per quella settimana.</p>
+              </div>
               <label class="etichetta-check">
                 <input type="checkbox" id="campo-ripeti">
                 Ripeti ogni settimana
@@ -166,6 +179,7 @@
                 <input type="date" id="campo-fino-al">
                 <p class="suggerimento">Una richiesta ricorrente può coprire al massimo 4 settimane.</p>
               </div>
+              <p class="suggerimento anteprima-date" id="anteprima-date" role="status" hidden></p>
             </fieldset>
             <div>
               <button type="submit" class="btn btn-primario" id="bottone-invia">Invia richiesta</button>

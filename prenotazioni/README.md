@@ -156,10 +156,16 @@ Consiglio: fai un backup prima di ogni `migrate:remote`.
 - **Sospensione**: cancella anche tutte le prenotazioni future della società
   e annulla le sue richieste in attesa (operazione atomica, tracciata in
   `audit_log`). La riattivazione non ripristina nulla.
-- **Ricorrenze**: una richiesta può ripetersi ogni settimana per massimo
-  4 settimane. All'approvazione le occorrenze vengono materializzate come
-  richieste indipendenti, così una singola data si può annullare senza
-  rompere la serie.
+- **Ricorrenze** (migrazione `0008`): una richiesta può chiedere lo stesso
+  orario per più giorni della settimana (es. lunedì, mercoledì e venerdì) e/o
+  ripetersi ogni settimana, per massimo 4 settimane piene (finestra di 28
+  giorni, quindi al più 7 × 4 = 28 occorrenze). Il giorno della data scelta fa
+  sempre parte della serie; senza ripetizione settimanale gli altri giorni
+  valgono solo per la settimana di quella data. L'admin approva o rifiuta
+  l'intera serie con una sola decisione; all'approvazione le occorrenze
+  vengono materializzate in un unico batch atomico come richieste
+  indipendenti, così una singola data si può annullare senza rompere la
+  serie.
 - **Annullamenti** (migrazione `0005`): una richiesta ancora in attesa può
   essere ritirata direttamente dalla società; una prenotazione approvata
   futura invece si annulla solo con una richiesta di tipo `annullamento`

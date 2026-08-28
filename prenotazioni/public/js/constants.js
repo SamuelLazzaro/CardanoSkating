@@ -9,8 +9,14 @@ export const CHIUSURA_MIN = 24 * 60;
 /** @type {number} slot length in minutes */
 export const PASSO_MIN = 30;
 
-/** @type {number} max weekly occurrences of a recurring request (mirrors the server cap) */
+/** @type {number} max weeks spanned by a recurring request (mirrors the server cap) */
 export const MAX_SETTIMANE_RICORRENZA = 4;
+
+/**
+ * @type {number} latest "fino al" as days after the first date: 4 full weeks,
+ * both ends included, so every selected weekday occurs exactly 4 times
+ */
+export const MAX_GIORNI_FINESTRA_RICORRENZA = MAX_SETTIMANE_RICORRENZA * 7 - 1;
 
 /** @type {string} default activity title of a booking (mirrors the server default) */
 export const TITOLO_PREDEFINITO = 'Allenamento';

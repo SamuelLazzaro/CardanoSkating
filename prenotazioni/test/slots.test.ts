@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   aggiungiGiorni,
+  domenicaDellaSettimana,
+  giorniDaTesto,
+  giorniInTesto,
   giornoSettimana,
   isDataValida,
   lunediDellaSettimana,
@@ -70,6 +73,12 @@ describe('date civili', () => {
     expect(lunediDellaSettimana('2026-08-23')).toBe('2026-08-17');
   });
 
+  it('domenicaDellaSettimana normalizza qualsiasi giorno alla sua domenica', () => {
+    expect(domenicaDellaSettimana('2026-08-17')).toBe('2026-08-23');
+    expect(domenicaDellaSettimana('2026-08-20')).toBe('2026-08-23');
+    expect(domenicaDellaSettimana('2026-08-23')).toBe('2026-08-23');
+  });
+
   it('aggiungiGiorni attraversa correttamente mesi e anni', () => {
     expect(aggiungiGiorni('2026-08-30', 3)).toBe('2026-09-02');
     expect(aggiungiGiorni('2026-12-30', 5)).toBe('2027-01-04');
@@ -80,7 +89,7 @@ describe('date civili', () => {
 describe('occorrenzeRicorrenza', () => {
   // 2030-01-07 è un lunedì (giorno 0 nella convenzione del progetto).
   it('genera le date settimanali nel periodo, estremi inclusi', () => {
-    expect(occorrenzeRicorrenza('2030-01-07', '2030-01-28', 0)).toEqual([
+    expect(occorrenzeRicorrenza('2030-01-07', '2030-01-28', [0])).toEqual([
       '2030-01-07',
       '2030-01-14',
       '2030-01-21',
@@ -90,11 +99,40 @@ describe('occorrenzeRicorrenza', () => {
 
   it('parte dalla prima data con il giorno della settimana richiesto', () => {
     // valida_dal cade di mercoledì: la prima occorrenza di lunedì è quella successiva
-    expect(occorrenzeRicorrenza('2030-01-09', '2030-01-28', 0)).toEqual([
+    expect(occorrenzeRicorrenza('2030-01-09', '2030-01-28', [0])).toEqual([
       '2030-01-14',
       '2030-01-21',
       '2030-01-28',
     ]);
+  });
+
+  it('con più giorni produce tutte le date richieste, in ordine cronologico', () => {
+    // lunedì, mercoledì e venerdì per due settimane
+    expect(occorrenzeRicorrenza('2030-01-07', '2030-01-20', [0, 2, 4])).toEqual([
+      '2030-01-07',
+      '2030-01-09',
+      '2030-01-11',
+      '2030-01-14',
+      '2030-01-16',
+      '2030-01-18',
+    ]);
+  });
+
+  it('senza giorni richiesti non produce date', () => {
+    expect(occorrenzeRicorrenza('2030-01-07', '2030-01-20', [])).toEqual([]);
+  });
+});
+
+describe('giorni della ricorrenza in DB', () => {
+  it('giorniDaTesto legge il formato salvato', () => {
+    expect(giorniDaTesto('0,2,4')).toEqual([0, 2, 4]);
+    expect(giorniDaTesto('3')).toEqual([3]);
+    expect(giorniDaTesto('')).toEqual([]);
+  });
+
+  it('giorniInTesto ordina, elimina i doppioni e serializza', () => {
+    expect(giorniInTesto([4, 0, 2, 0])).toBe('0,2,4');
+    expect(giorniInTesto([6])).toBe('6');
   });
 });
 

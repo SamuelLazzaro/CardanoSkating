@@ -6,7 +6,7 @@
  * everywhere and no timezone conversion ever happens client-side except in
  * adessoRoma(), which converts an instant to Italian civil time via Intl.
  */
-import { PASSO_MIN } from './constants.js';
+import { NOMI_GIORNI, PASSO_MIN } from './constants.js';
 
 /**
  * @param {string} valore - candidate 'YYYY-MM-DD' string
@@ -45,6 +45,42 @@ export function giornoSettimana(data) {
  */
 export function lunediDellaSettimana(data) {
   return aggiungiGiorni(data, -giornoSettimana(data));
+}
+
+/**
+ * @param {string} data - 'YYYY-MM-DD'
+ * @returns {string} the Sunday of the week the date belongs to
+ */
+export function domenicaDellaSettimana(data) {
+  return aggiungiGiorni(data, 6 - giornoSettimana(data));
+}
+
+/**
+ * Dates covered by a recurring request (mirrors the server): every day from
+ * validaDal to validaAl, both included, whose weekday is among the requested
+ * ones. The window is at most 4 weeks, so the day-by-day loop stays short.
+ * @param {string} validaDal - first date, 'YYYY-MM-DD'
+ * @param {string} validaAl - last date, 'YYYY-MM-DD'
+ * @param {number[]} giorni - weekdays, 0 = lunedì .. 6 = domenica
+ * @returns {string[]} dates in chronological order
+ */
+export function occorrenzeRicorrenza(validaDal, validaAl, giorni) {
+  const giorniRichiesti = new Set(giorni);
+  const date = [];
+  for (let giorno = validaDal; giorno <= validaAl; giorno = aggiungiGiorni(giorno, 1)) {
+    if (giorniRichiesti.has(giornoSettimana(giorno))) date.push(giorno);
+  }
+  return date;
+}
+
+/**
+ * @param {number[]} giorni - weekdays, 0 = lunedì .. 6 = domenica
+ * @returns {string} readable list, e.g. "lunedì, mercoledì e venerdì"
+ */
+export function elencoGiorni(giorni) {
+  const nomi = giorni.map((giorno) => NOMI_GIORNI[giorno]);
+  if (nomi.length <= 1) return nomi.join('');
+  return `${nomi.slice(0, -1).join(', ')} e ${nomi[nomi.length - 1]}`;
 }
 
 /**
@@ -125,7 +161,7 @@ export function espandiSlot(data, oraInizio, oraFine) {
 
 /**
  * @param {{tipo: string, stato: string, data: string, ora_inizio: string, ora_fine: string}[]} richieste - the società's richieste
- * @param {{stato: string, giorno_settimana: number, ora_inizio: string, ora_fine: string, valida_dal: string, valida_al: string}[]} ricorrenze - the società's ricorrenze
+ * @param {{stato: string, giorni: number[], ora_inizio: string, ora_fine: string, valida_dal: string, valida_al: string}[]} ricorrenze - the società's ricorrenze
  * @param {string} lunedi - Monday of the week to classify, 'YYYY-MM-DD'
  * @returns {{approvati: Set<string>, inAttesa: Set<string>}} slot keys of that week
  */
@@ -150,12 +186,15 @@ export function slotSocietaSettimana(richieste, ricorrenze, lunedi) {
 
   for (const ricorrenza of ricorrenze) {
     if (ricorrenza.stato !== 'in_attesa') continue;
-    // 0 = lunedì in the project convention and lunedi is a Monday, so the
-    // occurrence falling in this week is exactly that many days later.
-    const giorno = aggiungiGiorni(lunedi, ricorrenza.giorno_settimana);
-    if (giorno < ricorrenza.valida_dal || giorno > ricorrenza.valida_al) continue;
-    for (const chiave of espandiSlot(giorno, ricorrenza.ora_inizio, ricorrenza.ora_fine)) {
-      inAttesa.add(chiave);
+    // One occurrence per requested weekday: 0 = lunedì in the project
+    // convention and lunedi is a Monday, so the occurrence falling in this
+    // week is exactly that many days later.
+    for (const giornoSettimanale of ricorrenza.giorni) {
+      const giorno = aggiungiGiorni(lunedi, giornoSettimanale);
+      if (giorno < ricorrenza.valida_dal || giorno > ricorrenza.valida_al) continue;
+      for (const chiave of espandiSlot(giorno, ricorrenza.ora_inizio, ricorrenza.ora_fine)) {
+        inAttesa.add(chiave);
+      }
     }
   }
 

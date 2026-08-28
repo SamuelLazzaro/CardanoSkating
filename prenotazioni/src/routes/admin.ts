@@ -2,13 +2,15 @@ import { Hono } from 'hono';
 import type { Bindings, RichiestaRow, RicorrenzaRow, StatoRichiesta } from '../tipi';
 import {
   aggiungiGiorni,
+  giorniDaTesto,
   isDataValida,
   isMeseValido,
   lunediDellaSettimana,
-  MAX_SETTIMANE_RICORRENZA,
+  MAX_OCCORRENZE_RICORRENZA,
   meseSuccessivo,
   occorrenzeRicorrenza,
   oraRoma,
+  ricorrenzaConGiorni,
   slotKeyCorrente,
   slotKeys,
   validaIntervallo,
@@ -316,21 +318,22 @@ admin.get('/ricorrenze', async (c) => {
   if (!STATI_RICHIESTA.includes(stato)) return c.json({ errore: 'Stato non valido' }, 400);
   const { results } = await c.env.DB
     .prepare(
-      `SELECT r.id, r.societa_id, s.nome AS societa, r.giorno_settimana, r.ora_inizio, r.ora_fine,
+      `SELECT r.id, r.societa_id, s.nome AS societa, r.giorni, r.ora_inizio, r.ora_fine,
               r.valida_dal, r.valida_al, r.stato, r.titolo, r.note, r.motivazione, r.created_at
        FROM ricorrenze r JOIN societa s ON s.id = r.societa_id
        WHERE r.stato = ?1 ORDER BY r.valida_dal LIMIT 100`,
     )
     .bind(stato)
-    .all();
-  return c.json({ ricorrenze: results });
+    .all<RicorrenzaRow & { societa: string }>();
+  return c.json({ ricorrenze: results.map(ricorrenzaConGiorni) });
 });
 
 /**
- * Approvazione di una ricorrenza = MATERIALIZZAZIONE: ogni occorrenza
- * settimanale diventa una richiesta approvata indipendente più le relative
- * prenotazioni, così una singola data si può poi annullare senza toccare la
- * serie. Tutto avviene in UN solo db.batch() atomico:
+ * Approvazione di una ricorrenza = MATERIALIZZAZIONE: ogni occorrenza (ogni
+ * data dei giorni della settimana richiesti, nel periodo) diventa una
+ * richiesta approvata indipendente più le relative prenotazioni, così una
+ * singola data si può poi annullare senza toccare la serie. Tutto avviene in
+ * UN solo db.batch() atomico:
  *
  *   1. la ricorrenza passa ad 'approvata' (guardia su 'in_attesa');
  *   2. un INSERT..SELECT multi-riga crea le richieste, prendendo orari e note
@@ -340,10 +343,13 @@ admin.get('/ricorrenze', async (c) => {
  *      alla richiesta appena creata tramite (ricorrenza_id, data), coppia
  *      resa univoca dall'indice idx_richieste_ricorrenza_data.
  *
- * Dimensioni: con il cap a 4 settimane il batch è di al massimo 6 statement
- * e ogni statement resta sotto i 100 parametri bound (limite D1), quindi ben
- * dentro il limite free di 50 query per invocazione. Un conflitto su un
- * QUALSIASI slot fa fallire e annullare l'intero batch.
+ * Dimensioni: con il cap a 4 settimane piene e al massimo 7 giorni la
+ * ricorrenza ha al più MAX_OCCORRENZE_RICORRENZA = 28 occorrenze, quindi il
+ * batch è di al massimo 30 statement; ogni statement resta sotto i 100
+ * parametri bound (limite D1: 29 per le richieste, al più 34 per una giornata
+ * intera di slot). Contando anche le query di contorno dell'invocazione si
+ * resta sotto il limite free di 50 query. Un conflitto su un QUALSIASI slot
+ * fa fallire e annullare l'intero batch.
  */
 admin.post('/ricorrenze/:id/approva', async (c) => {
   const id = intero(c.req.param('id'));
@@ -354,7 +360,7 @@ admin.post('/ricorrenze/:id/approva', async (c) => {
 
   const ricorrenza = await c.env.DB
     .prepare(
-      `SELECT r.id, r.societa_id, r.giorno_settimana, r.ora_inizio, r.ora_fine, r.valida_dal, r.valida_al,
+      `SELECT r.id, r.societa_id, r.giorni, r.ora_inizio, r.ora_fine, r.valida_dal, r.valida_al,
               r.stato, r.note, r.titolo, s.stato AS societa_stato, s.nome AS societa_nome, s.email AS societa_email
        FROM ricorrenze r JOIN societa s ON s.id = r.societa_id WHERE r.id = ?1`,
     )
@@ -367,10 +373,10 @@ admin.post('/ricorrenze/:id/approva', async (c) => {
   if (ricorrenza.societa_stato !== 'attiva') return c.json({ errore: 'La società è sospesa' }, 409);
 
   const oggi = oraRoma(new Date()).data;
-  const tutte = occorrenzeRicorrenza(ricorrenza.valida_dal, ricorrenza.valida_al, ricorrenza.giorno_settimana);
+  const tutte = occorrenzeRicorrenza(ricorrenza.valida_dal, ricorrenza.valida_al, giorniDaTesto(ricorrenza.giorni));
   const date = tutte.filter((d) => d >= oggi); // le occorrenze già passate vengono saltate
   if (date.length === 0) return c.json({ errore: 'Tutte le occorrenze della ricorrenza sono già passate' }, 409);
-  if (date.length > MAX_SETTIMANE_RICORRENZA) return c.json({ errore: 'Ricorrenza troppo lunga' }, 400);
+  if (date.length > MAX_OCCORRENZE_RICORRENZA) return c.json({ errore: 'Ricorrenza troppo lunga' }, 400);
 
   const segnapostoGiorni = date.map(() => '(?)').join(', ');
   const istruzioni = [
@@ -426,7 +432,13 @@ admin.post('/ricorrenze/:id/approva', async (c) => {
     `ricorrenza ${id}: materializzate ${date.length} date (${date.join(', ')}) — motivazione: ${motivazione}`,
     'admin',
   );
-  notificaRicorrenzaApprovata(c, { nome: ricorrenza.societa_nome, email: ricorrenza.societa_email }, ricorrenza, date, motivazione);
+  notificaRicorrenzaApprovata(
+    c,
+    { nome: ricorrenza.societa_nome, email: ricorrenza.societa_email },
+    ricorrenzaConGiorni(ricorrenza),
+    date,
+    motivazione,
+  );
   return c.json({ ok: true, occorrenze: date, slot_inseriti: chiaviTotali.length });
 });
 
@@ -441,7 +453,7 @@ admin.post('/ricorrenze/:id/rifiuta', async (c) => {
   // stato resta nell'UPDATE, che decide da solo l'esito della chiamata.
   const ricorrenza = await c.env.DB
     .prepare(
-      `SELECT r.giorno_settimana, r.ora_inizio, r.ora_fine, r.valida_dal, r.valida_al, r.titolo,
+      `SELECT r.giorni, r.ora_inizio, r.ora_fine, r.valida_dal, r.valida_al, r.titolo,
               s.nome AS societa_nome, s.email AS societa_email
        FROM ricorrenze r JOIN societa s ON s.id = r.societa_id WHERE r.id = ?1`,
     )
@@ -455,7 +467,12 @@ admin.post('/ricorrenze/:id/rifiuta', async (c) => {
   if ((esito.meta.changes ?? 0) === 0) return c.json({ errore: 'Ricorrenza non trovata o non più in attesa' }, 409);
   await scriviAudit(c.env.DB, 'ricorrenza_rifiutata', `ricorrenza ${id} — motivazione: ${motivazione}`, 'admin');
   if (ricorrenza) {
-    notificaRicorrenzaRifiutata(c, { nome: ricorrenza.societa_nome, email: ricorrenza.societa_email }, ricorrenza, motivazione);
+    notificaRicorrenzaRifiutata(
+      c,
+      { nome: ricorrenza.societa_nome, email: ricorrenza.societa_email },
+      ricorrenzaConGiorni(ricorrenza),
+      motivazione,
+    );
   }
   return c.json({ ok: true });
 });

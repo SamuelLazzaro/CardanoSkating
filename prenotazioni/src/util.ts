@@ -40,6 +40,22 @@ export function titoloAttivita(valore: unknown): string | null {
   return testo(valore, MAX_TITOLO);
 }
 
+/**
+ * Valida l'elenco dei giorni della settimana di una richiesta ricorrente:
+ * array JSON di interi da 0 (lunedì) a 6 (domenica). Ritorna i giorni ordinati
+ * e senza doppioni, o null (→ 400 nel chiamante) se il formato non è quello
+ * atteso. L'array vuoto è valido: "nessun giorno oltre a quello della data".
+ */
+export function giorniSettimana(valore: unknown): number[] | null {
+  if (!Array.isArray(valore) || valore.length > 7) return null;
+  const giorni = new Set<number>();
+  for (const giorno of valore) {
+    if (typeof giorno !== 'number' || !Number.isInteger(giorno) || giorno < 0 || giorno > 6) return null;
+    giorni.add(giorno);
+  }
+  return [...giorni].sort((a, b) => a - b);
+}
+
 /** Limiti di lunghezza della motivazione di una decisione admin: il minimo
  *  a 2 caratteri ammette un "ok" sulle approvazioni (scelta del committente). */
 export const MIN_MOTIVAZIONE = 2;

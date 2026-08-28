@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { createExecutionContext, env, fetchMock, waitOnExecutionContext } from 'cloudflare:test';
 import app from '../src/index';
-import { corpoNotifica, corpoNotificaAdmin, dataItaliana } from '../src/notifiche';
+import { corpoNotifica, corpoNotificaAdmin, dataItaliana, elencoGiorni } from '../src/notifiche';
 import { cookieAdmin, cookieSocieta, creaRichiesta, creaSocietaConToken } from './helpers';
 
 /**
@@ -81,6 +81,12 @@ async function conteggioNotificheFallite(): Promise<number> {
 describe('formattazione', () => {
   it('dataItaliana converte in GG/MM/AAAA', () => {
     expect(dataItaliana('2026-08-19')).toBe('19/08/2026');
+  });
+
+  it('elencoGiorni unisce i nomi dei giorni con virgole e una "e" finale', () => {
+    expect(elencoGiorni([0])).toBe('lunedì');
+    expect(elencoGiorni([0, 2])).toBe('lunedì e mercoledì');
+    expect(elencoGiorni([0, 2, 4])).toBe('lunedì, mercoledì e venerdì');
   });
 
   it('corpoNotifica contiene destinatario, messaggio, dettagli e link privacy', () => {
@@ -268,6 +274,42 @@ describe('invio notifiche', () => {
     expect(perSocieta.textContent).toContain('  > Torneo giovanile');
     expect(perAdmin.subject).toContain('Richiesta ricorrente ricevuta');
     expect(perAdmin.textContent).toContain('  > Torneo giovanile');
+  });
+
+  it('la richiesta ricorrente su più giorni elenca i giorni in entrambe le email', async () => {
+    const { token } = await creaSocietaConToken();
+    const cookie = await cookieSocieta(token);
+    const cattura = intercettaBrevo(201, 2);
+
+    // 2027-03-08 è un lunedì; più mercoledì e venerdì, per due settimane.
+    const risposta = await postConContesto('/api/societa/richieste', cookie, {
+      data: '2027-03-08',
+      ora_inizio: '10:00',
+      ora_fine: '11:00',
+      giorni: [2, 4],
+      ripeti_fino_al: '2027-03-21',
+    });
+    expect(risposta.status).toBe(201);
+
+    for (const corpo of cattura.corpi()) {
+      expect(corpo.textContent).toContain('Giorni: ogni lunedì, mercoledì e venerdì, dalle 10:00 alle 11:00');
+      expect(corpo.textContent).toContain('Periodo: dal 08/03/2027 al 21/03/2027');
+    }
+  });
+
+  it('la richiesta ricorrente su un solo giorno usa l\'etichetta al singolare', async () => {
+    const { token } = await creaSocietaConToken();
+    const cookie = await cookieSocieta(token);
+    const cattura = intercettaBrevo(201, 2);
+
+    const risposta = await postConContesto('/api/societa/richieste', cookie, {
+      data: '2027-03-08',
+      ora_inizio: '10:00',
+      ora_fine: '11:00',
+      ripeti_fino_al: '2027-03-22',
+    });
+    expect(risposta.status).toBe(201);
+    expect(cattura.corpi()[0].textContent).toContain('Giorno: ogni lunedì, dalle 10:00 alle 11:00');
   });
 
   it("l'approvazione non ripete le note della richiesta", async () => {

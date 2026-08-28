@@ -16,9 +16,16 @@ export const ORA_APERTURA_MIN = 8 * 60; // il palazzetto apre alle 08:00
 export const ORA_CHIUSURA_MIN = 24 * 60; // e chiude alle 24:00
 
 // Project decision (confirmed by the owner): a single recurring request may
-// cover at most 4 weekly occurrences, so the materialization batch stays far
-// below D1's 50-statements-per-invocation free-plan limit.
+// span at most 4 weeks. The window is 4 full weeks (28 days, both ends
+// included) so every requested weekday occurs exactly 4 times; with all 7
+// weekdays selected that is 7 × 4 = 28 occurrences. The materialization
+// batch (2 statements + one per occurrence, see routes/admin.ts) thus stays
+// below D1's 50-queries-per-invocation free-plan limit.
 export const MAX_SETTIMANE_RICORRENZA = 4;
+/** Distanza massima di valida_al da valida_dal, in giorni (estremi inclusi). */
+export const MAX_GIORNI_FINESTRA_RICORRENZA = MAX_SETTIMANE_RICORRENZA * 7 - 1;
+/** Occorrenze massime di una ricorrenza: tutti i giorni per tutte le settimane. */
+export const MAX_OCCORRENZE_RICORRENZA = MAX_SETTIMANE_RICORRENZA * 7;
 
 /** Weekday convention used across the whole project: 0=lunedì .. 6=domenica. */
 export function giornoSettimana(data: string): number {
@@ -135,16 +142,47 @@ export function lunediDellaSettimana(data: string): string {
   return aggiungiGiorni(data, -giornoSettimana(data));
 }
 
+/** Domenica della settimana a cui appartiene la data. */
+export function domenicaDellaSettimana(data: string): string {
+  return aggiungiGiorni(data, 6 - giornoSettimana(data));
+}
+
 /**
- * Date delle occorrenze settimanali di una ricorrenza: la prima data con il
- * giorno della settimana richiesto a partire da validaDal, poi ogni 7 giorni
- * fino a validaAl incluso.
+ * Giorni della settimana di una ricorrenza, dal formato salvato in DB
+ * ('0,2,4', vedi migrazione 0008) all'array di numeri [0, 2, 4].
  */
-export function occorrenzeRicorrenza(validaDal: string, validaAl: string, giorno: number): string[] {
-  const scarto = (giorno - giornoSettimana(validaDal) + 7) % 7;
+export function giorniDaTesto(testo: string): number[] {
+  return testo
+    .split(',')
+    .filter((parte) => parte !== '')
+    .map(Number);
+}
+
+/** Inverso di giorniDaTesto: ordina, elimina i doppioni e serializza ('0,2,4'). */
+export function giorniInTesto(giorni: number[]): string {
+  return [...new Set(giorni)].sort((a, b) => a - b).join(',');
+}
+
+/**
+ * Riga di ricorrenza pronta per la risposta JSON: la colonna testuale `giorni`
+ * diventa l'array di numeri usato da frontend e notifiche.
+ */
+export function ricorrenzaConGiorni<T extends { giorni: string }>(riga: T): Omit<T, 'giorni'> & { giorni: number[] } {
+  return { ...riga, giorni: giorniDaTesto(riga.giorni) };
+}
+
+/**
+ * Date delle occorrenze di una ricorrenza: tutti i giorni tra validaDal e
+ * validaAl (inclusi) il cui giorno della settimana è tra quelli richiesti,
+ * in ordine cronologico. Con un solo giorno richiesto equivale a "ogni 7
+ * giorni a partire dalla prima data utile". La finestra è al massimo di
+ * MAX_GIORNI_FINESTRA_RICORRENZA giorni, quindi il ciclo resta corto.
+ */
+export function occorrenzeRicorrenza(validaDal: string, validaAl: string, giorni: number[]): string[] {
+  const giorniRichiesti = new Set(giorni);
   const date: string[] = [];
-  for (let d = aggiungiGiorni(validaDal, scarto); d <= validaAl; d = aggiungiGiorni(d, 7)) {
-    date.push(d);
+  for (let d = validaDal; d <= validaAl; d = aggiungiGiorni(d, 1)) {
+    if (giorniRichiesti.has(giornoSettimana(d))) date.push(d);
   }
   return date;
 }

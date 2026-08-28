@@ -1,5 +1,6 @@
 import { env } from 'cloudflare:test';
 import app from '../src/index';
+import { giorniInTesto } from '../src/slots';
 
 /** Crea una società direttamente su DB e ritorna anche il token del link personale. */
 export async function creaSocietaConToken(nome = 'Polisportiva Test'): Promise<{ id: number; token: string }> {
@@ -52,10 +53,10 @@ export async function creaRichiesta(societaId: number, data: string, oraInizio: 
   return esito.meta.last_row_id;
 }
 
-/** Crea una ricorrenza in attesa direttamente su DB. */
+/** Crea una ricorrenza in attesa direttamente su DB (giorni: 0 = lunedì .. 6 = domenica). */
 export async function creaRicorrenza(
   societaId: number,
-  giornoSettimana: number,
+  giorni: number[],
   oraInizio: string,
   oraFine: string,
   validaDal: string,
@@ -64,10 +65,10 @@ export async function creaRicorrenza(
 ): Promise<number> {
   const esito = await env.DB
     .prepare(
-      `INSERT INTO ricorrenze (societa_id, giorno_settimana, ora_inizio, ora_fine, valida_dal, valida_al, titolo)
+      `INSERT INTO ricorrenze (societa_id, giorni, ora_inizio, ora_fine, valida_dal, valida_al, titolo)
        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)`,
     )
-    .bind(societaId, giornoSettimana, oraInizio, oraFine, validaDal, validaAl, titolo)
+    .bind(societaId, giorniInTesto(giorni), oraInizio, oraFine, validaDal, validaAl, titolo)
     .run();
   return esito.meta.last_row_id;
 }

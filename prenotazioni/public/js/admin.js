@@ -8,13 +8,14 @@
  * suspend/reactivate, personal-link regeneration).
  */
 import { avviaTapFeedback } from './tap-feedback.js';
-import { COLORE_PREDEFINITO, MIN_MOTIVAZIONE, NOMI_GIORNI, PASSO_MIN, TITOLO_PREDEFINITO } from './constants.js';
+import { COLORE_PREDEFINITO, MIN_MOTIVAZIONE, PASSO_MIN, TITOLO_PREDEFINITO } from './constants.js';
 import {
   adessoRoma,
   aggiungiGiorni,
   chiaveSlot,
   dataEstesa,
   eColoreEsadecimale,
+  elencoGiorni,
   etichettaGiorno,
   formattaSlotKey,
   giorniSettimana,
@@ -330,7 +331,7 @@ function renderRicorrenzeAttesa(ricorrenze) {
     attivita.className = 'testo-tenue';
     attivita.textContent = ricorrenza.titolo;
     const quando = document.createElement('span');
-    quando.textContent = `ogni ${NOMI_GIORNI[ricorrenza.giorno_settimana]} · ${ricorrenza.ora_inizio}–${ricorrenza.ora_fine}`;
+    quando.textContent = `ogni ${elencoGiorni(ricorrenza.giorni)} · ${ricorrenza.ora_inizio}–${ricorrenza.ora_fine}`;
     const periodo = document.createElement('span');
     periodo.className = 'testo-tenue';
     periodo.textContent = `dal ${dataEstesa(ricorrenza.valida_dal)} al ${dataEstesa(ricorrenza.valida_al)}`;

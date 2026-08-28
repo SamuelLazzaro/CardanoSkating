@@ -72,7 +72,7 @@ describe('materializzazione ricorrenza', () => {
   it('crea una richiesta approvata e le prenotazioni per ogni occorrenza settimanale', async () => {
     const cookie = await cookieAdmin();
     const societaId = await creaSocieta();
-    const ricorrenzaId = await creaRicorrenza(societaId, 0, '18:00', '19:00', '2030-01-07', '2030-01-28', 'Corso avanzato');
+    const ricorrenzaId = await creaRicorrenza(societaId, [0], '18:00', '19:00', '2030-01-07', '2030-01-28', 'Corso avanzato');
 
     const risposta = await postAdmin(`/api/admin/ricorrenze/${ricorrenzaId}/approva`, cookie, { motivazione: 'Ok' });
     expect(risposta.status).toBe(200);
@@ -100,7 +100,7 @@ describe('materializzazione ricorrenza', () => {
     expect((await postAdmin(`/api/admin/richieste/${occupante}/approva`, cookie, { motivazione: 'Ok' })).status).toBe(200);
 
     const societaId = await creaSocieta();
-    const ricorrenzaId = await creaRicorrenza(societaId, 0, '18:00', '19:00', '2030-01-07', '2030-01-28');
+    const ricorrenzaId = await creaRicorrenza(societaId, [0], '18:00', '19:00', '2030-01-07', '2030-01-28');
     const risposta = await postAdmin(`/api/admin/ricorrenze/${ricorrenzaId}/approva`, cookie, { motivazione: 'Ok' });
     expect(risposta.status).toBe(409);
 
@@ -120,6 +120,55 @@ describe('materializzazione ricorrenza', () => {
     // In prenotazioni ci sono solo gli slot della società occupante.
     const totale = await env.DB.prepare('SELECT COUNT(*) AS n FROM prenotazioni').first<{ n: number }>();
     expect(totale?.n).toBe(1);
+  });
+
+  it('con più giorni della settimana materializza ogni data di ogni giorno richiesto', async () => {
+    const cookie = await cookieAdmin();
+    const societaId = await creaSocieta();
+    // Lunedì, mercoledì e venerdì per 4 settimane piene: dal lunedì 7 gennaio
+    // alla domenica 3 febbraio 2030 (27 giorni dopo).
+    const ricorrenzaId = await creaRicorrenza(societaId, [0, 2, 4], '18:00', '19:00', '2030-01-07', '2030-02-03');
+
+    const risposta = await postAdmin(`/api/admin/ricorrenze/${ricorrenzaId}/approva`, cookie, { motivazione: 'Ok' });
+    expect(risposta.status).toBe(200);
+    const corpo = (await risposta.json()) as { occorrenze: string[]; slot_inseriti: number };
+    const dateAttese = [
+      '2030-01-07', '2030-01-09', '2030-01-11',
+      '2030-01-14', '2030-01-16', '2030-01-18',
+      '2030-01-21', '2030-01-23', '2030-01-25',
+      '2030-01-28', '2030-01-30', '2030-02-01',
+    ];
+    expect(corpo.occorrenze).toEqual(dateAttese);
+    expect(corpo.slot_inseriti).toBe(24); // 12 date x 2 slot
+
+    const richieste = await env.DB
+      .prepare('SELECT data, stato FROM richieste WHERE ricorrenza_id = ?1 ORDER BY data')
+      .bind(ricorrenzaId)
+      .all<{ data: string; stato: string }>();
+    expect(richieste.results.map((r) => r.data)).toEqual(dateAttese);
+    expect(richieste.results.every((r) => r.stato === 'approvata')).toBe(true);
+    const totale = await env.DB.prepare('SELECT COUNT(*) AS n FROM prenotazioni').first<{ n: number }>();
+    expect(totale?.n).toBe(24);
+  });
+
+  it('caso limite: tutti i giorni per 4 settimane e giornate intere (28 occorrenze, 896 slot) in un solo batch', async () => {
+    const cookie = await cookieAdmin();
+    const societaId = await creaSocieta();
+    const ricorrenzaId = await creaRicorrenza(societaId, [0, 1, 2, 3, 4, 5, 6], '08:00', '24:00', '2030-01-07', '2030-02-03');
+
+    const risposta = await postAdmin(`/api/admin/ricorrenze/${ricorrenzaId}/approva`, cookie, { motivazione: 'Ok' });
+    expect(risposta.status).toBe(200);
+    const corpo = (await risposta.json()) as { occorrenze: string[]; slot_inseriti: number };
+    expect(corpo.occorrenze.length).toBe(28);
+    expect(corpo.slot_inseriti).toBe(28 * 32);
+
+    const materializzate = await env.DB
+      .prepare('SELECT COUNT(*) AS n FROM richieste WHERE ricorrenza_id = ?1')
+      .bind(ricorrenzaId)
+      .first<{ n: number }>();
+    expect(materializzate?.n).toBe(28);
+    const totale = await env.DB.prepare('SELECT COUNT(*) AS n FROM prenotazioni').first<{ n: number }>();
+    expect(totale?.n).toBe(28 * 32);
   });
 });
 
