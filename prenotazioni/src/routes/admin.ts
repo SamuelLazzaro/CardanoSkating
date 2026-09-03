@@ -30,6 +30,8 @@ import { eConflittoSlot, trovaConflitti } from '../conflitti';
 import {
   notificaAnnullamentoApprovato,
   notificaAnnullataDaAdmin,
+  notificaModificaApprovata,
+  notificaModificataDaAdmin,
   notificaPrenotazioneDiretta,
   notificaPrenotazioneDirettaRicorrente,
   notificaRichiestaApprovata,
@@ -38,6 +40,19 @@ import {
   notificaRicorrenzaRifiutata,
   notificaSospensione,
 } from '../notifiche';
+import {
+  ambitoVariazione,
+  campiModifica,
+  chiaviDopoModifica,
+  dataDopoModifica,
+  eFutura,
+  elencoId,
+  idGruppo,
+  istruzioniInserimentoSlot,
+  modificaSenzaEffetto,
+  occorrenzeDaVariare,
+  slotDopoModifica,
+} from '../variazioni';
 import {
   COLORE_PREDEFINITO,
   coloreEsadecimale,
@@ -60,6 +75,10 @@ const MAX_TENTATIVI_LOGIN = 10;
 const FINESTRA_LOGIN_S = 15 * 60;
 
 const ERRORE_MOTIVAZIONE = `Serve una motivazione (da ${MIN_MOTIVAZIONE} a ${MAX_MOTIVAZIONE} caratteri)`;
+const ERRORE_GRUPPO = 'La richiesta fa parte di un gruppo: va decisa insieme alle altre del gruppo';
+
+/** Riga di richiesta con i dati della società, come letta dalle route di decisione. */
+type RichiestaConSocieta = RichiestaRow & { societa_stato: string; societa_nome: string; societa_email: string };
 
 export const admin = new Hono<{ Bindings: Bindings }>();
 
@@ -100,12 +119,18 @@ admin.use('*', richiedeAdmin());
 admin.get('/richieste', async (c) => {
   const stato = (c.req.query('stato') ?? 'in_attesa') as StatoRichiesta;
   if (!STATI_RICHIESTA.includes(stato)) return c.json({ errore: 'Stato non valido' }, 400);
+  // Per le richieste di annullamento e di modifica si allegano gli estremi
+  // ATTUALI della prenotazione riferita (rif_*): il pannello mostra così
+  // "prima → dopo" senza una seconda chiamata.
   const { results } = await c.env.DB
     .prepare(
       `SELECT r.id, r.societa_id, s.nome AS societa, r.data, r.ora_inizio, r.ora_fine, r.stato, r.tipo,
-              r.richiesta_riferimento_id, r.titolo, r.note, r.motivazione, r.ricorrenza_id,
-              r.created_at, r.decisa_at, r.annullata_at
-       FROM richieste r JOIN societa s ON s.id = r.societa_id
+              r.richiesta_riferimento_id, r.gruppo_id, r.titolo, r.note, r.motivazione, r.ricorrenza_id,
+              r.created_at, r.decisa_at, r.annullata_at,
+              o.data AS rif_data, o.ora_inizio AS rif_ora_inizio, o.ora_fine AS rif_ora_fine, o.titolo AS rif_titolo
+       FROM richieste r
+       JOIN societa s ON s.id = r.societa_id
+       LEFT JOIN richieste o ON o.id = r.richiesta_riferimento_id
        WHERE r.stato = ?1 ORDER BY r.data, r.ora_inizio LIMIT 300`,
     )
     .bind(stato)
@@ -131,6 +156,23 @@ admin.get('/richieste', async (c) => {
  *   3. la prenotazione originaria passa ad 'annullata' con annullata_at.
  * I passi 2 e 3 hanno una guardia EXISTS sull'esito del passo 1: se la
  * richiesta non era più in attesa non toccano nulla.
+ *
+ * Per una richiesta di tipo 'modifica' (migrazione 0009), che porta i NUOVI
+ * estremi nelle proprie colonne:
+ *   1. la richiesta di modifica passa ad 'approvata' (stessa guardia);
+ *   2. gli slot attuali della prenotazione originaria vengono liberati;
+ *   3. la prenotazione originaria viene aggiornata SUL POSTO ai nuovi estremi
+ *      (stesso id: il feed ICS aggiorna l'evento invece di ricrearlo e i
+ *      filtri su tipo='nuova' restano validi). Se cambia la data, l'occorrenza
+ *      esce dalla sua ricorrenza (ricorrenza_id = NULL): non rispetta più lo
+ *      schema settimanale della serie e l'indice (ricorrenza, data) potrebbe
+ *      altrimenti confliggere con un'altra occorrenza;
+ *   4. i nuovi slot vengono prenotati per la prenotazione originaria.
+ * Anche qui i passi 2-4 sono condizionati (EXISTS) all'esito del passo 1. Un
+ * conflitto sui nuovi slot fa fallire tutto il batch e nulla cambia.
+ *
+ * Le richieste che fanno parte di un gruppo si decidono solo tutte insieme
+ * (POST /gruppi/:gruppo/approva): qui vengono respinte.
  */
 admin.post('/richieste/:id/approva', async (c) => {
   const id = intero(c.req.param('id'));
@@ -141,59 +183,106 @@ admin.post('/richieste/:id/approva', async (c) => {
 
   const richiesta = await c.env.DB
     .prepare(
-      `SELECT r.id, r.societa_id, r.data, r.ora_inizio, r.ora_fine, r.stato, r.tipo, r.richiesta_riferimento_id,
-              r.titolo, s.stato AS societa_stato, s.nome AS societa_nome, s.email AS societa_email
+      `SELECT r.*, s.stato AS societa_stato, s.nome AS societa_nome, s.email AS societa_email
        FROM richieste r JOIN societa s ON s.id = r.societa_id WHERE r.id = ?1`,
     )
     .bind(id)
-    .first<RichiestaRow & { societa_stato: string; societa_nome: string; societa_email: string }>();
+    .first<RichiestaConSocieta>();
   if (!richiesta) return c.json({ errore: 'Richiesta non trovata' }, 404);
   if (richiesta.stato !== 'in_attesa') {
     return c.json({ errore: `La richiesta non è in attesa (stato attuale: ${richiesta.stato})` }, 409);
   }
+  if (richiesta.gruppo_id !== null) return c.json({ errore: ERRORE_GRUPPO }, 409);
   if (richiesta.societa_stato !== 'attiva') return c.json({ errore: 'La società è sospesa' }, 409);
   if (richiesta.data < oraRoma(new Date()).data) return c.json({ errore: 'La data della richiesta è già passata' }, 409);
+  const societaDaNotificare = { nome: richiesta.societa_nome, email: richiesta.societa_email };
 
-  if (richiesta.tipo === 'annullamento') {
+  if (richiesta.tipo === 'annullamento' || richiesta.tipo === 'modifica') {
     const originaria = await c.env.DB
-      .prepare("SELECT id, stato FROM richieste WHERE id = ?1")
+      .prepare('SELECT * FROM richieste WHERE id = ?1')
       .bind(richiesta.richiesta_riferimento_id)
-      .first<{ id: number; stato: string }>();
-    if (!originaria || originaria.stato !== 'approvata') {
-      return c.json({ errore: 'La prenotazione da annullare non è più attiva' }, 409);
+      .first<RichiestaRow>();
+    if (!originaria || originaria.stato !== 'approvata' || originaria.tipo !== 'nuova') {
+      return c.json({ errore: `La prenotazione da ${richiesta.tipo === 'modifica' ? 'modificare' : 'annullare'} non è più attiva` }, 409);
     }
 
-    const esiti = await c.env.DB.batch([
-      c.env.DB
-        .prepare(
-          `UPDATE richieste SET stato = 'approvata', decisa_at = datetime('now'), motivazione = ?2
-           WHERE id = ?1 AND stato = 'in_attesa'`,
-        )
-        .bind(id, motivazione),
-      c.env.DB
-        .prepare(
-          `DELETE FROM prenotazioni WHERE richiesta_id = ?1
-           AND EXISTS (SELECT 1 FROM richieste ann WHERE ann.id = ?2 AND ann.stato = 'approvata')`,
-        )
-        .bind(originaria.id, id),
-      c.env.DB
-        .prepare(
-          `UPDATE richieste SET stato = 'annullata', annullata_at = datetime('now')
-           WHERE id = ?1 AND stato = 'approvata'
-           AND EXISTS (SELECT 1 FROM richieste ann WHERE ann.id = ?2 AND ann.stato = 'approvata')`,
-        )
-        .bind(originaria.id, id),
-    ]);
+    // Passi 1-3 comuni: approvazione, slot attuali liberati, prenotazione
+    // originaria aggiornata (annullata, oppure portata ai nuovi estremi).
+    const approvazione = c.env.DB
+      .prepare(
+        `UPDATE richieste SET stato = 'approvata', decisa_at = datetime('now'), motivazione = ?2
+         WHERE id = ?1 AND stato = 'in_attesa'`,
+      )
+      .bind(id, motivazione);
+    const liberaSlot = c.env.DB
+      .prepare(
+        `DELETE FROM prenotazioni WHERE richiesta_id = ?1
+         AND EXISTS (SELECT 1 FROM richieste m WHERE m.id = ?2 AND m.stato = 'approvata')`,
+      )
+      .bind(originaria.id, id);
+
+    if (richiesta.tipo === 'annullamento') {
+      const esiti = await c.env.DB.batch([
+        approvazione,
+        liberaSlot,
+        c.env.DB
+          .prepare(
+            `UPDATE richieste SET stato = 'annullata', annullata_at = datetime('now')
+             WHERE id = ?1 AND stato = 'approvata'
+             AND EXISTS (SELECT 1 FROM richieste m WHERE m.id = ?2 AND m.stato = 'approvata')`,
+          )
+          .bind(originaria.id, id),
+      ]);
+      if ((esiti[0].meta.changes ?? 0) === 0) return c.json({ errore: 'La richiesta non è più in attesa' }, 409);
+
+      await scriviAudit(
+        c.env.DB,
+        'annullamento_approvato',
+        `richiesta ${originaria.id} annullata su richiesta ${id} (${richiesta.data} ${richiesta.ora_inizio}-${richiesta.ora_fine}) — motivazione: ${motivazione}`,
+        'admin',
+      );
+      notificaAnnullamentoApprovato(c, societaDaNotificare, [richiesta], motivazione);
+      return c.json({ ok: true, slot_liberati: esiti[1].meta.changes ?? 0 });
+    }
+
+    // Modifica: i nuovi estremi sono quelli della richiesta di modifica.
+    const nuoveChiavi = slotKeys(richiesta.data, richiesta.ora_inizio, richiesta.ora_fine);
+    const conflittiPrevisti = await trovaConflitti(c.env.DB, nuoveChiavi, [originaria.id]);
+    if (conflittiPrevisti.length > 0) {
+      return c.json({ errore: 'Impossibile approvare la modifica: alcuni slot sono già occupati', conflitti: conflittiPrevisti }, 409);
+    }
+    const cambiaData = richiesta.data !== originaria.data;
+    let esiti: D1Result[];
+    try {
+      esiti = await c.env.DB.batch([
+        approvazione,
+        liberaSlot,
+        c.env.DB
+          .prepare(
+            `UPDATE richieste
+             SET data = ?3, ora_inizio = ?4, ora_fine = ?5, titolo = ?6, note = ?7,
+                 ricorrenza_id = CASE WHEN ?8 THEN NULL ELSE ricorrenza_id END
+             WHERE id = ?1 AND stato = 'approvata'
+             AND EXISTS (SELECT 1 FROM richieste m WHERE m.id = ?2 AND m.stato = 'approvata')`,
+          )
+          .bind(originaria.id, id, richiesta.data, richiesta.ora_inizio, richiesta.ora_fine, richiesta.titolo, richiesta.note, cambiaData ? 1 : 0),
+        ...istruzioniInserimentoSlot(c.env.DB, nuoveChiavi.map((chiave) => ({ chiave, richiestaId: originaria.id })), { modifica: id }),
+      ]);
+    } catch (errore) {
+      if (!eConflittoSlot(errore)) throw errore;
+      const conflitti = await trovaConflitti(c.env.DB, nuoveChiavi, [originaria.id]);
+      return c.json({ errore: 'Impossibile approvare la modifica: alcuni slot sono già occupati', conflitti }, 409);
+    }
     if ((esiti[0].meta.changes ?? 0) === 0) return c.json({ errore: 'La richiesta non è più in attesa' }, 409);
 
     await scriviAudit(
       c.env.DB,
-      'annullamento_approvato',
-      `richiesta ${originaria.id} annullata su richiesta ${id} (${richiesta.data} ${richiesta.ora_inizio}-${richiesta.ora_fine}) — motivazione: ${motivazione}`,
+      'modifica_approvata',
+      `richiesta ${originaria.id} portata a ${richiesta.data} ${richiesta.ora_inizio}-${richiesta.ora_fine} su richiesta ${id} — motivazione: ${motivazione}`,
       'admin',
     );
-    notificaAnnullamentoApprovato(c, { nome: richiesta.societa_nome, email: richiesta.societa_email }, richiesta, motivazione);
-    return c.json({ ok: true, slot_liberati: esiti[1].meta.changes ?? 0 });
+    notificaModificaApprovata(c, societaDaNotificare, [originaria], [richiesta], motivazione);
+    return c.json({ ok: true, slot_liberati: esiti[1].meta.changes ?? 0, slot_inseriti: nuoveChiavi.length });
   }
 
   const chiavi = slotKeys(richiesta.data, richiesta.ora_inizio, richiesta.ora_fine);
@@ -228,7 +317,7 @@ admin.post('/richieste/:id/approva', async (c) => {
     `richiesta ${id} (${richiesta.data} ${richiesta.ora_inizio}-${richiesta.ora_fine}) — motivazione: ${motivazione}`,
     'admin',
   );
-  notificaRichiestaApprovata(c, { nome: richiesta.societa_nome, email: richiesta.societa_email }, richiesta, motivazione);
+  notificaRichiestaApprovata(c, societaDaNotificare, richiesta, motivazione);
   return c.json({ ok: true, slot_inseriti: chiavi.length });
 });
 
@@ -239,15 +328,16 @@ admin.post('/richieste/:id/rifiuta', async (c) => {
   const motivazione = motivazioneDecisione(corpo?.motivazione);
   if (motivazione === null) return c.json({ errore: ERRORE_MOTIVAZIONE }, 400);
 
-  // La lettura serve solo per i dettagli della notifica email: la guardia di
-  // stato resta nell'UPDATE, che decide da solo l'esito della chiamata.
+  // La lettura serve ai dettagli della notifica email e alla guardia sul
+  // gruppo: quella di stato resta nell'UPDATE, che decide da solo l'esito.
   const richiesta = await c.env.DB
     .prepare(
-      `SELECT r.data, r.ora_inizio, r.ora_fine, r.tipo, r.titolo, s.nome AS societa_nome, s.email AS societa_email
+      `SELECT r.data, r.ora_inizio, r.ora_fine, r.tipo, r.titolo, r.gruppo_id, s.nome AS societa_nome, s.email AS societa_email
        FROM richieste r JOIN societa s ON s.id = r.societa_id WHERE r.id = ?1`,
     )
     .bind(id)
     .first<RichiestaRow & { societa_nome: string; societa_email: string }>();
+  if (richiesta?.gruppo_id) return c.json({ errore: ERRORE_GRUPPO }, 409);
 
   const esito = await c.env.DB
     .prepare(
@@ -259,28 +349,62 @@ admin.post('/richieste/:id/rifiuta', async (c) => {
   if ((esito.meta.changes ?? 0) === 0) return c.json({ errore: 'Richiesta non trovata o non più in attesa' }, 409);
   await scriviAudit(c.env.DB, 'richiesta_rifiutata', `richiesta ${id} — motivazione: ${motivazione}`, 'admin');
   if (richiesta) {
-    notificaRichiestaRifiutata(c, { nome: richiesta.societa_nome, email: richiesta.societa_email }, richiesta, richiesta.tipo, motivazione);
+    notificaRichiestaRifiutata(c, { nome: richiesta.societa_nome, email: richiesta.societa_email }, [richiesta], richiesta.tipo, motivazione);
   }
   return c.json({ ok: true });
 });
 
 /**
- * Cancellazione di una singola data da parte dell'admin. Le occorrenze di una
- * ricorrenza materializzata sono richieste indipendenti, quindi questa
- * operazione non rompe mai il resto della serie.
+ * Prenotazione approvata (tipo 'nuova', futura) su cui l'admin vuole agire dal
+ * calendario, con i dati della società per la notifica. Ritorna la risposta
+ * d'errore pronta se non si può procedere.
+ */
+async function prenotazioneDaVariare(
+  c: Context<{ Bindings: Bindings }>,
+  id: number,
+  verbo: string,
+): Promise<{ prenotazione: RichiestaConSocieta } | { risposta: Response }> {
+  const prenotazione = await c.env.DB
+    .prepare(
+      `SELECT r.*, s.stato AS societa_stato, s.nome AS societa_nome, s.email AS societa_email
+       FROM richieste r JOIN societa s ON s.id = r.societa_id WHERE r.id = ?1`,
+    )
+    .bind(id)
+    .first<RichiestaConSocieta>();
+  if (!prenotazione) return { risposta: c.json({ errore: 'Prenotazione non trovata' }, 404) };
+  if (prenotazione.tipo !== 'nuova' || prenotazione.stato !== 'approvata') {
+    return { risposta: c.json({ errore: `Si può ${verbo} solo una prenotazione approvata` }, 409) };
+  }
+  if (!eFutura(prenotazione, oraRoma(new Date()))) {
+    return { risposta: c.json({ errore: `Non si può ${verbo} una prenotazione già iniziata o passata` }, 409) };
+  }
+  return { prenotazione };
+}
+
+/**
+ * Cancellazione da parte dell'admin, immediata e senza motivazione: di una
+ * singola richiesta (in attesa o approvata) oppure, con ambito 'successive' su
+ * una prenotazione ricorrente approvata, di quella e di tutte le successive
+ * occorrenze della stessa serie. Le occorrenze di una ricorrenza materializzata
+ * sono richieste indipendenti, quindi l'ambito 'singola' non rompe mai il
+ * resto della serie. Numero di statement fisso: gli id vanno in una clausola
+ * IN (al più MAX_OCCORRENZE_RICORRENZA).
  */
 admin.post('/richieste/:id/annulla', async (c) => {
   const id = intero(c.req.param('id'));
   if (id === null) return c.json({ errore: 'Identificativo non valido' }, 400);
+  // Il corpo è facoltativo: senza, l'ambito è la singola richiesta.
+  const corpo = await leggiJson(c);
+  const ambito = ambitoVariazione(corpo?.ambito);
+  if (ambito === null) return c.json({ errore: "Ambito non valido (atteso 'singola' o 'successive')" }, 400);
 
   const richiesta = await c.env.DB
     .prepare(
-      `SELECT r.id, r.data, r.ora_inizio, r.ora_fine, r.stato, r.tipo, r.titolo, r.societa_id,
-              s.nome AS societa_nome, s.email AS societa_email
+      `SELECT r.*, s.stato AS societa_stato, s.nome AS societa_nome, s.email AS societa_email
        FROM richieste r JOIN societa s ON s.id = r.societa_id WHERE r.id = ?1`,
     )
     .bind(id)
-    .first<RichiestaRow & { societa_nome: string; societa_email: string }>();
+    .first<RichiestaConSocieta>();
   if (!richiesta) return c.json({ errore: 'Richiesta non trovata' }, 404);
   if (richiesta.stato !== 'in_attesa' && richiesta.stato !== 'approvata') {
     return c.json({ errore: 'La richiesta è già stata rifiutata o annullata' }, 409);
@@ -288,28 +412,315 @@ admin.post('/richieste/:id/annulla', async (c) => {
   if (richiesta.data < oraRoma(new Date()).data) {
     return c.json({ errore: 'Non si possono annullare date già passate' }, 409);
   }
+  if (ambito === 'successive' && (richiesta.tipo !== 'nuova' || richiesta.stato !== 'approvata')) {
+    return c.json({ errore: "L'ambito 'successive' vale solo per una prenotazione approvata" }, 409);
+  }
 
+  const occorrenze = await occorrenzeDaVariare(c.env.DB, richiesta, ambito);
+  const { segnaposto, ids } = elencoId(occorrenze);
   const esiti = await c.env.DB.batch([
-    c.env.DB.prepare('DELETE FROM prenotazioni WHERE richiesta_id = ?1').bind(id),
+    c.env.DB.prepare(`DELETE FROM prenotazioni WHERE richiesta_id IN (${segnaposto})`).bind(...ids),
     c.env.DB
       .prepare(
         `UPDATE richieste SET stato = 'annullata', annullata_at = datetime('now')
-         WHERE id = ?1 AND stato IN ('in_attesa', 'approvata')`,
+         WHERE id IN (${segnaposto}) AND stato IN ('in_attesa', 'approvata')`,
       )
-      .bind(id),
-    // Le eventuali richieste di annullamento pendenti che puntavano a questa
-    // prenotazione decadono con essa (non resterebbero approvabili comunque).
+      .bind(...ids),
+    // Le eventuali richieste di annullamento o modifica pendenti che puntavano
+    // a queste prenotazioni decadono con esse (non resterebbero approvabili).
     c.env.DB
       .prepare(
         `UPDATE richieste SET stato = 'annullata', annullata_at = datetime('now')
-         WHERE richiesta_riferimento_id = ?1 AND tipo = 'annullamento' AND stato = 'in_attesa'`,
+         WHERE richiesta_riferimento_id IN (${segnaposto}) AND stato = 'in_attesa'`,
       )
-      .bind(id),
+      .bind(...ids),
   ]);
-  if ((esiti[1].meta.changes ?? 0) === 0) return c.json({ errore: 'La richiesta risulta già decisa o annullata' }, 409);
-  await scriviAudit(c.env.DB, 'richiesta_annullata', `richiesta ${id} (${richiesta.data} ${richiesta.ora_inizio}-${richiesta.ora_fine})`, 'admin');
-  notificaAnnullataDaAdmin(c, { nome: richiesta.societa_nome, email: richiesta.societa_email }, richiesta, richiesta.tipo);
-  return c.json({ ok: true, slot_liberati: esiti[0].meta.changes ?? 0 });
+  const annullate = esiti[1].meta.changes ?? 0;
+  if (annullate === 0) return c.json({ errore: 'La richiesta risulta già decisa o annullata' }, 409);
+  await scriviAudit(
+    c.env.DB,
+    'richiesta_annullata',
+    `richieste ${ids.join(', ')} (${occorrenze.map((o) => o.data).join(', ')} ${richiesta.ora_inizio}-${richiesta.ora_fine})`,
+    'admin',
+  );
+  notificaAnnullataDaAdmin(c, { nome: richiesta.societa_nome, email: richiesta.societa_email }, occorrenze, richiesta.tipo);
+  return c.json({ ok: true, richieste_annullate: annullate, slot_liberati: esiti[0].meta.changes ?? 0 });
+});
+
+/**
+ * Modifica DIRETTA di una prenotazione approvata da parte dell'admin (data,
+ * orario, attività, note), immediata e senza motivazione, con notifica alla
+ * società. Con ambito 'successive' su una prenotazione ricorrente si applica a
+ * quella e alle successive occorrenze della serie: orario, attività e note, mai
+ * la data (vedi variazioni.campiModifica). Se cambia la data, l'occorrenza
+ * esce dalla ricorrenza (ricorrenza_id = NULL).
+ *
+ * Un solo db.batch() atomico, con numero di statement limitato: DELETE degli
+ * slot attuali e UPDATE delle occorrenze per clausola IN, decadenza delle
+ * richieste pendenti riferite, poi gli INSERT dei nuovi slot a blocchi. Un
+ * conflitto su un qualsiasi nuovo slot annulla tutto.
+ */
+admin.patch('/richieste/:id', async (c) => {
+  const id = intero(c.req.param('id'));
+  if (id === null) return c.json({ errore: 'Identificativo non valido' }, 400);
+  const corpo = await leggiJson(c);
+  if (!corpo) return c.json({ errore: 'Corpo della richiesta non valido' }, 400);
+  const ambito = ambitoVariazione(corpo.ambito);
+  if (ambito === null) return c.json({ errore: "Ambito non valido (atteso 'singola' o 'successive')" }, 400);
+
+  const lettura = await prenotazioneDaVariare(c, id, 'modificare');
+  if ('risposta' in lettura) return lettura.risposta;
+  const { prenotazione } = lettura;
+
+  const campi = campiModifica(corpo, ambito, prenotazione.data);
+  if ('errore' in campi) return c.json({ errore: campi.errore }, 400);
+  if (modificaSenzaEffetto(campi, prenotazione)) return c.json({ errore: 'Nessuna modifica rispetto alla prenotazione attuale' }, 400);
+  if (!eFutura({ data: campi.data ?? prenotazione.data, ora_inizio: campi.oraInizio }, oraRoma(new Date()))) {
+    return c.json({ errore: 'La prenotazione modificata deve iniziare nel futuro' }, 400);
+  }
+
+  const occorrenze = await occorrenzeDaVariare(c.env.DB, prenotazione, ambito);
+  const { segnaposto, ids } = elencoId(occorrenze);
+  const nuoveChiavi = chiaviDopoModifica(campi, occorrenze);
+  const conflittiPrevisti = await trovaConflitti(c.env.DB, nuoveChiavi, ids);
+  if (conflittiPrevisti.length > 0) {
+    return c.json({ errore: 'Impossibile modificare: alcuni slot sono già occupati', conflitti: conflittiPrevisti }, 409);
+  }
+
+  let esiti: D1Result[];
+  try {
+    esiti = await c.env.DB.batch([
+      c.env.DB.prepare(`DELETE FROM prenotazioni WHERE richiesta_id IN (${segnaposto})`).bind(...ids),
+      // La data cambia solo con ambito 'singola' (una sola occorrenza): con
+      // campi.data NULL ogni occorrenza conserva la propria e resta nella serie.
+      c.env.DB
+        .prepare(
+          `UPDATE richieste
+           SET data = COALESCE(?1, data), ora_inizio = ?2, ora_fine = ?3, titolo = ?4, note = ?5,
+               ricorrenza_id = CASE WHEN ?1 IS NULL THEN ricorrenza_id ELSE NULL END
+           WHERE id IN (${segnaposto}) AND stato = 'approvata'`,
+        )
+        .bind(campi.data, campi.oraInizio, campi.oraFine, campi.titolo, campi.note, ...ids),
+      c.env.DB
+        .prepare(
+          `UPDATE richieste SET stato = 'annullata', annullata_at = datetime('now')
+           WHERE richiesta_riferimento_id IN (${segnaposto}) AND stato = 'in_attesa'`,
+        )
+        .bind(...ids),
+      ...istruzioniInserimentoSlot(c.env.DB, slotDopoModifica(campi, occorrenze)),
+    ]);
+  } catch (errore) {
+    if (!eConflittoSlot(errore)) throw errore;
+    const conflitti = await trovaConflitti(c.env.DB, nuoveChiavi, ids);
+    return c.json({ errore: 'Impossibile modificare: alcuni slot sono già occupati', conflitti }, 409);
+  }
+
+  const modificate = esiti[1].meta.changes ?? 0;
+  const dopo = occorrenze.map((occorrenza) => ({
+    data: dataDopoModifica(campi, occorrenza),
+    ora_inizio: campi.oraInizio,
+    ora_fine: campi.oraFine,
+    titolo: campi.titolo,
+  }));
+  await scriviAudit(
+    c.env.DB,
+    'prenotazione_modificata',
+    `richieste ${ids.join(', ')} portate a ${dopo.map((d) => d.data).join(', ')} ${campi.oraInizio}-${campi.oraFine}`,
+    'admin',
+  );
+  notificaModificataDaAdmin(c, { nome: prenotazione.societa_nome, email: prenotazione.societa_email }, occorrenze, dopo);
+  return c.json({ ok: true, richieste_modificate: modificate, slot_inseriti: nuoveChiavi.length, date: dopo.map((d) => d.data) });
+});
+
+// ---------------------------------------------------------------------------
+// Gruppi di richieste (annullamento o modifica su più occorrenze)
+// ---------------------------------------------------------------------------
+
+/** Membri in attesa di un gruppo, con la prenotazione riferita di ciascuno. */
+type MembroGruppo = RichiestaRow & {
+  societa_stato: string;
+  societa_nome: string;
+  societa_email: string;
+  rif_stato: string | null;
+  rif_tipo: string | null;
+  rif_data: string | null;
+  rif_ora_inizio: string | null;
+  rif_ora_fine: string | null;
+  rif_titolo: string | null;
+  rif_note: string | null;
+};
+
+async function membriInAttesa(db: D1Database, gruppo: string): Promise<MembroGruppo[]> {
+  const { results } = await db
+    .prepare(
+      `SELECT r.*, s.stato AS societa_stato, s.nome AS societa_nome, s.email AS societa_email,
+              o.stato AS rif_stato, o.tipo AS rif_tipo, o.data AS rif_data, o.ora_inizio AS rif_ora_inizio,
+              o.ora_fine AS rif_ora_fine, o.titolo AS rif_titolo, o.note AS rif_note
+       FROM richieste r
+       JOIN societa s ON s.id = r.societa_id
+       LEFT JOIN richieste o ON o.id = r.richiesta_riferimento_id
+       WHERE r.gruppo_id = ?1 AND r.stato = 'in_attesa'
+       ORDER BY r.data, r.ora_inizio LIMIT ${MAX_OCCORRENZE_RICORRENZA}`,
+    )
+    .bind(gruppo)
+    .all<MembroGruppo>();
+  return results;
+}
+
+/** Estremi della prenotazione riferita da un membro, per le notifiche. */
+function estremiRiferiti(membro: MembroGruppo): { data: string; ora_inizio: string; ora_fine: string; titolo: string } {
+  return { data: membro.rif_data!, ora_inizio: membro.rif_ora_inizio!, ora_fine: membro.rif_ora_fine!, titolo: membro.rif_titolo! };
+}
+
+/**
+ * Approvazione di un GRUPPO di richieste (tutte di annullamento o tutte di
+ * modifica, sulla stessa serie): una decisione, una motivazione, un solo
+ * db.batch() atomico, una sola email. Stessa logica dell'approvazione singola,
+ * ma per insiemi: i membri passano ad 'approvata' (guardia su 'in_attesa') e
+ * ogni passo successivo agisce solo sulle prenotazioni riferite da un membro
+ * che risulta approvato (guardia EXISTS sul gruppo), così una decisione
+ * concorrente su qualche membro non lascia mai slot orfani.
+ *
+ * I membri la cui data è già passata non sono più approvabili: decadono
+ * ('annullata') nello stesso batch e il resto del gruppo procede.
+ */
+admin.post('/gruppi/:gruppo/approva', async (c) => {
+  const gruppo = idGruppo(c.req.param('gruppo'));
+  if (gruppo === null) return c.json({ errore: 'Identificativo di gruppo non valido' }, 400);
+  const corpo = await leggiJson(c);
+  const motivazione = motivazioneDecisione(corpo?.motivazione);
+  if (motivazione === null) return c.json({ errore: ERRORE_MOTIVAZIONE }, 400);
+
+  const membri = await membriInAttesa(c.env.DB, gruppo);
+  if (membri.length === 0) return c.json({ errore: 'Il gruppo non ha richieste in attesa' }, 409);
+  const tipo = membri[0].tipo;
+  if (tipo === 'nuova' || membri.some((m) => m.tipo !== tipo || m.societa_id !== membri[0].societa_id)) {
+    return c.json({ errore: 'Gruppo incoerente' }, 409);
+  }
+  if (membri[0].societa_stato !== 'attiva') return c.json({ errore: 'La società è sospesa' }, 409);
+  if (membri.some((m) => m.rif_stato !== 'approvata' || m.rif_tipo !== 'nuova')) {
+    return c.json({ errore: 'Una delle prenotazioni del gruppo non è più attiva' }, 409);
+  }
+  const oggi = oraRoma(new Date()).data;
+  const futuri = membri.filter((m) => m.data >= oggi);
+  if (futuri.length === 0) return c.json({ errore: 'Tutte le date del gruppo sono già passate' }, 409);
+  const { segnaposto: segnapostoFuturi, ids: idFuturi } = elencoId(futuri);
+  const societaDaNotificare = { nome: membri[0].societa_nome, email: membri[0].societa_email };
+
+  const approvaMembri = c.env.DB
+    .prepare(
+      `UPDATE richieste SET stato = 'approvata', decisa_at = datetime('now'), motivazione = ?1
+       WHERE gruppo_id = ?2 AND stato = 'in_attesa' AND id IN (${segnapostoFuturi})`,
+    )
+    .bind(motivazione, gruppo, ...idFuturi);
+  // Dopo l'approvazione dei futuri restano in attesa solo i membri passati.
+  const decadonoPassati = c.env.DB
+    .prepare("UPDATE richieste SET stato = 'annullata', annullata_at = datetime('now') WHERE gruppo_id = ?1 AND stato = 'in_attesa'")
+    .bind(gruppo);
+  const riferiteApprovate = `SELECT m.richiesta_riferimento_id FROM richieste m WHERE m.gruppo_id = ?1 AND m.stato = 'approvata'`;
+  const liberaSlot = c.env.DB.prepare(`DELETE FROM prenotazioni WHERE richiesta_id IN (${riferiteApprovate})`).bind(gruppo);
+
+  if (tipo === 'annullamento') {
+    const esiti = await c.env.DB.batch([
+      approvaMembri,
+      decadonoPassati,
+      liberaSlot,
+      c.env.DB
+        .prepare(
+          `UPDATE richieste SET stato = 'annullata', annullata_at = datetime('now')
+           WHERE stato = 'approvata' AND id IN (${riferiteApprovate})`,
+        )
+        .bind(gruppo),
+    ]);
+    const approvate = esiti[0].meta.changes ?? 0;
+    if (approvate === 0) return c.json({ errore: 'Il gruppo non è più in attesa' }, 409);
+    await scriviAudit(
+      c.env.DB,
+      'annullamento_approvato',
+      `gruppo ${gruppo}: annullate ${approvate} prenotazioni (${futuri.map((m) => m.data).join(', ')}) — motivazione: ${motivazione}`,
+      'admin',
+    );
+    notificaAnnullamentoApprovato(c, societaDaNotificare, futuri.map(estremiRiferiti), motivazione);
+    return c.json({ ok: true, richieste_approvate: approvate, slot_liberati: esiti[2].meta.changes ?? 0 });
+  }
+
+  // Modifica di gruppo: stessi nuovi orario/attività/note per tutte le
+  // occorrenze e data invariata (così nascono, vedi routes/societa.ts).
+  const nuovi = futuri[0];
+  if (futuri.some((m) => m.data !== m.rif_data || m.ora_inizio !== nuovi.ora_inizio || m.ora_fine !== nuovi.ora_fine)) {
+    return c.json({ errore: 'Gruppo di modifica incoerente' }, 409);
+  }
+  const slotNuovi = futuri.flatMap((m) =>
+    slotKeys(m.data, m.ora_inizio, m.ora_fine).map((chiave) => ({ chiave, richiestaId: m.richiesta_riferimento_id! })),
+  );
+  const nuoveChiavi = slotNuovi.map((s) => s.chiave);
+  const idRiferite = futuri.map((m) => m.richiesta_riferimento_id!);
+  const conflittiPrevisti = await trovaConflitti(c.env.DB, nuoveChiavi, idRiferite);
+  if (conflittiPrevisti.length > 0) {
+    return c.json({ errore: 'Impossibile approvare la modifica: alcuni slot sono già occupati', conflitti: conflittiPrevisti }, 409);
+  }
+
+  let esiti: D1Result[];
+  try {
+    esiti = await c.env.DB.batch([
+      approvaMembri,
+      decadonoPassati,
+      liberaSlot,
+      c.env.DB
+        .prepare(
+          `UPDATE richieste SET ora_inizio = ?2, ora_fine = ?3, titolo = ?4, note = ?5
+           WHERE stato = 'approvata' AND id IN (${riferiteApprovate})`,
+        )
+        .bind(gruppo, nuovi.ora_inizio, nuovi.ora_fine, nuovi.titolo, nuovi.note),
+      ...istruzioniInserimentoSlot(c.env.DB, slotNuovi, { gruppo }),
+    ]);
+  } catch (errore) {
+    if (!eConflittoSlot(errore)) throw errore;
+    const conflitti = await trovaConflitti(c.env.DB, nuoveChiavi, idRiferite);
+    return c.json({ errore: 'Impossibile approvare la modifica: alcuni slot sono già occupati', conflitti }, 409);
+  }
+  const approvate = esiti[0].meta.changes ?? 0;
+  if (approvate === 0) return c.json({ errore: 'Il gruppo non è più in attesa' }, 409);
+  await scriviAudit(
+    c.env.DB,
+    'modifica_approvata',
+    `gruppo ${gruppo}: ${approvate} prenotazioni portate a ${nuovi.ora_inizio}-${nuovi.ora_fine} (${futuri.map((m) => m.data).join(', ')}) — motivazione: ${motivazione}`,
+    'admin',
+  );
+  notificaModificaApprovata(c, societaDaNotificare, futuri.map(estremiRiferiti), futuri, motivazione);
+  return c.json({ ok: true, richieste_approvate: approvate, slot_liberati: esiti[2].meta.changes ?? 0, slot_inseriti: nuoveChiavi.length });
+});
+
+/** Rifiuto di un intero gruppo, con motivazione: le prenotazioni riferite restano com'erano. */
+admin.post('/gruppi/:gruppo/rifiuta', async (c) => {
+  const gruppo = idGruppo(c.req.param('gruppo'));
+  if (gruppo === null) return c.json({ errore: 'Identificativo di gruppo non valido' }, 400);
+  const corpo = await leggiJson(c);
+  const motivazione = motivazioneDecisione(corpo?.motivazione);
+  if (motivazione === null) return c.json({ errore: ERRORE_MOTIVAZIONE }, 400);
+
+  // Lettura per la notifica: la guardia di stato resta nell'UPDATE.
+  const membri = await membriInAttesa(c.env.DB, gruppo);
+  const esito = await c.env.DB
+    .prepare(
+      `UPDATE richieste SET stato = 'rifiutata', decisa_at = datetime('now'), motivazione = ?2
+       WHERE gruppo_id = ?1 AND stato = 'in_attesa'`,
+    )
+    .bind(gruppo, motivazione)
+    .run();
+  const rifiutate = esito.meta.changes ?? 0;
+  if (rifiutate === 0) return c.json({ errore: 'Gruppo non trovato o non più in attesa' }, 409);
+  await scriviAudit(c.env.DB, 'richiesta_rifiutata', `gruppo ${gruppo}: ${rifiutate} richieste — motivazione: ${motivazione}`, 'admin');
+  if (membri.length > 0) {
+    notificaRichiestaRifiutata(
+      c,
+      { nome: membri[0].societa_nome, email: membri[0].societa_email },
+      membri.map(estremiRiferiti),
+      membri[0].tipo,
+      motivazione,
+    );
+  }
+  return c.json({ ok: true, richieste_rifiutate: rifiutate });
 });
 
 // ---------------------------------------------------------------------------
@@ -711,14 +1122,15 @@ admin.post('/societa/:id/rigenera-token', async (c) => {
 /**
  * Calendario dell'admin: come quello pubblico accetta `settimana=AAAA-MM-GG`
  * oppure `mese=AAAA-MM` (griglia mensile, settimane intere), ma ogni slot porta
- * anche società, colore e titolo dell'attività.
+ * anche società, colore, titolo dell'attività, note e ricorrenza (il popup dei
+ * dettagli propone l'ambito "questa e le successive" solo se c'è una serie).
  */
 admin.get('/calendario', async (c) => {
   const intervallo = intervalloCalendario(c.req.query('settimana'), c.req.query('mese'), new Date());
   if (intervallo.tipo === 'errore') return c.json({ errore: intervallo.messaggio }, 400);
   const { results } = await c.env.DB
     .prepare(
-      `SELECT p.slot_key, p.societa_id, s.nome AS societa, s.colore, p.richiesta_id, r.titolo
+      `SELECT p.slot_key, p.societa_id, s.nome AS societa, s.colore, p.richiesta_id, r.titolo, r.note, r.ricorrenza_id
        FROM prenotazioni p
        JOIN societa s ON s.id = p.societa_id
        JOIN richieste r ON r.id = p.richiesta_id

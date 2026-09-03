@@ -113,6 +113,65 @@ function righeRichiesta(richiesta: EstremiRichiesta): string[] {
 }
 
 /**
+ * Righe di dettaglio per una o più occorrenze con lo stesso orario (una
+ * richiesta di annullamento o modifica su "questa e le successive"): con una
+ * sola occorrenza è la riga classica, altrimenti l'elenco delle date e
+ * l'orario comune, così l'email di un gruppo di 12 date resta leggibile.
+ */
+function righeOccorrenze(richieste: EstremiRichiesta[]): string[] {
+  if (richieste.length === 1) return righeRichiesta(richieste[0]);
+  const prima = richieste[0];
+  const righe = [
+    `Date (${richieste.length}): ${richieste.map((richiesta) => dataItaliana(richiesta.data)).join(', ')}`,
+    `Orario: dalle ${prima.ora_inizio} alle ${prima.ora_fine}`,
+  ];
+  if (prima.titolo) righe.unshift(`Attività: ${prima.titolo}`);
+  return righe;
+}
+
+/**
+ * Righe "prima → dopo" di una modifica. `prima` e `dopo` sono allineati per
+ * indice (stessa occorrenza). Su una singola occorrenza si mostrano i due
+ * estremi completi; su più occorrenze le date non cambiano (una modifica di
+ * serie non le tocca), quindi si elencano una volta sola con i due orari.
+ * L'attività compare solo se cambia, così da non ripetere l'ovvio.
+ */
+function righeVariazione(prima: EstremiRichiesta[], dopo: EstremiRichiesta[]): string[] {
+  const righe: string[] = [];
+  if (prima.length === 1) {
+    righe.push(
+      `Prima: ${dataItaliana(prima[0].data)}, dalle ${prima[0].ora_inizio} alle ${prima[0].ora_fine}`,
+      `Dopo: ${dataItaliana(dopo[0].data)}, dalle ${dopo[0].ora_inizio} alle ${dopo[0].ora_fine}`,
+    );
+  } else {
+    righe.push(
+      `Date (${dopo.length}): ${dopo.map((richiesta) => dataItaliana(richiesta.data)).join(', ')}`,
+      `Orario prima: dalle ${prima[0].ora_inizio} alle ${prima[0].ora_fine}`,
+      `Orario dopo: dalle ${dopo[0].ora_inizio} alle ${dopo[0].ora_fine}`,
+    );
+  }
+  if (dopo[0].titolo && dopo[0].titolo !== prima[0].titolo) {
+    righe.unshift(`Attività: ${dopo[0].titolo} (prima: ${prima[0].titolo ?? '—'})`);
+  } else if (dopo[0].titolo) {
+    righe.unshift(`Attività: ${dopo[0].titolo}`);
+  }
+  return righe;
+}
+
+/** Etichetta dell'evento a partire dal tipo di richiesta (nome al femminile). */
+function nomeTipo(tipo: string): string {
+  if (tipo === 'annullamento') return 'di annullamento';
+  if (tipo === 'modifica') return 'di modifica';
+  return 'di prenotazione';
+}
+
+/** Data nell'oggetto: la sola data, oppure la prima con il conteggio. */
+function dateOggetto(richieste: EstremiRichiesta[]): string {
+  if (richieste.length === 1) return dataItaliana(richieste[0].data);
+  return `${richieste.length} date dal ${dataItaliana(richieste[0].data)}`;
+}
+
+/**
  * Righe di dettaglio per le note libere della società. Usate SOLO negli
  * eventi di creazione ("richiesta inviata/ricevuta"), dove la società le ha
  * appena scritte e servono all'admin per decidere; gli altri eventi non le
@@ -290,38 +349,85 @@ export function notificaRicorrenzaInviata(c: ContestoNotifica, societa: SocietaD
   });
 }
 
-/** Società: richiesta in attesa ritirata (nuova o di annullamento). */
+/**
+ * Società: richiesta in attesa ritirata (di prenotazione, di annullamento o
+ * di modifica; più occorrenze se era un gruppo).
+ */
 export function notificaRichiestaRitirata(
   c: ContestoNotifica,
   societa: SocietaDaNotificare,
-  richiesta: EstremiRichiesta,
+  richieste: EstremiRichiesta[],
   tipo: string,
 ): void {
-  const eAnnullamento = tipo === 'annullamento';
+  const restaConfermata = tipo === 'annullamento' || tipo === 'modifica';
+  const plurale = richieste.length > 1;
   inviaNotifica(c, {
-    oggetto: eAnnullamento
-      ? `Richiesta di annullamento ritirata — ${dataItaliana(richiesta.data)}`
-      : `Richiesta di prenotazione ritirata — ${dataItaliana(richiesta.data)}`,
-    messaggio: eAnnullamento
-      ? 'la richiesta di annullamento è stata ritirata dalla società: la prenotazione resta confermata.'
+    oggetto: `Richiesta ${nomeTipo(tipo)} ritirata — ${dateOggetto(richieste)}`,
+    messaggio: restaConfermata
+      ? `la richiesta ${nomeTipo(tipo)} è stata ritirata dalla società: ${plurale ? 'le prenotazioni restano confermate' : 'la prenotazione resta confermata'} così ${plurale ? 'come erano' : "com'era"}.`
       : 'la richiesta di prenotazione è stata ritirata dalla società.',
-    messaggioAdmin: eAnnullamento
-      ? `La società ${societa.nome} ha ritirato la richiesta di annullamento: la prenotazione resta confermata.`
+    messaggioAdmin: restaConfermata
+      ? `La società ${societa.nome} ha ritirato la richiesta ${nomeTipo(tipo)}: ${plurale ? 'le prenotazioni restano confermate' : 'la prenotazione resta confermata'}.`
       : `La società ${societa.nome} ha ritirato la richiesta di prenotazione.`,
-    dettagli: righeRichiesta(richiesta),
+    dettagli: righeOccorrenze(richieste),
     societa,
   });
 }
 
-/** Società: inviata la richiesta di annullamento di una prenotazione approvata. */
-export function notificaAnnullamentoRichiesto(c: ContestoNotifica, societa: SocietaDaNotificare, richiesta: EstremiRichiesta): void {
+/** Società: inviata la richiesta di annullamento di una o più prenotazioni approvate. */
+export function notificaAnnullamentoRichiesto(c: ContestoNotifica, societa: SocietaDaNotificare, richieste: EstremiRichiesta[]): void {
+  const plurale = richieste.length > 1;
   inviaNotifica(c, {
-    oggetto: `Richiesta di annullamento inviata — ${dataItaliana(richiesta.data)}`,
-    oggettoAdmin: `Richiesta di annullamento ricevuta — ${dataItaliana(richiesta.data)}`,
-    messaggio:
-      "è stata inviata la richiesta di annullamento della prenotazione. Gli slot restano prenotati finché l'amministratore non la conferma.",
-    messaggioAdmin: `La società ${societa.nome} ha richiesto l'annullamento di una prenotazione approvata. Gli slot restano prenotati finché la richiesta non viene decisa.`,
-    dettagli: righeRichiesta(richiesta),
+    oggetto: `Richiesta di annullamento inviata — ${dateOggetto(richieste)}`,
+    oggettoAdmin: `Richiesta di annullamento ricevuta — ${dateOggetto(richieste)}`,
+    messaggio: `è stata inviata la richiesta di annullamento ${plurale ? 'delle prenotazioni elencate' : 'della prenotazione'}. Gli slot restano prenotati finché l'amministratore non la conferma.`,
+    messaggioAdmin: `La società ${societa.nome} ha richiesto l'annullamento di ${plurale ? `${richieste.length} prenotazioni approvate` : 'una prenotazione approvata'}. Gli slot restano prenotati finché la richiesta non viene decisa.`,
+    dettagli: righeOccorrenze(richieste),
+    societa,
+  });
+}
+
+/** Società: inviata la richiesta di modifica di una o più prenotazioni approvate. */
+export function notificaModificaRichiesta(
+  c: ContestoNotifica,
+  societa: SocietaDaNotificare,
+  prima: EstremiRichiesta[],
+  dopo: EstremiRichiesta[],
+): void {
+  const plurale = prima.length > 1;
+  inviaNotifica(c, {
+    oggetto: `Richiesta di modifica inviata — ${dateOggetto(prima)}`,
+    oggettoAdmin: `Richiesta di modifica ricevuta — ${dateOggetto(prima)}`,
+    messaggio: `è stata inviata la richiesta di modifica ${plurale ? 'delle prenotazioni elencate' : 'della prenotazione'}. Fino alla decisione dell'amministratore ${plurale ? 'restano valide le prenotazioni attuali' : 'resta valida la prenotazione attuale'}.`,
+    messaggioAdmin: `La società ${societa.nome} ha richiesto la modifica di ${plurale ? `${prima.length} prenotazioni approvate` : 'una prenotazione approvata'}. Fino alla decisione restano validi gli estremi attuali.`,
+    dettagli: righeVariazione(prima, dopo),
+    societa,
+  });
+}
+
+/** Società: richiesta singola ancora in attesa modificata direttamente. */
+export function notificaRichiestaModificata(
+  c: ContestoNotifica,
+  societa: SocietaDaNotificare,
+  prima: EstremiRichiesta,
+  dopo: EstremiRichiesta,
+): void {
+  inviaNotifica(c, {
+    oggetto: `Richiesta di prenotazione modificata — ${dataItaliana(dopo.data)}`,
+    messaggio: "la richiesta di prenotazione in attesa è stata modificata; attende l'approvazione dell'amministratore con i nuovi estremi.",
+    messaggioAdmin: `La società ${societa.nome} ha modificato una richiesta di prenotazione ancora in attesa di approvazione.`,
+    dettagli: [...righeVariazione([prima], [dopo]), ...righeNote(dopo.note)],
+    societa,
+  });
+}
+
+/** Società: richiesta ricorrente ancora in attesa modificata direttamente. */
+export function notificaRicorrenzaModificata(c: ContestoNotifica, societa: SocietaDaNotificare, ricorrenza: EstremiRicorrenza): void {
+  inviaNotifica(c, {
+    oggetto: `Richiesta ricorrente modificata — dal ${dataItaliana(ricorrenza.valida_dal)}`,
+    messaggio: "la richiesta di prenotazione ricorrente in attesa è stata modificata; attende l'approvazione dell'amministratore con i nuovi estremi.",
+    messaggioAdmin: `La società ${societa.nome} ha modificato una richiesta di prenotazione ricorrente ancora in attesa di approvazione.`,
+    dettagli: [...righeRicorrenza(ricorrenza), ...righeNote(ricorrenza.note)],
     societa,
   });
 }
@@ -352,58 +458,98 @@ export function notificaRichiestaApprovata(
   });
 }
 
-/** Admin: richiesta rifiutata (nuova o di annullamento). */
+/**
+ * Admin: richiesta rifiutata (di prenotazione, di annullamento o di modifica;
+ * più occorrenze se era un gruppo).
+ */
 export function notificaRichiestaRifiutata(
   c: ContestoNotifica,
   societa: SocietaDaNotificare,
-  richiesta: EstremiRichiesta,
+  richieste: EstremiRichiesta[],
   tipo: string,
   motivazione: string,
 ): void {
-  const eAnnullamento = tipo === 'annullamento';
+  const restaConfermata = tipo === 'annullamento' || tipo === 'modifica';
+  const plurale = richieste.length > 1;
   inviaNotifica(c, {
-    oggetto: eAnnullamento
-      ? `Richiesta di annullamento rifiutata — ${dataItaliana(richiesta.data)}`
-      : `Richiesta di prenotazione rifiutata — ${dataItaliana(richiesta.data)}`,
-    messaggio: eAnnullamento
-      ? "la richiesta di annullamento è stata rifiutata dall'amministratore: la prenotazione resta confermata."
+    oggetto: `Richiesta ${nomeTipo(tipo)} rifiutata — ${dateOggetto(richieste)}`,
+    messaggio: restaConfermata
+      ? `la richiesta ${nomeTipo(tipo)} è stata rifiutata dall'amministratore: ${plurale ? 'le prenotazioni restano confermate' : 'la prenotazione resta confermata'} così ${plurale ? 'come erano' : "com'era"}.`
       : "la richiesta di prenotazione è stata rifiutata dall'amministratore.",
-    dettagli: [...righeRichiesta(richiesta), `Motivazione: ${motivazione}`],
+    dettagli: [...righeOccorrenze(richieste), `Motivazione: ${motivazione}`],
     societa,
   });
 }
 
-/** Admin: richiesta di annullamento approvata (prenotazione annullata). */
+/** Admin: richiesta di annullamento approvata (prenotazioni annullate). */
 export function notificaAnnullamentoApprovato(
   c: ContestoNotifica,
   societa: SocietaDaNotificare,
-  richiesta: EstremiRichiesta,
+  richieste: EstremiRichiesta[],
   motivazione: string,
 ): void {
+  const plurale = richieste.length > 1;
   inviaNotifica(c, {
-    oggetto: `Annullamento confermato — ${dataItaliana(richiesta.data)}`,
-    messaggio: 'la richiesta di annullamento è stata approvata: la prenotazione è annullata e gli slot sono di nuovo liberi.',
-    dettagli: [...righeRichiesta(richiesta), `Motivazione: ${motivazione}`],
+    oggetto: `Annullamento confermato — ${dateOggetto(richieste)}`,
+    messaggio: `la richiesta di annullamento è stata approvata: ${plurale ? 'le prenotazioni elencate sono annullate' : 'la prenotazione è annullata'} e gli slot sono di nuovo liberi.`,
+    dettagli: [...righeOccorrenze(richieste), `Motivazione: ${motivazione}`],
     societa,
   });
 }
 
-/** Admin: richiesta o prenotazione annullata direttamente dall'amministratore. */
+/** Admin: richiesta di modifica approvata (prenotazioni aggiornate ai nuovi estremi). */
+export function notificaModificaApprovata(
+  c: ContestoNotifica,
+  societa: SocietaDaNotificare,
+  prima: EstremiRichiesta[],
+  dopo: EstremiRichiesta[],
+  motivazione: string,
+): void {
+  const plurale = prima.length > 1;
+  inviaNotifica(c, {
+    oggetto: `Modifica confermata — ${dateOggetto(dopo)}`,
+    messaggio: `la richiesta di modifica è stata approvata: ${plurale ? 'le prenotazioni elencate sono aggiornate' : 'la prenotazione è aggiornata'} ai nuovi estremi.`,
+    dettagli: [...righeVariazione(prima, dopo), `Motivazione: ${motivazione}`],
+    societa,
+  });
+}
+
+/**
+ * Admin: richiesta o prenotazione annullata direttamente dall'amministratore
+ * (più occorrenze quando annulla "questa e le successive").
+ */
 export function notificaAnnullataDaAdmin(
   c: ContestoNotifica,
   societa: SocietaDaNotificare,
-  richiesta: EstremiRichiesta,
+  richieste: EstremiRichiesta[],
   tipo: string,
 ): void {
-  const eAnnullamento = tipo === 'annullamento';
+  const restaConfermata = tipo === 'annullamento' || tipo === 'modifica';
+  const plurale = richieste.length > 1;
   inviaNotifica(c, {
-    oggetto: eAnnullamento
-      ? `Richiesta di annullamento annullata — ${dataItaliana(richiesta.data)}`
-      : `Prenotazione annullata — ${dataItaliana(richiesta.data)}`,
-    messaggio: eAnnullamento
-      ? "la richiesta di annullamento è stata annullata dall'amministratore: la prenotazione resta confermata."
-      : "la prenotazione è stata annullata dall'amministratore.",
-    dettagli: righeRichiesta(richiesta),
+    oggetto: restaConfermata
+      ? `Richiesta ${nomeTipo(tipo)} annullata — ${dateOggetto(richieste)}`
+      : `${plurale ? 'Prenotazioni annullate' : 'Prenotazione annullata'} — ${dateOggetto(richieste)}`,
+    messaggio: restaConfermata
+      ? `la richiesta ${nomeTipo(tipo)} è stata annullata dall'amministratore: la prenotazione resta confermata così com'era.`
+      : `${plurale ? 'le prenotazioni elencate sono state annullate' : 'la prenotazione è stata annullata'} dall'amministratore.`,
+    dettagli: righeOccorrenze(richieste),
+    societa,
+  });
+}
+
+/** Admin: prenotazioni approvate modificate direttamente dall'amministratore. */
+export function notificaModificataDaAdmin(
+  c: ContestoNotifica,
+  societa: SocietaDaNotificare,
+  prima: EstremiRichiesta[],
+  dopo: EstremiRichiesta[],
+): void {
+  const plurale = prima.length > 1;
+  inviaNotifica(c, {
+    oggetto: `${plurale ? 'Prenotazioni modificate' : 'Prenotazione modificata'} — ${dateOggetto(dopo)}`,
+    messaggio: `${plurale ? 'le prenotazioni elencate sono state modificate' : 'la prenotazione è stata modificata'} dall'amministratore: valgono i nuovi estremi riportati sotto. Eventuali richieste di modifica o annullamento in attesa su queste date sono decadute.`,
+    dettagli: righeVariazione(prima, dopo),
     societa,
   });
 }

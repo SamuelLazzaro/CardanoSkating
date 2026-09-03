@@ -16,17 +16,31 @@ export function eConflittoSlot(errore: unknown): boolean {
 }
 
 /**
- * Riconosce la violazione dell'indice UNIQUE parziale della migrazione 0005:
- * esiste già una richiesta di annullamento in attesa per la stessa
- * prenotazione. A seconda della versione di SQLite il messaggio riporta la
- * colonna oppure il nome dell'indice, quindi si accettano entrambi.
+ * Riconosce la violazione dell'indice UNIQUE parziale sulle richieste
+ * pendenti riferite a una prenotazione (idx_richieste_variazione_pendente,
+ * migrazione 0009, che ha sostituito idx_richieste_annullamento_pendente
+ * della 0005): esiste già una richiesta di annullamento o di modifica in
+ * attesa per la stessa prenotazione. A seconda della versione di SQLite il
+ * messaggio riporta la colonna oppure il nome dell'indice, quindi si accettano
+ * entrambi.
  */
-export function eAnnullamentoDuplicato(errore: unknown): boolean {
+export function eVariazionePendenteDuplicata(errore: unknown): boolean {
   if (!(errore instanceof Error) || !errore.message.includes('UNIQUE constraint failed')) return false;
   return (
     errore.message.includes('richieste.richiesta_riferimento_id') ||
-    errore.message.includes('idx_richieste_annullamento_pendente')
+    errore.message.includes('idx_richieste_variazione_pendente')
   );
+}
+
+/**
+ * Riconosce la violazione dell'indice UNIQUE (ricorrenza_id, data) della
+ * migrazione 0001: si sta spostando un'occorrenza su una data in cui la stessa
+ * serie ha già una richiesta. Chi modifica deve prima sganciare l'occorrenza
+ * dalla serie (vedi la modifica di data in routes/*).
+ */
+export function eOccorrenzaDuplicata(errore: unknown): boolean {
+  if (!(errore instanceof Error) || !errore.message.includes('UNIQUE constraint failed')) return false;
+  return errore.message.includes('idx_richieste_ricorrenza_data') || errore.message.includes('richieste.ricorrenza_id');
 }
 
 export type Conflitto = { slot_key: string; societa: string };
@@ -44,21 +58,40 @@ function estremi(chiaviCandidate: string[]): { minimo: string; massimo: string }
   return { minimo: ordinate[0], massimo: ordinate[ordinate.length - 1] };
 }
 
-/** Trova quali tra le chiavi candidate sono già occupate, e da chi (vista admin). */
-export async function trovaConflitti(db: D1Database, chiaviCandidate: string[]): Promise<Conflitto[]> {
-  if (chiaviCandidate.length === 0) return [];
+/**
+ * Slot già prenotati nel range delle chiavi candidate, con la richiesta a cui
+ * appartengono. Il filtro `richiesteEscluse` serve alle MODIFICHE: chi sposta
+ * la propria prenotazione dalle 18:00 alle 18:30 ritrova i propri slot tra
+ * quelli occupati, ma quegli slot verranno liberati nello stesso batch che
+ * prenota i nuovi, quindi non sono un conflitto. Le richieste da escludere
+ * sono al più le occorrenze di una ricorrenza (MAX_OCCORRENZE_RICORRENZA):
+ * insieme ai due estremi del range restano ben sotto i 100 parametri D1.
+ */
+async function occupatiNelRange(
+  db: D1Database,
+  chiaviCandidate: string[],
+  richiesteEscluse: number[],
+): Promise<{ slot_key: string; societa: string }[]> {
   const { minimo, massimo } = estremi(chiaviCandidate);
+  const segnapostoEscluse = richiesteEscluse.map(() => '?').join(', ');
+  const filtroEscluse = richiesteEscluse.length > 0 ? `AND p.richiesta_id NOT IN (${segnapostoEscluse})` : '';
   const { results } = await db
     .prepare(
       `SELECT p.slot_key, s.nome AS societa
        FROM prenotazioni p JOIN societa s ON s.id = p.societa_id
-       WHERE p.slot_key >= ?1 AND p.slot_key <= ?2
+       WHERE p.slot_key >= ? AND p.slot_key <= ? ${filtroEscluse}
        ORDER BY p.slot_key`,
     )
-    .bind(minimo, massimo)
-    .all<Conflitto>();
+    .bind(minimo, massimo, ...richiesteEscluse)
+    .all<{ slot_key: string; societa: string }>();
   const cercate = new Set(chiaviCandidate);
   return results.filter((riga) => cercate.has(riga.slot_key));
+}
+
+/** Trova quali tra le chiavi candidate sono già occupate, e da chi (vista admin). */
+export async function trovaConflitti(db: D1Database, chiaviCandidate: string[], richiesteEscluse: number[] = []): Promise<Conflitto[]> {
+  if (chiaviCandidate.length === 0) return [];
+  return await occupatiNelRange(db, chiaviCandidate, richiesteEscluse);
 }
 
 /**
@@ -69,13 +102,8 @@ export async function trovaConflitti(db: D1Database, chiaviCandidate: string[]):
  * riservatezza vale qui. Il tipo di ritorno è di sole chiavi proprio perché
  * l'identità di chi occupa lo slot non possa sfuggire nella risposta.
  */
-export async function slotOccupati(db: D1Database, chiaviCandidate: string[]): Promise<string[]> {
+export async function slotOccupati(db: D1Database, chiaviCandidate: string[], richiesteEscluse: number[] = []): Promise<string[]> {
   if (chiaviCandidate.length === 0) return [];
-  const { minimo, massimo } = estremi(chiaviCandidate);
-  const { results } = await db
-    .prepare('SELECT slot_key FROM prenotazioni WHERE slot_key >= ?1 AND slot_key <= ?2 ORDER BY slot_key')
-    .bind(minimo, massimo)
-    .all<{ slot_key: string }>();
-  const cercate = new Set(chiaviCandidate);
-  return results.map((riga) => riga.slot_key).filter((chiave) => cercate.has(chiave));
+  const occupati = await occupatiNelRange(db, chiaviCandidate, richiesteEscluse);
+  return occupati.map((riga) => riga.slot_key);
 }

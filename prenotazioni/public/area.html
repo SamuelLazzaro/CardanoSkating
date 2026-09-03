@@ -192,6 +192,27 @@
           <p id="esito-form" class="stato" role="status" hidden></p>
         </div>
       </dialog>
+
+      <dialog id="dialogo-dettagli" class="dialogo" aria-labelledby="titolo-dialogo-dettagli">
+        <div class="dialogo-contenuto">
+          <div class="dialogo-testata">
+            <h2 id="titolo-dialogo-dettagli">Prenotazione</h2>
+            <button type="button" class="btn btn-testo" id="bottone-chiudi-dettagli" aria-label="Chiudi">✕</button>
+          </div>
+          <dl class="dettagli" id="dettagli-elenco"></dl>
+          <fieldset class="campo scelta-ambito" id="dettagli-ambito" hidden>
+            <legend>Prenotazione ricorrente: applica a</legend>
+            <label class="etichetta-check"><input type="radio" name="ambito" value="singola" checked><span>Solo questa data</span></label>
+            <label class="etichetta-check"><input type="radio" name="ambito" value="successive"><span>Questa e le successive</span></label>
+          </fieldset>
+          <p id="dettagli-avviso" class="testo-tenue" hidden></p>
+          <div class="riga-azioni">
+            <button type="button" class="btn btn-primario" id="dettagli-modifica">Modifica</button>
+            <button type="button" class="btn btn-pericolo" id="dettagli-annulla">Annulla</button>
+          </div>
+          <p id="esito-dettagli" class="stato" role="status" hidden></p>
+        </div>
+      </dialog>
     </main>
   </div>
 

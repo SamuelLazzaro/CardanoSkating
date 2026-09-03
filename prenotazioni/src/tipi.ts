@@ -16,7 +16,21 @@ export type Bindings = {
 
 export type StatoSocieta = 'attiva' | 'sospesa';
 export type StatoRichiesta = 'in_attesa' | 'approvata' | 'rifiutata' | 'annullata';
-export type TipoRichiesta = 'nuova' | 'annullamento';
+/**
+ * 'nuova': richiesta di prenotazione (l'unico tipo che, approvato, occupa slot).
+ * 'annullamento' / 'modifica': richieste riferite (richiesta_riferimento_id)
+ * a una prenotazione approvata, che l'admin approva o rifiuta; una volta
+ * decise sono atti conclusi, non prenotazioni. Vedi migrazioni 0005 e 0009.
+ */
+export type TipoRichiesta = 'nuova' | 'annullamento' | 'modifica';
+
+/**
+ * Ambito di una modifica o di un annullamento su una prenotazione che fa
+ * parte di una ricorrenza materializzata: la sola occorrenza cliccata, oppure
+ * quella e tutte le successive della stessa serie (scelta del committente,
+ * stile Google Calendar). Su una prenotazione singola i due ambiti coincidono.
+ */
+export type Ambito = 'singola' | 'successive';
 
 export type SocietaRow = {
   id: number;
@@ -44,6 +58,8 @@ export type RichiestaRow = {
   note: string | null;
   motivazione: string | null;
   ricorrenza_id: number | null;
+  /** Identificativo comune alle richieste inviate insieme su più occorrenze (0009); NULL se singola. */
+  gruppo_id: string | null;
   created_at: string;
   decisa_at: string | null;
   annullata_at: string | null;

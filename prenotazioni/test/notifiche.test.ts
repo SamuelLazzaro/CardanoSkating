@@ -393,6 +393,73 @@ describe('invio notifiche', () => {
     expect(perAdmin.textContent).toContain(`La società Polisportiva Test ha richiesto l'annullamento`);
   });
 
+  it("la richiesta di modifica genera due email con gli estremi prima e dopo", async () => {
+    const { id: societaId, token } = await creaSocietaConToken();
+    const esito = await env.DB
+      .prepare("INSERT INTO richieste (societa_id, data, ora_inizio, ora_fine, stato) VALUES (?1, '2027-05-07', '18:00', '19:00', 'approvata')")
+      .bind(societaId)
+      .run();
+    const cookie = await cookieSocieta(token);
+    const cattura = intercettaBrevo(201, 2);
+
+    const risposta = await postConContesto(`/api/societa/richieste/${esito.meta.last_row_id}/richiedi-modifica`, cookie, {
+      data: '2027-05-08',
+      ora_inizio: '20:00',
+      ora_fine: '21:00',
+      titolo: 'Gara',
+    });
+    expect(risposta.status).toBe(201);
+
+    const [perSocieta, perAdmin] = cattura.corpi();
+    expect(perSocieta.subject).toContain('Richiesta di modifica inviata');
+    expect(perAdmin.subject).toContain('Richiesta di modifica ricevuta');
+    expect(perAdmin.textContent).toContain('La società Polisportiva Test ha richiesto la modifica');
+    for (const corpo of [perSocieta, perAdmin]) {
+      expect(corpo.textContent).toContain('Prima: 07/05/2027, dalle 18:00 alle 19:00');
+      expect(corpo.textContent).toContain('Dopo: 08/05/2027, dalle 20:00 alle 21:00');
+      expect(corpo.textContent).toContain('Attività: Gara (prima: Allenamento)');
+    }
+  });
+
+  it("la modifica diretta dell'admin su una serie notifica solo la società, con le date e i due orari", async () => {
+    const { id: societaId } = await creaSocietaConToken();
+    const cookieAmm = await cookieAdmin();
+    // Serie di 3 lunedì già approvata (prenotazione diretta ricorrente).
+    intercettaBrevo();
+    const creazione = await postConContesto('/api/admin/prenotazioni', cookieAmm, {
+      societa_id: societaId, data: '2027-03-08', ora_inizio: '10:00', ora_fine: '11:00', ripeti_fino_al: '2027-03-22',
+    });
+    expect(creazione.status).toBe(201);
+    const prima = await env.DB
+      .prepare("SELECT id FROM richieste WHERE societa_id = ?1 AND data = '2027-03-08'")
+      .bind(societaId)
+      .first<{ id: number }>();
+
+    const cattura = intercettaBrevo();
+    const contesto = createExecutionContext();
+    const modifica = await app.request(
+      `/api/admin/richieste/${prima!.id}`,
+      {
+        method: 'PATCH',
+        headers: { Cookie: cookieAmm, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ora_inizio: '11:00', ora_fine: '12:00', ambito: 'successive' }),
+      },
+      env,
+      contesto,
+    );
+    await waitOnExecutionContext(contesto);
+    expect(modifica.status).toBe(200);
+
+    const corpo = cattura.corpo();
+    expect(corpo).not.toBeNull();
+    expect(corpo!.to[0].email).toBe('test@example.com');
+    expect(corpo!.subject).toContain('Prenotazioni modificate');
+    expect(corpo!.textContent).toContain('Date (3): 08/03/2027, 15/03/2027, 22/03/2027');
+    expect(corpo!.textContent).toContain('Orario prima: dalle 10:00 alle 11:00');
+    expect(corpo!.textContent).toContain('Orario dopo: dalle 11:00 alle 12:00');
+    expect(await conteggioNotificheFallite()).toBe(0);
+  });
+
   it("il fallimento dell'email alla società non blocca quella all'admin", async () => {
     const { token } = await creaSocietaConToken();
     const cookie = await cookieSocieta(token);

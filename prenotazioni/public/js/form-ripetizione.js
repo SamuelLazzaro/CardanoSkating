@@ -33,6 +33,8 @@ import {
  * @property {() => string|null} erroreCampi - message to show when the block is not ready to be sent, null when fine
  * @property {() => {giorni?: number[], ripeti_fino_al?: string}} campiRichiesta - request fields describing the repetition (empty object for a plain request)
  * @property {() => void} azzera - back to the plain-request state (extra weekdays off, repetition off)
+ * @property {(giorni: number[], ripetiFinoAl: string) => void} imposta - fills the block from an existing series (to edit it)
+ * @property {(visibile: boolean) => void} mostra - shows or hides the whole block (hidden when editing a single booking)
  */
 
 /**
@@ -168,6 +170,39 @@ export function preparaFormRipetizione(elementi) {
         }
       }
       aggiornaAnteprima();
+    },
+
+    /**
+     * Fills the block from an existing series, so it can be edited: the
+     * caller has already set the date field. A "fino al" equal to the Sunday
+     * of the first week is how the server stores "no weekly repetition", so
+     * the repetition checkbox is on only when the series goes beyond it.
+     * @param {number[]} giorni - weekdays of the series (0 = lunedì)
+     * @param {string} ripetiFinoAl - last date of the series, 'YYYY-MM-DD'
+     */
+    imposta(giorni, ripetiFinoAl) {
+      const ripete = ripetiFinoAl > domenicaDellaSettimana(campoData.value);
+      casellaRipeti.checked = ripete;
+      campoFinoAl.value = ripete ? ripetiFinoAl : '';
+      aggiornaBloccoFinoAl();
+      const scelti = new Set(giorni);
+      for (const casella of caselleGiorni()) {
+        const scelta = scelti.has(Number(casella.value));
+        if (casella.disabled) {
+          casella.dataset.sceltaPrima = String(scelta);
+        } else {
+          casella.checked = scelta;
+        }
+      }
+      aggiorna();
+    },
+
+    mostra(visibile) {
+      // The block is a <fieldset>: hiding it also takes its controls out of
+      // the form validation, so a hidden "fino al" never blocks the submit.
+      const blocco = contenitoreGiorni.closest('fieldset') ?? contenitoreGiorni;
+      blocco.hidden = !visibile;
+      blocco.disabled = !visibile;
     },
   };
 }

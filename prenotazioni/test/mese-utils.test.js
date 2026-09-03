@@ -132,6 +132,8 @@ describe('raggruppaPrenotazioni', () => {
         societa: 'ASD Uno',
         colore: '#00aabb',
         titolo: 'Allenamento',
+        note: null,
+        ricorrenzaId: null,
         data: '2026-09-16',
         oraInizio: '18:00',
         oraFine: '19:30',

@@ -1,3 +1,5 @@
 node_modules/
 .wrangler/
 .dev.vars
+# Database dumps (contain real emails and access tokens): never commit them.
+backup*.sql

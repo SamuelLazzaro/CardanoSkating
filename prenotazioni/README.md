@@ -22,6 +22,7 @@ prenotazioni/
 │   ├── auth.ts           # sessioni con cookie firmati HMAC-SHA256
 │   ├── ratelimit.ts      # rate limit del login su D1
 │   ├── conflitti.ts      # riconoscimento e diagnostica dei conflitti slot
+│   ├── variazioni.ts     # modifica/annullamento: ambito, occorrenze, slot a blocchi
 │   ├── ics.ts            # generazione calendario iCalendar
 │   └── routes/           # pubblico.ts, societa.ts, admin.ts
 ├── public/               # frontend statico
@@ -178,6 +179,33 @@ Consiglio: fai un backup prima di ogni `migrate:remote`.
   richieste di annullamento pendenti). Le richieste annullate restano nel
   database con stato `annullata` e timestamp `annullata_at`, per poter
   verificare quando una società ha rinunciato a uno slot.
+- **Modifiche e annullamenti dal calendario** (migrazione `0009`): nel
+  pannello admin e nell'area società ogni prenotazione propria nel calendario
+  (settimana e mese) e nelle liste apre un popup di dettagli con le azioni
+  disponibili. La **società** modifica direttamente le proprie richieste
+  ancora in attesa (singole e ricorrenti, quest'ultime nell'intera
+  definizione: giorni, orario, periodo, attività, note); per una prenotazione
+  **approvata** invia invece una richiesta di tipo `modifica` (nuovi data,
+  orario, attività, note) o di `annullamento`, che l'admin approva o rifiuta
+  con motivazione: fino alla decisione resta valida la prenotazione attuale,
+  e su ogni prenotazione può esserci una sola richiesta pendente (indice
+  UNIQUE parziale). All'approvazione di una modifica la prenotazione
+  originale viene aggiornata sul posto, con lo stesso id (il feed ICS
+  aggiorna l'evento invece di ricrearlo), scambiando gli slot in un batch
+  atomico; se cambia la data l'occorrenza esce dalla sua ricorrenza.
+  L'**admin** modifica e annulla le prenotazioni approvate subito, senza
+  motivazione, con email alla società; le richieste pendenti su una
+  prenotazione modificata o annullata dall'admin decadono. L'admin non
+  modifica mai una richiesta in attesa: la approva o la rifiuta soltanto.
+  Su una prenotazione **ricorrente** il popup chiede l'ambito: *solo questa
+  data* oppure *questa e le successive* occorrenze della serie; alla serie si
+  propagano orario, attività e note, mai la data. Quando la società chiede
+  modifica o annullamento su più occorrenze nasce un **gruppo** di richieste
+  (`gruppo_id` comune) che l'admin decide in blocco con una sola motivazione
+  (`POST /api/admin/gruppi/:gruppo/approva|rifiuta`) e che la società ritira
+  tutto insieme; le richieste di un gruppo non si decidono singolarmente. Il
+  controllo di disponibilità di una modifica ignora gli slot della
+  prenotazione stessa, che verranno liberati nello stesso batch.
 - **Motivazione delle decisioni** (migrazione `0004`): approvare o rifiutare
   una richiesta o una ricorrenza richiede una motivazione (2–300 caratteri,
   validata lato server). Per l'approvazione può essere breve ("ok"), per il

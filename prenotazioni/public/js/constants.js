@@ -39,6 +39,16 @@ export const TESTO_STATO = {
   attiva: 'Attiva',
   sospesa: 'Sospesa',
   annullamento: 'Annullamento', // richiesta tipo, not a stato: reuses the badge machinery
+  modifica: 'Modifica', // same: tipo of a change request on an approved booking
+};
+
+/**
+ * @type {Record<string, string>} labels of the scope choice on a recurring
+ * booking (mirrors the server's Ambito type)
+ */
+export const TESTO_AMBITO = {
+  singola: 'Solo questa data',
+  successive: 'Questa e le successive',
 };
 
 /* --- tap feedback (see js/tap-feedback.js and .is-tapped in css/base.css) --- */

@@ -74,13 +74,61 @@ export function annullaRichiesta(idRichiesta) {
 }
 
 /**
- * Asks the admin to cancel an approved future booking: slots stay occupied
- * until the admin approves the annullamento request.
- * @param {number} idRichiesta - id of the approved richiesta to cancel
- * @returns {Promise<{tipo: 'annullamento', id: number}>}
+ * Directly edits a pending single richiesta (no slots involved): it stays
+ * pending with the new data.
+ * @param {number} idRichiesta - id of the pending richiesta
+ * @param {{titolo?: string, data: string, ora_inizio: string, ora_fine: string, note?: string}} corpo
+ * @returns {Promise<{ok: boolean}>}
  */
-export function richiediAnnullamento(idRichiesta) {
-  return richiestaJson(`/api/societa/richieste/${idRichiesta}/richiedi-annullamento`, { method: 'POST' });
+export function modificaRichiestaInAttesa(idRichiesta, corpo) {
+  return richiestaJson(`/api/societa/richieste/${idRichiesta}`, { method: 'PATCH', body: JSON.stringify(corpo) });
+}
+
+/**
+ * Directly edits a pending ricorrenza (not materialized yet): the whole
+ * series definition changes, same fields as a new recurring request.
+ * @param {number} idRicorrenza - id of the pending ricorrenza
+ * @param {{titolo?: string, data: string, ora_inizio: string, ora_fine: string, note?: string, ripeti_fino_al?: string, giorni?: number[]}} corpo
+ * @returns {Promise<{ok: boolean, occorrenze: string[]}>}
+ */
+export function modificaRicorrenzaInAttesa(idRicorrenza, corpo) {
+  return richiestaJson(`/api/societa/ricorrenze/${idRicorrenza}`, { method: 'PATCH', body: JSON.stringify(corpo) });
+}
+
+/**
+ * Asks the admin to cancel an approved future booking: slots stay occupied
+ * until the admin approves the annullamento request. With ambito
+ * 'successive' on a recurring booking, one request per following occurrence
+ * is created, all in one group.
+ * @param {number} idRichiesta - id of the approved richiesta to cancel
+ * @param {'singola'|'successive'} [ambito]
+ * @returns {Promise<{tipo: 'annullamento', id: number, gruppo_id: string|null, richieste: number}>}
+ */
+export function richiediAnnullamento(idRichiesta, ambito = 'singola') {
+  return richiestaJson(`/api/societa/richieste/${idRichiesta}/richiedi-annullamento`, { method: 'POST', body: JSON.stringify({ ambito }) });
+}
+
+/**
+ * Asks the admin to change an approved future booking (date, time, activity,
+ * notes): nothing changes until the admin approves. With ambito 'successive'
+ * the new time/activity/notes apply to the following occurrences too (dates
+ * cannot change then).
+ * @param {number} idRichiesta - id of the approved richiesta to change
+ * @param {{data?: string, ora_inizio: string, ora_fine: string, titolo?: string, note?: string, ambito: 'singola'|'successive'}} corpo
+ * @returns {Promise<{tipo: 'modifica', id: number, gruppo_id: string|null, richieste: number}>}
+ */
+export function richiediModifica(idRichiesta, corpo) {
+  return richiestaJson(`/api/societa/richieste/${idRichiesta}/richiedi-modifica`, { method: 'POST', body: JSON.stringify(corpo) });
+}
+
+/**
+ * Withdraws a whole pending group of requests (annullamento or modifica on
+ * several occurrences).
+ * @param {string} gruppoId
+ * @returns {Promise<{ok: boolean, richieste_ritirate: number}>}
+ */
+export function annullaGruppo(gruppoId) {
+  return richiestaJson(`/api/societa/gruppi/${gruppoId}/annulla`, { method: 'POST' });
 }
 
 /**
@@ -148,11 +196,46 @@ export function rifiutaRichiesta(idRichiesta, motivazione) {
 }
 
 /**
+ * Cancels a richiesta right away. With ambito 'successive' on an approved
+ * recurring booking, that occurrence and all the following ones are cancelled.
  * @param {number} idRichiesta
- * @returns {Promise<{ok: boolean, slot_liberati: number}>}
+ * @param {'singola'|'successive'} [ambito]
+ * @returns {Promise<{ok: boolean, richieste_annullate: number, slot_liberati: number}>}
  */
-export function annullaRichiestaAdmin(idRichiesta) {
-  return richiestaJson(`/api/admin/richieste/${idRichiesta}/annulla`, { method: 'POST' });
+export function annullaRichiestaAdmin(idRichiesta, ambito = 'singola') {
+  return richiestaJson(`/api/admin/richieste/${idRichiesta}/annulla`, { method: 'POST', body: JSON.stringify({ ambito }) });
+}
+
+/**
+ * Directly changes an approved booking (date, time, activity, notes), right
+ * away and without motivation. With ambito 'successive' the new time,
+ * activity and notes apply to the following occurrences too (no date change).
+ * @param {number} idRichiesta
+ * @param {{data?: string, ora_inizio: string, ora_fine: string, titolo?: string, note?: string, ambito: 'singola'|'successive'}} corpo
+ * @returns {Promise<{ok: boolean, richieste_modificate: number, slot_inseriti: number, date: string[]}>}
+ */
+export function modificaPrenotazioneAdmin(idRichiesta, corpo) {
+  return richiestaJson(`/api/admin/richieste/${idRichiesta}`, { method: 'PATCH', body: JSON.stringify(corpo) });
+}
+
+/**
+ * Approves a whole group of requests (annullamento or modifica on several
+ * occurrences) with one decision.
+ * @param {string} gruppoId
+ * @param {string} motivazione - mandatory decision motivation
+ * @returns {Promise<{ok: boolean, richieste_approvate: number, slot_liberati: number, slot_inseriti?: number}>}
+ */
+export function approvaGruppo(gruppoId, motivazione) {
+  return richiestaJson(`/api/admin/gruppi/${gruppoId}/approva`, { method: 'POST', body: JSON.stringify({ motivazione }) });
+}
+
+/**
+ * @param {string} gruppoId
+ * @param {string} motivazione - mandatory decision motivation
+ * @returns {Promise<{ok: boolean, richieste_rifiutate: number}>}
+ */
+export function rifiutaGruppo(gruppoId, motivazione) {
+  return richiestaJson(`/api/admin/gruppi/${gruppoId}/rifiuta`, { method: 'POST', body: JSON.stringify({ motivazione }) });
 }
 
 /**
@@ -221,7 +304,7 @@ export function rigeneraTokenSocieta(idSocieta) {
 
 /**
  * @param {string} lunedi - Monday of the requested week
- * @returns {Promise<{settimana: string, prenotazioni: {slot_key: string, societa_id: number, societa: string, colore: string, richiesta_id: number, titolo: string}[]}>}
+ * @returns {Promise<{settimana: string, prenotazioni: {slot_key: string, societa_id: number, societa: string, colore: string, richiesta_id: number, titolo: string, note: string|null, ricorrenza_id: number|null}[]}>}
  */
 export function ottieniCalendarioAdmin(lunedi) {
   return richiestaJson(`/api/admin/calendario?settimana=${lunedi}`);

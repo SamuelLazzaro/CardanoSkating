@@ -186,8 +186,8 @@ export function raggruppaSlotInFasce(chiavi) {
  * describe it entirely. Both the list under the calendar and the monthly view
  * read "18:00–19:30 · Società · Attività" from here instead of walking the
  * half-hour slots the booking is made of.
- * @param {{slot_key: string, societa_id: number, societa: string, colore: string, richiesta_id: number, titolo: string}[]} prenotazioni
- * @returns {{richiestaId: number, societaId: number, societa: string, colore: string, titolo: string, data: string, oraInizio: string, oraFine: string}[]} bookings in chronological order
+ * @param {{slot_key: string, societa_id: number, societa: string, colore: string, richiesta_id: number, titolo: string, note?: string|null, ricorrenza_id?: number|null}[]} prenotazioni
+ * @returns {{richiestaId: number, societaId: number, societa: string, colore: string, titolo: string, note: string|null, ricorrenzaId: number|null, data: string, oraInizio: string, oraFine: string}[]} bookings in chronological order
  */
 export function raggruppaPrenotazioni(prenotazioni) {
   /** @type {Map<number, {prima: object, chiavi: string[]}>} */
@@ -212,6 +212,8 @@ export function raggruppaPrenotazioni(prenotazioni) {
       societa: gruppo.prima.societa,
       colore: gruppo.prima.colore,
       titolo: gruppo.prima.titolo,
+      note: gruppo.prima.note ?? null,
+      ricorrenzaId: gruppo.prima.ricorrenza_id ?? null,
       data,
       oraInizio: oraCompatta(orarioInizio),
       // The last slot only marks its own start: the booking ends one step later.
@@ -232,34 +234,57 @@ export function raggruppaPrenotazioni(prenotazioni) {
  *               again, since the server-side conflict check only knows about
  *               APPROVED bookings and would accept the duplicate.
  *
- * Two sources feed inAttesa, because a pending request can live in either
- * table: a single richiesta with stato 'in_attesa', and a pending ricorrenza,
- * which holds no richieste rows at all until it is approved and therefore has
- * to be expanded here from the series definition.
+ * Three sources feed inAttesa, because a pending request can live in several
+ * shapes: a single richiesta with stato 'in_attesa'; a pending 'modifica'
+ * request, whose columns hold the NEW slots the società is asking for (the
+ * current booking stays approved until the admin decides); and a pending
+ * ricorrenza, which holds no richieste rows at all until it is approved and
+ * therefore has to be expanded here from the series definition.
  */
 
 /**
- * @param {{tipo: string, stato: string, data: string, ora_inizio: string, ora_fine: string}[]} richieste - the società's richieste
- * @param {{stato: string, giorni: number[], ora_inizio: string, ora_fine: string, valida_dal: string, valida_al: string}[]} ricorrenze - the società's ricorrenze
+ * @typedef {object} OrigineSlot
+ * @property {'approvata'|'in_attesa'|'modifica'|'ricorrenza'} genere - what kind of own item the slot belongs to
+ * @property {object} [richiesta] - the richiesta row (approved booking, pending request or pending modifica)
+ * @property {object} [ricorrenza] - the pending ricorrenza row
+ */
+
+/**
+ * Classifies every slot the società owns in a date interval and remembers
+ * where it comes from, so a click on the calendar can open the right item:
+ * the approved booking, the pending request, the pending modifica request
+ * (its new slots) or the pending series. Same rules as slotSocietaIntervallo,
+ * of which this is the detailed form: an approved booking always wins over a
+ * pending item on the same slot.
+ * @param {{id: number, tipo: string, stato: string, data: string, ora_inizio: string, ora_fine: string}[]} richieste - the società's richieste
+ * @param {{id: number, stato: string, giorni: number[], ora_inizio: string, ora_fine: string, valida_dal: string, valida_al: string}[]} ricorrenze - the società's ricorrenze
  * @param {string} dal - first date of the interval, 'YYYY-MM-DD' (included)
  * @param {string} al - last date of the interval, 'YYYY-MM-DD' (included)
- * @returns {{approvati: Set<string>, inAttesa: Set<string>}} slot keys inside the interval
+ * @returns {Map<string, OrigineSlot>} slot key → origin, for the slots inside the interval
  */
-export function slotSocietaIntervallo(richieste, ricorrenze, dal, al) {
-  const approvati = new Set();
-  const inAttesa = new Set();
+export function origineSlotSocieta(richieste, ricorrenze, dal, al) {
+  /** @type {Map<string, OrigineSlot>} */
+  const origini = new Map();
+  const assegna = (chiave, origine) => {
+    // An approved booking is the strongest claim on a slot: it is never
+    // overwritten by a pending item that happens to ask for the same slot.
+    if (origini.get(chiave)?.genere === 'approvata') return;
+    origini.set(chiave, origine);
+  };
 
   for (const richiesta of richieste) {
-    // Only booking requests hold slots. An annullamento request is skipped
-    // whatever its state: once approved its referenced booking has just been
-    // freed, and while pending that booking is still fully valid, so its
-    // slots must keep showing as approved rather than as undecided.
-    if (richiesta.tipo !== 'nuova') continue;
-    if (richiesta.stato !== 'approvata' && richiesta.stato !== 'in_attesa') continue;
     if (richiesta.data < dal || richiesta.data > al) continue;
-    const destinazione = richiesta.stato === 'approvata' ? approvati : inAttesa;
+    // Only booking requests and pending modifica requests describe slots. An
+    // annullamento request is skipped whatever its state: once approved its
+    // referenced booking has just been freed, and while pending that booking
+    // is still fully valid, so its slots must keep showing as approved.
+    let genere = null;
+    if (richiesta.tipo === 'nuova' && richiesta.stato === 'approvata') genere = 'approvata';
+    if (richiesta.tipo === 'nuova' && richiesta.stato === 'in_attesa') genere = 'in_attesa';
+    if (richiesta.tipo === 'modifica' && richiesta.stato === 'in_attesa') genere = 'modifica';
+    if (genere === null) continue;
     for (const chiave of espandiSlot(richiesta.data, richiesta.ora_inizio, richiesta.ora_fine)) {
-      destinazione.add(chiave);
+      assegna(chiave, { genere, richiesta });
     }
   }
 
@@ -271,11 +296,27 @@ export function slotSocietaIntervallo(richieste, ricorrenze, dal, al) {
     const ultimaData = ricorrenza.valida_al < al ? ricorrenza.valida_al : al;
     for (const giorno of occorrenzeRicorrenza(primaData, ultimaData, ricorrenza.giorni)) {
       for (const chiave of espandiSlot(giorno, ricorrenza.ora_inizio, ricorrenza.ora_fine)) {
-        inAttesa.add(chiave);
+        assegna(chiave, { genere: 'ricorrenza', ricorrenza });
       }
     }
   }
 
+  return origini;
+}
+
+/**
+ * @param {{id: number, tipo: string, stato: string, data: string, ora_inizio: string, ora_fine: string}[]} richieste - the società's richieste
+ * @param {{id: number, stato: string, giorni: number[], ora_inizio: string, ora_fine: string, valida_dal: string, valida_al: string}[]} ricorrenze - the società's ricorrenze
+ * @param {string} dal - first date of the interval, 'YYYY-MM-DD' (included)
+ * @param {string} al - last date of the interval, 'YYYY-MM-DD' (included)
+ * @returns {{approvati: Set<string>, inAttesa: Set<string>}} slot keys inside the interval
+ */
+export function slotSocietaIntervallo(richieste, ricorrenze, dal, al) {
+  const approvati = new Set();
+  const inAttesa = new Set();
+  for (const [chiave, origine] of origineSlotSocieta(richieste, ricorrenze, dal, al)) {
+    (origine.genere === 'approvata' ? approvati : inAttesa).add(chiave);
+  }
   return { approvati, inAttesa };
 }
 

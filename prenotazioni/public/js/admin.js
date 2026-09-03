@@ -1,11 +1,13 @@
 /*
  * admin.js — entry point of the admin panel. Shows the login form until an
  * admin session cookie is present, then three sections behind the nav
- * (js/navigazione.js): Home with the full weekly calendar (società names,
- * per-date cancellation, direct bookings) and the monthly report; Notifiche
- * with the pending richieste/ricorrenze to approve/reject, counted by the
- * bell badge; Società with the società management (create, edit,
- * suspend/reactivate, personal-link regeneration).
+ * (js/navigazione.js): Home with the full calendar (società names, direct
+ * bookings, and a details popup on every booking with Modifica/Annulla, on
+ * the single date or on "questa e le successive" of a series) and the monthly
+ * report; Notifiche with the pending richieste/ricorrenze to approve/reject
+ * (grouped requests decided together), counted by the bell badge; Società
+ * with the società management (create, edit, suspend/reactivate,
+ * personal-link regeneration).
  */
 import { avviaTapFeedback } from './tap-feedback.js';
 import { COLORE_PREDEFINITO, MIN_MOTIVAZIONE, PASSO_MIN, TITOLO_PREDEFINITO } from './constants.js';
@@ -29,11 +31,13 @@ import {
   accediAdmin,
   aggiornaSocietaAdmin,
   annullaRichiestaAdmin,
+  approvaGruppo,
   approvaRicorrenza,
   approvaRichiesta,
   creaPrenotazioneDiretta,
   creaSocietaAdmin,
   esciAdmin,
+  modificaPrenotazioneAdmin,
   ottieniCalendarioAdmin,
   ottieniCalendarioAdminMese,
   ottieniElencoSocieta,
@@ -41,6 +45,7 @@ import {
   ottieniRichiesteAdmin,
   ottieniRicorrenzeAdmin,
   riattivaSocieta,
+  rifiutaGruppo,
   rifiutaRicorrenza,
   rifiutaRichiesta,
   rigeneraTokenSocieta,
@@ -54,10 +59,13 @@ import {
   creaBadge,
   creaVoceMese,
   mostraMessaggio,
+  preparaAperturaDettagli,
   preparaDialogo,
+  preparaDialogoDettagli,
   preparaDrillDownGiorno,
   preparaScorciatoiaSlot,
   preparaSelectOrari,
+  rendiCliccabile,
 } from './ui.js';
 import { creaVistaCalendario } from './vista-calendario.js';
 import { preparaFormRipetizione } from './form-ripetizione.js';
@@ -91,6 +99,22 @@ let g_societaInModifica = null;
 
 /** @type {import('./form-ripetizione.js').FormRipetizione|null} repetition block of the direct booking form */
 let g_ripetizione = null;
+
+/** @type {ReturnType<typeof preparaDialogoDettagli>|null} details popup of a booking */
+let g_dettagli = null;
+
+/**
+ * @type {Map<number, object>} bookings of the interval on screen, by richiesta
+ * id (blocks from utils.raggruppaPrenotazioni): what the details popup shows
+ * when a cell or an entry is clicked
+ */
+let g_blocchi = new Map();
+
+/**
+ * @type {{blocco: object, ambito: 'singola'|'successive'}|null} booking being
+ * edited in the booking form, null when the form creates a new booking
+ */
+let g_modifica = null;
 
 /* ------------------------------------------------------------------ init */
 
@@ -137,8 +161,28 @@ function preparaEventi() {
     elemento('bottone-nuova-prenotazione'),
     elemento('bottone-chiudi-dialogo'),
   );
-  // A stale error from a previous attempt must not greet the reopened dialog.
-  elemento('bottone-nuova-prenotazione').addEventListener('click', () => mostraMessaggio(elemento('esito-form'), ''));
+  // The panel button always opens the form in create mode, discarding any
+  // leftover edit state; a stale error must not greet the reopened dialog.
+  elemento('bottone-nuova-prenotazione').addEventListener('click', () => {
+    impostaModalitaNuova();
+    mostraMessaggio(elemento('esito-form'), '');
+  });
+
+  // Details popup of a booking, opened from the calendar cells and entries
+  // (delegated listener on the grid) and from the list under the calendar.
+  g_dettagli = preparaDialogoDettagli({
+    dialogo: elemento('dialogo-dettagli'),
+    titolo: elemento('titolo-dialogo-dettagli'),
+    elenco: elemento('dettagli-elenco'),
+    bloccoAmbito: elemento('dettagli-ambito'),
+    avviso: elemento('dettagli-avviso'),
+    bottoneModifica: elemento('dettagli-modifica'),
+    bottoneAnnulla: elemento('dettagli-annulla'),
+    bottoneChiudi: elemento('bottone-chiudi-dettagli'),
+    esito: elemento('esito-dettagli'),
+  });
+  // The admin grid only holds bookings: the kind is always 'prenotazione'.
+  preparaAperturaDettagli(elemento('cal-griglia'), (_genere, id) => apriDettagliPrenotazione(id));
 
   preparaDialogo(
     elemento('dialogo-societa'),
@@ -221,15 +265,77 @@ async function esci() {
 /** @returns {Promise<void>} reloads and renders the pending lists */
 async function caricaInAttesa() {
   const [richieste, ricorrenze] = await Promise.all([ottieniRichiesteAdmin(), ottieniRicorrenzeAdmin()]);
-  renderRichiesteAttesa(richieste.richieste);
+  const voci = raggruppaPerGruppo(richieste.richieste);
+  renderRichiesteAttesa(voci);
   renderRicorrenzeAttesa(ricorrenze.ricorrenze);
   // The bell badge mirrors this section: anything still waiting for a
-  // decision. Every caller of caricaInAttesa (login, approve/reject,
-  // suspension cascade) therefore keeps the counter up to date for free.
+  // decision (a group of requests is one decision). Every caller of
+  // caricaInAttesa (login, approve/reject, suspension cascade) therefore
+  // keeps the counter up to date for free.
   aggiornaBadgeNotifiche(
     elemento('badge-notifiche'),
-    richieste.richieste.length + ricorrenze.ricorrenze.length,
+    voci.length + ricorrenze.ricorrenze.length,
   );
+}
+
+/**
+ * @typedef {object} VoceAttesa
+ * @property {string|null} gruppoId - null for a single request
+ * @property {object[]} richieste - the request, or the members of the group in date order
+ */
+
+/**
+ * The pending list shows one entry per decision: a single request stands
+ * alone, the members of a group (annullamento or modifica asked on "questa e
+ * le successive") are folded into one entry, decided together.
+ * @param {object[]} richieste - pending richieste from the API, in date order
+ * @returns {VoceAttesa[]} entries in the order of their first request
+ */
+function raggruppaPerGruppo(richieste) {
+  /** @type {VoceAttesa[]} */
+  const voci = [];
+  /** @type {Map<string, VoceAttesa>} */
+  const perGruppo = new Map();
+  for (const richiesta of richieste) {
+    if (richiesta.gruppo_id === null) {
+      voci.push({ gruppoId: null, richieste: [richiesta] });
+      continue;
+    }
+    const voce = perGruppo.get(richiesta.gruppo_id);
+    if (voce === undefined) {
+      const nuova = { gruppoId: richiesta.gruppo_id, richieste: [richiesta] };
+      perGruppo.set(richiesta.gruppo_id, nuova);
+      voci.push(nuova);
+    } else {
+      voce.richieste.push(richiesta);
+    }
+  }
+  return voci;
+}
+
+/**
+ * "18:00–19:00 → 19:00–20:00": the current time range of a booking struck
+ * through, then the one a modifica request asks for. When the date changes
+ * too, both sides carry it.
+ * @param {{data: string, ora_inizio: string, ora_fine: string}} prima - current booking
+ * @param {{data: string, ora_inizio: string, ora_fine: string}} dopo - requested values
+ * @returns {HTMLSpanElement}
+ */
+function creaVariazione(prima, dopo) {
+  const cambiaData = prima.data !== dopo.data;
+  const testo = (estremi) => `${cambiaData ? `${dataEstesa(estremi.data)} ` : ''}${estremi.ora_inizio}–${estremi.ora_fine}`;
+  const contenitore = document.createElement('span');
+  contenitore.className = 'variazione';
+  const vecchio = document.createElement('span');
+  vecchio.className = 'prima';
+  vecchio.textContent = testo(prima);
+  const freccia = document.createElement('span');
+  freccia.textContent = '→';
+  freccia.setAttribute('aria-label', 'diventa');
+  const nuovo = document.createElement('span');
+  nuovo.textContent = testo(dopo);
+  contenitore.append(vecchio, freccia, nuovo);
+  return contenitore;
 }
 
 /**
@@ -245,41 +351,73 @@ function messaggioConflitti(errore) {
 }
 
 /**
- * @param {object[]} richieste - pending richieste with società name
+ * Renders the pending requests, one row per decision. A booking request shows
+ * its date and time; an annullamento request the booking it frees; a modifica
+ * request the current time range struck through and the requested one. A
+ * group shows its dates and the common time range, and is decided as a whole.
+ * @param {VoceAttesa[]} voci - pending entries (see raggruppaPerGruppo)
  * @returns {void}
  */
-function renderRichiesteAttesa(richieste) {
+function renderRichiesteAttesa(voci) {
   const lista = elemento('lista-richieste-attesa');
   lista.textContent = '';
-  for (const richiesta of richieste) {
+  for (const voce of voci) {
+    const prima = voce.richieste[0];
     const riga = document.createElement('li');
     const info = document.createElement('div');
     info.className = 'riga-info';
     const nome = document.createElement('strong');
-    nome.textContent = richiesta.societa;
+    nome.textContent = prima.societa;
     const attivita = document.createElement('span');
     attivita.className = 'testo-tenue';
-    attivita.textContent = richiesta.titolo;
-    const quando = document.createElement('span');
-    quando.textContent = `${dataEstesa(richiesta.data)} · ${richiesta.ora_inizio}–${richiesta.ora_fine}`;
-    info.append(nome, attivita, quando);
-    // Annullamento requests share the pending list but must stand out:
-    // approving one FREES the referenced booking instead of adding slots.
-    if (richiesta.tipo === 'annullamento') info.append(creaBadge('annullamento'));
+    attivita.textContent = prima.titolo;
+    info.append(nome, attivita);
+
+    if (voce.gruppoId === null) {
+      const quando = document.createElement('span');
+      quando.textContent = `${dataEstesa(prima.data)} · ${prima.ora_inizio}–${prima.ora_fine}`;
+      if (prima.tipo === 'modifica' && prima.rif_data) {
+        // Current values come from the referenced booking (rif_*), the
+        // requested ones from the request itself.
+        quando.textContent = `${dataEstesa(prima.rif_data)} · `;
+        quando.append(creaVariazione(
+          { data: prima.rif_data, ora_inizio: prima.rif_ora_inizio, ora_fine: prima.rif_ora_fine },
+          prima,
+        ));
+      }
+      info.append(quando);
+    } else {
+      const date = voce.richieste.map((richiesta) => richiesta.data);
+      const quando = document.createElement('span');
+      quando.textContent = `${date.length} date, dal ${dataEstesa(date[0])} al ${dataEstesa(date[date.length - 1])} · `;
+      if (prima.tipo === 'modifica' && prima.rif_ora_inizio) {
+        quando.append(creaVariazione(
+          { data: prima.data, ora_inizio: prima.rif_ora_inizio, ora_fine: prima.rif_ora_fine },
+          prima,
+        ));
+      } else {
+        quando.append(`${prima.ora_inizio}–${prima.ora_fine}`);
+      }
+      info.append(quando);
+    }
+    // Annullamento and modifica requests share the pending list but must
+    // stand out: approving one FREES or MOVES the referenced booking instead
+    // of adding slots.
+    if (prima.tipo !== 'nuova') info.append(creaBadge(prima.tipo));
     riga.append(info);
-    if (richiesta.note) {
+    if (prima.note) {
       const nota = document.createElement('p');
       nota.className = 'riga-nota';
-      nota.textContent = richiesta.note;
+      nota.textContent = prima.note;
       riga.append(nota);
     }
     riga.append(azioniDecisione(
-      () => decidiRichiesta(richiesta, true),
-      () => decidiRichiesta(richiesta, false),
+      () => decidiVoce(voce, true),
+      () => decidiVoce(voce, false),
     ));
     lista.append(riga);
   }
-  elemento('vuoto-richieste-attesa').hidden = richieste.length > 0;
+  elemento('vuoto-richieste-attesa').hidden = voci.length > 0;
 }
 
 /**
@@ -325,24 +463,43 @@ function chiediMotivazione(approvare, esito) {
 }
 
 /**
- * @param {object} richiesta - pending richiesta
+ * Readable outcome of an approval, by request type.
+ * @param {string} tipo - request type
+ * @param {{slot_inseriti?: number, slot_liberati?: number, richieste_approvate?: number}} risposta
+ * @returns {string}
+ */
+function dettaglioApprovazione(tipo, risposta) {
+  if (tipo === 'annullamento') return `annullamento approvato (${risposta.slot_liberati} slot liberati)`;
+  if (tipo === 'modifica') return `modifica approvata (${risposta.slot_liberati} slot liberati, ${risposta.slot_inseriti} prenotati)`;
+  return `richiesta approvata (${risposta.slot_inseriti} slot)`;
+}
+
+/**
+ * Approves or rejects a pending entry: a single request through its own
+ * endpoint, a group through the group endpoints (one decision for all).
+ * @param {VoceAttesa} voce - pending entry
  * @param {boolean} approvare - true to approve, false to reject
  * @returns {Promise<void>}
  */
-async function decidiRichiesta(richiesta, approvare) {
+async function decidiVoce(voce, approvare) {
   const esito = elemento('esito-attesa');
   const motivazione = chiediMotivazione(approvare, esito);
   if (motivazione === null) return;
+  const prima = voce.richieste[0];
   try {
     if (approvare) {
-      const risposta = await approvaRichiesta(richiesta.id, motivazione);
-      const dettaglio = richiesta.tipo === 'annullamento'
-        ? `annullamento approvato (${risposta.slot_liberati} slot liberati)`
-        : `richiesta approvata (${risposta.slot_inseriti} slot)`;
-      mostraMessaggio(esito, `${richiesta.societa}: ${dettaglio}.`, 'ok');
+      const risposta = voce.gruppoId === null
+        ? await approvaRichiesta(prima.id, motivazione)
+        : await approvaGruppo(voce.gruppoId, motivazione);
+      const gruppo = voce.gruppoId === null ? '' : ` su ${voce.richieste.length} date`;
+      mostraMessaggio(esito, `${prima.societa}: ${dettaglioApprovazione(prima.tipo, risposta)}${gruppo}.`, 'ok');
     } else {
-      await rifiutaRichiesta(richiesta.id, motivazione);
-      mostraMessaggio(esito, `Richiesta di ${richiesta.societa} rifiutata.`, 'ok');
+      if (voce.gruppoId === null) {
+        await rifiutaRichiesta(prima.id, motivazione);
+      } else {
+        await rifiutaGruppo(voce.gruppoId, motivazione);
+      }
+      mostraMessaggio(esito, `Richiesta di ${prima.societa} rifiutata.`, 'ok');
     }
     await caricaInAttesa();
     await caricaCalendario();
@@ -444,12 +601,16 @@ async function mostraCalendario(intervallo) {
       `Calendario ${eMese ? 'mensile' : 'settimanale'} con i nomi delle società`,
     );
     renderLegendaCalendario(dati.prenotazioni);
+    // One block per booking: the source of the details popup, the monthly
+    // entries and the list under the calendar.
+    const blocchi = raggruppaPrenotazioni(dati.prenotazioni);
+    g_blocchi = new Map(blocchi.map((blocco) => [blocco.richiestaId, blocco]));
     if (eMese) {
-      renderCalendarioMese(intervallo.mese, dati.prenotazioni);
+      renderCalendarioMese(intervallo.mese, blocchi);
     } else {
       renderCalendarioSettimana(intervallo.lunedi, dati.prenotazioni);
     }
-    renderElencoPrenotazioni(dati.prenotazioni, eMese);
+    renderElencoPrenotazioni(blocchi, eMese);
     mostraMessaggio(statoCalendario, '');
   } catch (errore) {
     if (versione !== g_versioneCalendario) return;
@@ -534,6 +695,15 @@ function renderCalendarioSettimana(lunedi, prenotazioni) {
          */
         const chiavePrecedente = chiaveSlot(giorno, minuti - PASSO_MIN);
         const inizioBlocco = perChiave.get(chiavePrecedente)?.richiesta_id !== prenotazione.richiesta_id;
+        // Every slot of a booked block opens its details popup; only the
+        // first one is a tab stop, so the block counts once for the keyboard.
+        rendiCliccabile(
+          cella,
+          'prenotazione',
+          prenotazione.richiesta_id,
+          `Dettagli prenotazione ${prenotazione.societa} ${etichetta.nomeGiorno} ${etichetta.dataBreve} ${oraTesto(minuti)}`,
+          inizioBlocco,
+        );
         if (inizioBlocco) {
           let slotDelBlocco = 1;
           while (perChiave.get(chiaveSlot(giorno, minuti + slotDelBlocco * PASSO_MIN))?.richiesta_id === prenotazione.richiesta_id) {
@@ -572,15 +742,15 @@ function renderCalendarioSettimana(lunedi, prenotazioni) {
  * painted with the color of the società that booked it. A day with more
  * bookings than its cell can show scrolls inside the cell (see .mese-voci).
  * @param {string} mese - month to draw, 'YYYY-MM'
- * @param {{slot_key: string, societa_id: number, societa: string, colore: string, richiesta_id: number, titolo: string}[]} prenotazioni
+ * @param {object[]} blocchi - bookings of the grid (utils.raggruppaPrenotazioni), in chronological order
  * @returns {void}
  */
-function renderCalendarioMese(mese, prenotazioni) {
+function renderCalendarioMese(mese, blocchi) {
   /** @type {Map<string, object[]>} bookings of the grid, by date */
   const perGiorno = new Map();
   // Chronological order in, chronological order out: every cell lists its
   // bookings from the earliest to the latest.
-  for (const blocco of raggruppaPrenotazioni(prenotazioni)) {
+  for (const blocco of blocchi) {
     const delGiorno = perGiorno.get(blocco.data);
     if (delGiorno === undefined) {
       perGiorno.set(blocco.data, [blocco]);
@@ -595,13 +765,15 @@ function renderCalendarioMese(mese, prenotazioni) {
     if (giorno === oggi) cella.classList.add('oggi');
     for (const blocco of perGiorno.get(giorno) ?? []) {
       const orario = `${blocco.oraInizio}–${blocco.oraFine}`;
-      voci.append(creaVoceMese({
+      const voce = creaVoceMese({
         orario,
         etichetta: blocco.societa,
         stato: 'occupato',
         colore: blocco.colore,
         descrizione: `${dataEstesa(giorno)} · ${orario} · ${blocco.societa} · ${blocco.titolo}`,
-      }));
+      });
+      rendiCliccabile(voce, 'prenotazione', blocco.richiestaId, `Dettagli prenotazione ${blocco.societa} ${dataEstesa(giorno)} ${orario}`);
+      voci.append(voce);
     }
     // Only a day that is not over can host a new booking, so only there the
     // "+" shortcut makes sense: elsewhere the popup would be born rejected.
@@ -610,14 +782,15 @@ function renderCalendarioMese(mese, prenotazioni) {
 }
 
 /**
- * Renders the list of the bookings of the shown interval, with the per-date
- * cancel action. Title and empty message follow the view, because the list
- * always mirrors what the calendar above it is showing.
- * @param {{slot_key: string, societa: string, richiesta_id: number, titolo: string}[]} prenotazioni
+ * Renders the list of the bookings of the shown interval; a future booking
+ * has a "Dettagli" button opening the same popup as the calendar cells (with
+ * Modifica and Annulla). Title and empty message follow the view, because the
+ * list always mirrors what the calendar above it is showing.
+ * @param {object[]} blocchi - bookings of the interval (utils.raggruppaPrenotazioni)
  * @param {boolean} eMese - true when the monthly view is on screen
  * @returns {void}
  */
-function renderElencoPrenotazioni(prenotazioni, eMese) {
+function renderElencoPrenotazioni(blocchi, eMese) {
   elemento('cal-titolo-lista').textContent = eMese ? 'Prenotazioni del mese' : 'Prenotazioni della settimana';
   elemento('vuoto-prenotazioni').textContent = eMese
     ? 'Nessuna prenotazione in questo mese.'
@@ -626,7 +799,6 @@ function renderElencoPrenotazioni(prenotazioni, eMese) {
   const oggi = adessoRoma().data;
   const lista = elemento('lista-prenotazioni');
   lista.textContent = '';
-  const blocchi = raggruppaPrenotazioni(prenotazioni);
   for (const blocco of blocchi) {
     const riga = document.createElement('li');
     const info = document.createElement('div');
@@ -642,37 +814,118 @@ function renderElencoPrenotazioni(prenotazioni, eMese) {
     riga.append(info);
 
     if (blocco.data >= oggi) {
-      const bottone = document.createElement('button');
-      bottone.type = 'button';
-      bottone.className = 'btn btn-pericolo btn-piccolo';
-      bottone.textContent = 'Annulla';
-      bottone.addEventListener('click', () => annullaData(blocco.richiestaId, blocco.societa, blocco.data, blocco.oraInizio, blocco.oraFine));
-      riga.append(bottone);
+      riga.append(bottoneAzione('Dettagli', 'btn', () => apriDettagliPrenotazione(blocco.richiestaId)));
     }
     lista.append(riga);
   }
   elemento('vuoto-prenotazioni').hidden = blocchi.length > 0;
 }
 
+/* ------------------------------------------------- dettagli prenotazione */
+
 /**
- * Cancels a single date (its richiesta) after confirmation.
+ * Opens the details popup of a booking of the interval on screen: what it is
+ * (società, activity, date, time, notes, whether it belongs to a series) and
+ * the two actions, Modifica and Annulla, each taking the ambito chosen in the
+ * popup when the booking is recurring. Past bookings are read-only.
  * @param {number} richiestaId
- * @param {string} societa - società name, for the confirm message
- * @param {string} data - 'YYYY-MM-DD'
- * @param {string} oraInizio - 'HH:MM'
- * @param {string} oraFine - 'HH:MM'
+ * @returns {void}
+ */
+function apriDettagliPrenotazione(richiestaId) {
+  const blocco = g_blocchi.get(richiestaId);
+  if (blocco === undefined) return;
+  const adesso = adessoRoma();
+  const futura = blocco.data > adesso.data || (blocco.data === adesso.data && blocco.oraInizio > adesso.ora);
+  const ricorrente = blocco.ricorrenzaId !== null;
+  g_dettagli.apri({
+    titolo: 'Prenotazione',
+    righe: [
+      { etichetta: 'Società', valore: blocco.societa },
+      { etichetta: 'Attività', valore: blocco.titolo },
+      { etichetta: 'Data', valore: dataEstesa(blocco.data) },
+      { etichetta: 'Orario', valore: `${blocco.oraInizio}–${blocco.oraFine}` },
+      { etichetta: 'Note', valore: blocco.note ?? '' },
+      { etichetta: 'Ricorrente', valore: ricorrente ? 'Sì, fa parte di una serie settimanale' : '' },
+    ],
+    ricorrente: ricorrente && futura,
+    avviso: futura ? undefined : 'Prenotazione già iniziata o passata: non si può più modificare né annullare.',
+    modifica: futura ? { testo: 'Modifica', azione: (ambito) => apriModificaPrenotazione(blocco, ambito) } : undefined,
+    annulla: futura ? { testo: 'Annulla prenotazione', azione: (ambito) => annullaPrenotazione(blocco, ambito) } : undefined,
+  });
+}
+
+/**
+ * Cancels a booking (or that occurrence and the following ones of its series)
+ * after confirmation, right away.
+ * @param {object} blocco - booking from g_blocchi
+ * @param {'singola'|'successive'} ambito
  * @returns {Promise<void>}
  */
-async function annullaData(richiestaId, societa, data, oraInizio, oraFine) {
-  const conferma = confirm(`Annullare la prenotazione di ${societa} del ${dataEstesa(data)} ${oraInizio}–${oraFine}?`);
+async function annullaPrenotazione(blocco, ambito) {
+  const descrizione = `${blocco.societa} del ${dataEstesa(blocco.data)} ${blocco.oraInizio}–${blocco.oraFine}`;
+  const conferma = confirm(
+    ambito === 'successive'
+      ? `Annullare la prenotazione di ${descrizione} E TUTTE LE SUCCESSIVE della stessa serie?`
+      : `Annullare la prenotazione di ${descrizione}?`,
+  );
   if (!conferma) return;
   try {
-    await annullaRichiestaAdmin(richiestaId);
-    mostraMessaggio(elemento('esito-cal'), 'Prenotazione annullata.', 'ok');
+    const risposta = await annullaRichiestaAdmin(blocco.richiestaId, ambito);
+    g_dettagli.chiudi();
+    const conteggio = risposta.richieste_annullate > 1 ? `${risposta.richieste_annullate} prenotazioni annullate` : 'Prenotazione annullata';
+    mostraMessaggio(elemento('esito-cal'), `${conteggio} (${risposta.slot_liberati} slot liberati).`, 'ok');
     await caricaCalendario();
   } catch (errore) {
-    mostraMessaggio(elemento('esito-cal'), errore.message, 'errore');
+    mostraMessaggio(elemento('esito-dettagli'), errore.message, 'errore');
   }
+}
+
+/**
+ * Opens the booking form in edit mode, prefilled with the booking. The
+ * società cannot change (a booking belongs to who made it) and the repetition
+ * block is hidden: a series is edited through the ambito, not by redefining
+ * it. On "questa e le successive" the date is locked too, because only time,
+ * activity and notes propagate to the series.
+ * @param {object} blocco - booking from g_blocchi
+ * @param {'singola'|'successive'} ambito
+ * @returns {void}
+ */
+function apriModificaPrenotazione(blocco, ambito) {
+  g_modifica = { blocco, ambito };
+  g_dettagli.chiudi();
+  const successive = ambito === 'successive';
+  elemento('titolo-dialogo-diretta').textContent = successive ? 'Modifica prenotazione e successive' : 'Modifica prenotazione';
+  elemento('bottone-diretta').textContent = 'Salva modifiche';
+  const selettoreSocieta = elemento('dir-societa');
+  selettoreSocieta.value = String(blocco.societaId);
+  selettoreSocieta.disabled = true;
+  elemento('dir-titolo').value = blocco.titolo;
+  elemento('dir-data').value = blocco.data;
+  elemento('dir-data').disabled = successive;
+  elemento('dir-inizio').value = blocco.oraInizio;
+  elemento('dir-fine').value = blocco.oraFine;
+  elemento('dir-note').value = blocco.note ?? '';
+  g_ripetizione.mostra(false);
+  mostraMessaggio(elemento('esito-form'), '');
+  elemento('dialogo-diretta').showModal();
+}
+
+/**
+ * Puts the booking form back in create mode (title, button, enabled fields,
+ * repetition block shown). Idempotent: called before every opening for a new
+ * booking, so a previous edit never leaks into it.
+ * @returns {void}
+ */
+function impostaModalitaNuova() {
+  if (g_modifica === null) return;
+  g_modifica = null;
+  elemento('titolo-dialogo-diretta').textContent = 'Nuova prenotazione diretta';
+  elemento('bottone-diretta').textContent = 'Prenota';
+  elemento('dir-societa').disabled = false;
+  elemento('dir-data').disabled = false;
+  elemento('dir-titolo').value = TITOLO_PREDEFINITO;
+  elemento('dir-note').value = '';
+  g_ripetizione.mostra(true);
 }
 
 /* --------------------------------------------------- prenotazione diretta */
@@ -687,6 +940,7 @@ async function annullaData(richiestaId, societa, data, oraInizio, oraFine) {
  * @returns {void}
  */
 function apriDirettaPerSlot(giorno, minuti) {
+  impostaModalitaNuova();
   elemento('dir-data').value = giorno;
   elemento('dir-inizio').value = oraTesto(minuti);
   elemento('dir-fine').value = oraTesto(minuti + PASSO_MIN);
@@ -699,12 +953,52 @@ function apriDirettaPerSlot(giorno, minuti) {
 }
 
 /**
- * @param {SubmitEvent} evento - direct booking form submit
+ * Saves the booking form in edit mode: the new time, activity and notes (and
+ * the new date, on a single occurrence) go straight to the booking, or to
+ * that occurrence and the following ones of its series.
+ * @param {HTMLElement} esitoForm - status element inside the popup
+ * @returns {Promise<void>}
+ */
+async function salvaModifica(esitoForm) {
+  const { blocco, ambito } = g_modifica;
+  const corpo = {
+    titolo: elemento('dir-titolo').value.trim(),
+    ora_inizio: elemento('dir-inizio').value,
+    ora_fine: elemento('dir-fine').value,
+    note: elemento('dir-note').value.trim(),
+    ambito,
+  };
+  if (ambito === 'singola') corpo.data = elemento('dir-data').value;
+  const risposta = await modificaPrenotazioneAdmin(blocco.richiestaId, corpo);
+  elemento('dialogo-diretta').close();
+  const conteggio = risposta.richieste_modificate > 1 ? `${risposta.richieste_modificate} prenotazioni modificate` : 'Prenotazione modificata';
+  mostraMessaggio(elemento('esito-cal'), `${conteggio} (${risposta.slot_inseriti} slot).`, 'ok');
+  impostaModalitaNuova();
+  mostraMessaggio(esitoForm, '');
+  await caricaCalendario();
+}
+
+/**
+ * @param {SubmitEvent} evento - booking form submit (new booking or edit)
  * @returns {Promise<void>}
  */
 async function prenotaDiretta(evento) {
   evento.preventDefault();
   const esitoForm = elemento('esito-form');
+  const bottoneInvio = elemento('bottone-diretta');
+  if (g_modifica !== null) {
+    bottoneInvio.disabled = true;
+    try {
+      await salvaModifica(esitoForm);
+    } catch (errore) {
+      // Errors (e.g. slot conflicts) stay inside the popup, so the admin can
+      // adjust date or time without reopening it.
+      mostraMessaggio(esitoForm, messaggioConflitti(errore), 'errore');
+    } finally {
+      bottoneInvio.disabled = false;
+    }
+    return;
+  }
   const erroreRipetizione = g_ripetizione.erroreCampi();
   if (erroreRipetizione !== null) {
     mostraMessaggio(esitoForm, erroreRipetizione, 'errore');

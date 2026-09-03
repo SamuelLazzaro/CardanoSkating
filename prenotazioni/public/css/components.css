@@ -522,6 +522,68 @@ fieldset.campo {
     color: #5b4a8a;
 }
 
+/* tipo di richiesta (modifica di una prenotazione approvata) */
+.badge-modifica {
+    background: #e3eef8;
+    color: #2d5a87;
+}
+
+/* -------------------------------------------------------- popup dettagli */
+
+/* label/value rows of the details popup: two columns on wide screens, one
+   below the other on a phone */
+.dettagli {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 0.35rem 1rem;
+    margin: 0 0 1rem;
+    font-size: 0.92rem;
+}
+
+.dettagli dt {
+    font-weight: 600;
+    color: var(--testo-tenue);
+}
+
+.dettagli dd {
+    margin: 0;
+    /* notes are free text and may be long: keep them inside the popup */
+    overflow-wrap: anywhere;
+    white-space: pre-line;
+}
+
+/* the two ambito radios ("solo questa data" / "questa e le successive") */
+.scelta-ambito {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    margin-bottom: 1rem;
+}
+
+/* text shown before/after a change request: "18:00–19:00 → 19:00–20:00" */
+.variazione {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+}
+
+.variazione .prima {
+    text-decoration: line-through;
+    color: var(--testo-tenue);
+}
+
+@media (max-width: 480px) {
+    .dettagli {
+        grid-template-columns: 1fr;
+        gap: 0.1rem;
+    }
+
+    .dettagli dd {
+        margin-bottom: 0.5rem;
+    }
+}
+
 /*
  * Pending-requests counter on the bell of the section nav (admin page only):
  * white number on a brand-orange rectangle, anchored to the top-right corner
@@ -794,6 +856,39 @@ fieldset.campo {
 /* first slot of a booked block: anchor for the block label overlay */
 .slot.con-etichetta {
     position: relative;
+}
+
+/*
+ * Own bookings and requests (area società) and every booked block (admin)
+ * open the details popup on click: the cell or entry is a button
+ * (role="button", see rendiCliccabile in js/ui.js). The pressed look is a
+ * thicker bar of the slot color on the left edge, shared by :hover, the touch
+ * twin .is-tapped (see js/tap-feedback.js) and the keyboard focus.
+ */
+.slot.cliccabile,
+.mese-voce.cliccabile {
+    --cliccabile-barra-attiva: inset 6px 0 0 var(--colore-slot);
+    cursor: pointer;
+    transition: box-shadow var(--t-veloce);
+}
+
+@media (pointer: fine) {
+    .slot.cliccabile:hover,
+    .mese-voce.cliccabile:hover {
+        box-shadow: var(--cliccabile-barra-attiva);
+    }
+}
+
+.slot.cliccabile.is-tapped,
+.mese-voce.cliccabile.is-tapped {
+    box-shadow: var(--cliccabile-barra-attiva);
+}
+
+.slot.cliccabile:focus-visible,
+.mese-voce.cliccabile:focus-visible {
+    box-shadow: var(--cliccabile-barra-attiva);
+    outline: 2px solid var(--accento-scuro);
+    outline-offset: -2px;
 }
 
 /*

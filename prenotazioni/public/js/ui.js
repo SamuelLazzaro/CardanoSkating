@@ -1,7 +1,10 @@
 /* ui.js — DOM manipulation helpers shared by the pages. No API calls here. */
-import { APERTURA_MIN, CHIUSURA_MIN, PASSO_MIN, TESTO_STATO } from './constants.js';
+import { APERTURA_MIN, CHIUSURA_MIN, PASSO_MIN, TESTO_AMBITO, TESTO_STATO } from './constants.js';
 import { eUltimoInputTouch } from './tap-feedback.js';
 import { eColoreEsadecimale, etichettaGiorno, meseDellaData, oraTesto } from './utils.js';
+
+/** @type {string} class of a calendar cell or entry that opens the details popup */
+const CLASSE_CLICCABILE = 'cliccabile';
 
 /** @type {string} class of the "+" shortcut button placed on free slots */
 const CLASSE_BOTTONE_SLOT = 'btn-aggiungi-slot';
@@ -304,6 +307,145 @@ export function preparaScorciatoiaSlot(contenitore, alSelezione) {
       && cellaCliccata.querySelector(`.${CLASSE_BOTTONE_SLOT}`) !== null;
     if (daRivelare) cellaCliccata.classList.add(CLASSE_SLOT_RIVELATO);
   });
+}
+
+/**
+ * Marks a calendar cell (weekly grid) or entry (monthly grid) as the handle of
+ * an own item, so a click on it opens the details popup: the item is described
+ * by a kind and an id kept in data attributes, read back by
+ * preparaAperturaDettagli. The element becomes a real button for keyboard and
+ * assistive technologies (Enter/Space are handled by the delegated listener).
+ * @param {HTMLElement} elemento - the .slot or .mese-voce
+ * @param {string} genere - kind of item, e.g. 'prenotazione' or 'ricorrenza'
+ * @param {number} id - id of the item
+ * @param {string} etichetta - accessible name, e.g. "Dettagli prenotazione mar 18/08 18:00"
+ * @param {boolean} [focalizzabile] - false for the follow-up slots of a block: they answer to
+ *   the mouse but stay out of the tab order, so a two-hour booking is one tab stop, not four
+ * @returns {void}
+ */
+export function rendiCliccabile(elemento, genere, id, etichetta, focalizzabile = true) {
+  elemento.classList.add(CLASSE_CLICCABILE);
+  elemento.dataset.genere = genere;
+  elemento.dataset.id = String(id);
+  if (!focalizzabile) return;
+  elemento.setAttribute('role', 'button');
+  elemento.tabIndex = 0;
+  elemento.setAttribute('aria-label', etichetta);
+}
+
+/**
+ * Wires the clickable cells and entries of a calendar grid with one delegated
+ * listener, which survives every re-render. A click on the "+" shortcut or on
+ * a day number is left to their own listeners.
+ * @param {HTMLElement} contenitore - the grid container (#cal-griglia)
+ * @param {(genere: string, id: number) => void} allApertura - opens the details of the item
+ * @returns {void}
+ */
+export function preparaAperturaDettagli(contenitore, allApertura) {
+  const gestisci = (evento) => {
+    const bersaglio = evento.target instanceof Element ? evento.target : null;
+    if (bersaglio?.closest('button') !== null) return; // "+" shortcut or day number
+    const cella = bersaglio?.closest(`.${CLASSE_CLICCABILE}`) ?? null;
+    if (cella === null || !contenitore.contains(cella)) return;
+    if (evento.type === 'keydown') {
+      if (evento.key !== 'Enter' && evento.key !== ' ') return;
+      evento.preventDefault();
+    }
+    allApertura(cella.dataset.genere, Number(cella.dataset.id));
+  };
+  contenitore.addEventListener('click', gestisci);
+  contenitore.addEventListener('keydown', gestisci);
+}
+
+/**
+ * @typedef {object} ElementiDettagli
+ * @property {HTMLDialogElement} dialogo
+ * @property {HTMLElement} titolo - heading of the popup
+ * @property {HTMLElement} elenco - <dl> that receives the detail rows
+ * @property {HTMLElement} bloccoAmbito - fieldset with the two ambito radios, shown for recurring items
+ * @property {HTMLElement} avviso - paragraph for a notice (e.g. "annullamento richiesto, in attesa")
+ * @property {HTMLButtonElement} bottoneModifica
+ * @property {HTMLButtonElement} bottoneAnnulla
+ * @property {HTMLButtonElement} bottoneChiudi
+ * @property {HTMLElement} esito - status element inside the popup
+ */
+
+/**
+ * @typedef {object} DatiDettagli
+ * @property {string} titolo - heading text
+ * @property {{etichetta: string, valore: string}[]} righe - detail rows (label + value), empty values are skipped
+ * @property {boolean} ricorrente - true to offer the "questa e le successive" choice
+ * @property {string} [avviso] - notice shown instead of the actions when they are not available
+ * @property {{testo: string, azione: (ambito: 'singola'|'successive') => void}} [modifica] - the Modifica button, absent to hide it
+ * @property {{testo: string, azione: (ambito: 'singola'|'successive') => void}} [annulla] - the Annulla button, absent to hide it
+ */
+
+/**
+ * Wires the details popup shared by the calendar and the lists: the page hands
+ * over the markup once and then calls apri() with the rows and the actions of
+ * the clicked item. On a recurring item the popup asks for the ambito ("solo
+ * questa data" / "questa e le successive") and passes the choice to the
+ * action. Every text goes through textContent: it is user data.
+ * @param {ElementiDettagli} elementi
+ * @returns {{apri: (dati: DatiDettagli) => void, chiudi: () => void, ambito: () => 'singola'|'successive'}}
+ */
+export function preparaDialogoDettagli(elementi) {
+  /** @type {DatiDettagli|null} item currently shown */
+  let corrente = null;
+
+  /** @returns {'singola'|'successive'} the chosen ambito, 'singola' when the choice is hidden */
+  function ambito() {
+    if (elementi.bloccoAmbito.hidden) return 'singola';
+    const scelta = elementi.bloccoAmbito.querySelector('input[name="ambito"]:checked');
+    return scelta?.value === 'successive' ? 'successive' : 'singola';
+  }
+
+  elementi.bottoneChiudi.addEventListener('click', () => elementi.dialogo.close());
+  elementi.dialogo.addEventListener('click', (evento) => {
+    if (evento.target === elementi.dialogo) elementi.dialogo.close();
+  });
+  elementi.bottoneModifica.addEventListener('click', () => corrente?.modifica?.azione(ambito()));
+  elementi.bottoneAnnulla.addEventListener('click', () => corrente?.annulla?.azione(ambito()));
+
+  // Labels of the two radios come from the shared constants, so the popup
+  // and the server speak the same words.
+  for (const radio of elementi.bloccoAmbito.querySelectorAll('input[name="ambito"]')) {
+    const testo = radio.parentElement?.querySelector('span');
+    if (testo) testo.textContent = TESTO_AMBITO[radio.value] ?? radio.value;
+  }
+
+  return {
+    ambito,
+
+    apri(dati) {
+      corrente = dati;
+      elementi.titolo.textContent = dati.titolo;
+      elementi.elenco.textContent = '';
+      for (const riga of dati.righe) {
+        if (!riga.valore) continue;
+        const termine = document.createElement('dt');
+        termine.textContent = riga.etichetta;
+        const valore = document.createElement('dd');
+        valore.textContent = riga.valore;
+        elementi.elenco.append(termine, valore);
+      }
+      elementi.bloccoAmbito.hidden = !dati.ricorrente;
+      const radioSingola = elementi.bloccoAmbito.querySelector('input[name="ambito"][value="singola"]');
+      if (radioSingola) radioSingola.checked = true;
+      elementi.avviso.textContent = dati.avviso ?? '';
+      elementi.avviso.hidden = !dati.avviso;
+      elementi.bottoneModifica.hidden = !dati.modifica;
+      elementi.bottoneModifica.textContent = dati.modifica?.testo ?? 'Modifica';
+      elementi.bottoneAnnulla.hidden = !dati.annulla;
+      elementi.bottoneAnnulla.textContent = dati.annulla?.testo ?? 'Annulla';
+      mostraMessaggio(elementi.esito, '');
+      elementi.dialogo.showModal();
+    },
+
+    chiudi() {
+      elementi.dialogo.close();
+    },
+  };
 }
 
 /**
