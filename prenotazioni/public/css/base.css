@@ -38,7 +38,6 @@
     --accento-testo: #a35100;     /* links / colored text (5.6:1 on white) */
     --accento-testo-scuro: #7d3e00; /* hover state of colored text */
     --accento-tinta: #fff3e5;     /* pale orange wash for hover backgrounds */
-    --velo-accento: rgba(255, 136, 0, 0.18); /* orange wash for hovers on dark surfaces */
     --testo-tenue-scuro: #b5b5b5; /* muted gray on the dark surfaces (header, nav) */
     /* calendar slot states: each one is washed out and given a left bar by the
        .slot rules in components.css, so only the base hue lives here. Past

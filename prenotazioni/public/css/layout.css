@@ -42,9 +42,6 @@
 
 .testata-nav a,
 .testata-nav button {
-    /* shared between :hover, :focus-visible and .is-tapped; orange wash on
-       the dark header, same ghost-button pattern as the main site */
-    --nav-fondo-attivo: var(--velo-accento);
     font: inherit;
     color: #fff;
     background: none;
@@ -54,24 +51,23 @@
     border-radius: var(--raggio);
     padding: 0.4rem 0.8rem;
     cursor: pointer;
-    transition: background-color var(--t-veloce);
+    transition: background-color var(--t-veloce), color var(--t-veloce);
 }
 
 @media (pointer: fine) {
     .testata-nav a:hover,
     .testata-nav button:hover {
-        background: var(--nav-fondo-attivo);
+        background: white;
+        color: var(--accento);
     }
 }
 
 .testata-nav a.is-tapped,
-.testata-nav button.is-tapped {
-    background: var(--nav-fondo-attivo);
-}
-
+.testata-nav button.is-tapped,
 .testata-nav a:focus-visible,
 .testata-nav button:focus-visible {
-    background: var(--nav-fondo-attivo);
+    background: white;
+    color: var(--accento);
 }
 
 /* ------------------------------------------------- navigazione sezioni */
@@ -111,8 +107,6 @@ body:has(.nav-sezioni:not([hidden])) {
 }
 
 .nav-voce {
-    /* shared between :hover, :focus-visible and .is-tapped */
-    --nav-voce-fondo-attivo: var(--velo-accento);
     flex: 1;
     display: flex;
     flex-direction: column;
@@ -142,16 +136,15 @@ body:has(.nav-sezioni:not([hidden])) {
 
 @media (pointer: fine) {
     .nav-voce:hover {
-        background: var(--nav-voce-fondo-attivo);
+        background: white;
+        color: var(--accento);
     }
 }
 
-.nav-voce.is-tapped {
-    background: var(--nav-voce-fondo-attivo);
-}
-
+.nav-voce.is-tapped,
 .nav-voce:focus-visible {
-    background: var(--nav-voce-fondo-attivo);
+    background: white;
+    color: var(--accento);
 }
 
 /* wrapper around the bell icon: positioning anchor of .badge-notifiche
