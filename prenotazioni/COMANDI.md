@@ -50,7 +50,7 @@ Se la modifica include una **nuova migrazione**, vedi l'operazione
 npm run dev           # dev server su http://localhost:8787
 ```
 
-Pagine: `/` calendario pubblico · `/area` area società · `/admin` pannello
+Pagine: `/area` area società (la radice `/` ci reindirizza) · `/admin` pannello
 admin (password = `ADMIN_PASSWORD` in `.dev.vars`).
 
 In parallelo, se stai toccando logica o API:

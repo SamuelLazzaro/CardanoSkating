@@ -151,9 +151,9 @@ societa.get('/me', (c) => {
 });
 
 /**
- * Calendario dell'area società: stessi parametri del calendario pubblico
+ * Calendario dell'area società: stessi parametri del calendario admin
  * (`settimana=AAAA-MM-GG` oppure `mese=AAAA-MM`, griglia mensile a settimane
- * intere), ma ogni slot porta anche la società che lo ha prenotato (id, nome,
+ * intere), e ogni slot porta la società che lo ha prenotato (id, nome,
  * colore) e l'id della richiesta, che raggruppa gli slot di uno stesso blocco.
  * Titolo e note delle prenotazioni restano riservati: le società vedono CHI
  * occupa una fascia, non cosa ci fa.

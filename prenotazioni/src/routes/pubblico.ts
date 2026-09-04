@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import type { Bindings } from '../tipi';
-import { aggiungiGiorni, intervalloCalendario, oraRoma } from '../slots';
+import { aggiungiGiorni, oraRoma } from '../slots';
 import { COOKIE_SOCIETA, creaSessione, DURATA_SOCIETA_S, hashToken, scriviCookieSessione } from '../auth';
 import { generaICS, type EventoICS } from '../ics';
 import { scriviAudit } from '../util';
@@ -11,25 +11,11 @@ const TOKEN_RE = /^[A-Za-z0-9-]{16,64}$/;
 export const pubblico = new Hono<{ Bindings: Bindings }>();
 
 /**
- * Calendario pubblico: gli slot occupati dell'intervallo richiesto — una
- * settimana (`settimana=AAAA-MM-GG`) o la griglia di un mese (`mese=AAAA-MM`) —
- * senza alcun dato sulla società. Una sola query in entrambi i casi: le
- * slot_key hanno formato ordinabile a larghezza fissa, quindi qualsiasi
- * intervallo di date è un range lessicografico.
+ * Radice del sito: non esiste una pagina pubblica: chi arriva sul dominio nudo
+ * viene mandato all'area società, che senza sessione spiega che serve il link
+ * personale. L'admin entra direttamente da /admin.
  */
-pubblico.get('/api/calendario', async (c) => {
-  const intervallo = intervalloCalendario(c.req.query('settimana'), c.req.query('mese'), new Date());
-  if (intervallo.tipo === 'errore') return c.json({ errore: intervallo.messaggio }, 400);
-  const { results } = await c.env.DB
-    .prepare('SELECT slot_key FROM prenotazioni WHERE slot_key >= ?1 AND slot_key < ?2 ORDER BY slot_key')
-    .bind(`${intervallo.dal}_0000`, `${aggiungiGiorni(intervallo.al, 1)}_0000`)
-    .all<{ slot_key: string }>();
-  const slotOccupati = results.map((r) => r.slot_key);
-  if (intervallo.tipo === 'mese') {
-    return c.json({ mese: intervallo.mese, dal: intervallo.dal, al: intervallo.al, slot_occupati: slotOccupati });
-  }
-  return c.json({ settimana: intervallo.lunedi, slot_occupati: slotOccupati });
-});
+pubblico.get('/', (c) => c.redirect('/area', 302));
 
 /**
  * Accesso società via link personale: se il token corrisponde a una società

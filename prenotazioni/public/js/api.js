@@ -29,24 +29,6 @@ async function richiestaJson(url, opzioni = {}) {
 }
 
 /**
- * @param {string} lunedi - Monday of the requested week, 'YYYY-MM-DD'
- * @returns {Promise<{settimana: string, slot_occupati: string[]}>}
- */
-export function ottieniCalendario(lunedi) {
-  return richiestaJson(`/api/calendario?settimana=${lunedi}`);
-}
-
-/**
- * Occupied slots of a whole monthly grid (whole weeks, spill-over days
- * included): one call per month instead of one per week.
- * @param {string} mese - requested month, 'YYYY-MM'
- * @returns {Promise<{mese: string, dal: string, al: string, slot_occupati: string[]}>}
- */
-export function ottieniCalendarioMese(mese) {
-  return richiestaJson(`/api/calendario?mese=${mese}`);
-}
-
-/**
  * Calendar of the area società: every booked slot with the società that booked
  * it (name and color), no activity title nor notes.
  * @param {string} lunedi - Monday of the requested week, 'YYYY-MM-DD'

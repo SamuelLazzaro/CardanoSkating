@@ -1,9 +1,9 @@
 /**
  * Test sul colore distintivo delle società (migrazione 0006): validazione
- * #RRGGBB lato server su creazione e modifica, esposizione nelle viste
- * autenticate (elenco società, calendario admin, /me della società) e
- * anonimato del calendario pubblico, che non deve mai contenere colori né
- * nomi società.
+ * #RRGGBB lato server su creazione e modifica ed esposizione nelle viste
+ * autenticate (elenco società, calendario admin, /me della società). Il colore
+ * esce solo da API che richiedono una sessione: non esistono più viste
+ * anonime.
  */
 import { describe, expect, it } from 'vitest';
 import { env } from 'cloudflare:test';
@@ -56,7 +56,7 @@ describe('validazione del colore', () => {
 });
 
 describe('esposizione del colore nelle viste autenticate', () => {
-  it('calendario admin e /me della società espongono il colore; il calendario pubblico no', async () => {
+  it('calendario admin e /me della società espongono il colore', async () => {
     const cookieAmm = await cookieAdmin();
     const creazione = await postJson('/api/admin/societa', cookieAmm, { ...ANAGRAFICA, colore: '#cc0011' });
     const { id, link_accesso } = (await creazione.json()) as { id: number; link_accesso: string };
@@ -77,15 +77,9 @@ describe('esposizione del colore nelle viste autenticate', () => {
     const corpoProfilo = (await profilo.json()) as { societa: { colore: string } };
     expect(corpoProfilo.societa.colore).toBe('#cc0011');
 
-    // Anonimato: la risposta pubblica contiene solo le slot_key, mai colori
-    // o nomi società.
-    const pubblico = await app.request(`/api/calendario?settimana=${dataFutura}`, {}, env);
-    expect(pubblico.status).toBe(200);
-    const testoPubblico = await pubblico.text();
-    expect(testoPubblico).not.toContain('#cc0011');
-    expect(testoPubblico).not.toContain('colore');
-    expect(testoPubblico).not.toContain('ASD Colorata');
-    const corpoPubblico = JSON.parse(testoPubblico) as Record<string, unknown>;
-    expect(Object.keys(corpoPubblico).sort()).toEqual(['settimana', 'slot_occupati']);
+    // Senza sessione il colore non esce da nessuna parte.
+    const anonimo = await app.request(`/api/admin/calendario?settimana=${dataFutura}`, {}, env);
+    expect(anonimo.status).toBe(401);
+    expect(await anonimo.text()).not.toContain('#cc0011');
   });
 });

@@ -1,6 +1,6 @@
 /**
- * Test di integrazione sul flusso dell'area società: accesso via link
- * personale, invio richieste (singole e ricorrenti) e annullamento.
+ * Test di integrazione sul flusso dell'area società: radice del sito, accesso
+ * via link personale, invio richieste (singole e ricorrenti) e annullamento.
  *
  * Le date sono calcolate rispetto a oggi (ora italiana) perché la creazione
  * di richieste rifiuta date passate o oltre un anno nel futuro.
@@ -27,6 +27,12 @@ const dataFutura = aggiungiGiorni(oggi, 7);
 const lunediFuturo = lunediDellaSettimana(aggiungiGiorni(oggi, 14));
 
 describe('accesso via link personale', () => {
+  it('la radice manda all\'area società, che senza sessione spiega come entrare', async () => {
+    const risposta = await app.request('/', {}, env);
+    expect(risposta.status).toBe(302);
+    expect(risposta.headers.get('location')).toBe('/area');
+  });
+
   it('imposta il cookie di sessione e /me risponde con i dati della società', async () => {
     const { token } = await creaSocietaConToken('ASD Rotelle');
     const cookie = await cookieSocieta(token);
@@ -281,7 +287,7 @@ describe('disponibilità degli slot al momento dell\'invio', () => {
     expect(risposta.status).toBe(409);
     const corpo = (await risposta.json()) as { errore: string; fasce_occupate: unknown[] };
     expect(corpo.fasce_occupate).toEqual([{ data, ora_inizio: '18:30', ora_fine: '19:00' }]);
-    // Nessuna identità rivelata: il calendario pubblico è anonimo.
+    // Nessuna identità rivelata: la diagnostica dei conflitti dà solo le fasce.
     expect(JSON.stringify(corpo)).not.toContain('Occupante');
 
     const rimaste = await env.DB

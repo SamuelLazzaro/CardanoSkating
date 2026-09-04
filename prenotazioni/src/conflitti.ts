@@ -97,10 +97,10 @@ export async function trovaConflitti(db: D1Database, chiaviCandidate: string[], 
 /**
  * Quali tra le chiavi candidate risultano già prenotate, SENZA dire da chi.
  *
- * È la variante destinata alle società: il calendario pubblico mostra gli
- * slot occupati in forma anonima (vedi routes/pubblico.ts) e la stessa
- * riservatezza vale qui. Il tipo di ritorno è di sole chiavi proprio perché
- * l'identità di chi occupa lo slot non possa sfuggire nella risposta.
+ * È la variante destinata alle società: la diagnostica di un conflitto dice
+ * quali fasce sono già prese, non a chi appartengono. Il tipo di ritorno è di
+ * sole chiavi proprio perché l'identità di chi occupa lo slot non possa
+ * sfuggire nella risposta.
  */
 export async function slotOccupati(db: D1Database, chiaviCandidate: string[], richiesteEscluse: number[] = []): Promise<string[]> {
   if (chiaviCandidate.length === 0) return [];

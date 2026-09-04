@@ -26,7 +26,6 @@ prenotazioni/
 │   ├── ics.ts            # generazione calendario iCalendar
 │   └── routes/           # pubblico.ts, societa.ts, admin.ts
 ├── public/               # frontend statico
-│   ├── index.html        # calendario pubblico (slot occupati, senza nomi)
 │   ├── area.html         # area riservata delle società
 │   ├── admin.html        # pannello amministrazione
 │   ├── css/              # base / layout / components / main (@import)
@@ -54,8 +53,9 @@ npm run migrate:local
 npm run dev
 ```
 
-Pagine: `/` calendario pubblico · `/area` area società · `/admin` pannello
-amministrazione (password = `ADMIN_PASSWORD` di `.dev.vars`).
+Pagine: `/area` area società · `/admin` pannello amministrazione (password =
+`ADMIN_PASSWORD` di `.dev.vars`). Non esiste una pagina pubblica: la radice `/`
+reindirizza a `/area`, che senza sessione spiega che serve il link personale.
 
 Per provare l'area società: crea una società dal pannello admin e visita il
 link personale mostrato (`/accesso/<token>`).
@@ -229,7 +229,7 @@ Consiglio: fai un backup prima di ogni `migrate:remote`.
   creazione o dalla modifica. Nel calendario admin e in quello dell'area
   società ogni prenotazione usa il colore della sua società (sfondo
   semitrasparente + barra piena, con il nome nella cella e legenda
-  dell'intervallo mostrato). Il calendario pubblico resta neutro e anonimo.
+  dell'intervallo mostrato).
 - **Calendario dell'area società** (`GET /api/societa/calendario`): stessa
   vista del pannello admin, con nome e colore della società su ogni fascia
   prenotata, così ogni società vede chi occupa il palazzetto. Titolo
@@ -244,7 +244,7 @@ Consiglio: fai un backup prima di ogni `migrate:remote`.
   riga totale; `GET /api/admin/report.csv?mese=AAAA-MM` esporta una riga per
   prenotazione in CSV per Excel italiano (BOM UTF-8, separatore `;`, numeri
   con la virgola, `Content-Disposition: attachment`). Le tariffe non
-  compaiono mai nell'area società né nella parte pubblica.
+  compaiono mai nell'area società.
 - **Vista settimanale o mensile**: nel pannello admin e nell'area società il
   calendario si commuta con l'interruttore "Settimana / Mese". La vista mensile
   disegna le settimane intere che contengono il mese (quindi anche i giorni di

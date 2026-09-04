@@ -190,11 +190,6 @@
     background: var(--superficie);
 }
 
-.quadretto-occupato {
-    background: var(--occupato);
-    border-color: var(--occupato);
-}
-
 .quadretto-passato {
     background: var(--passato);
 }
