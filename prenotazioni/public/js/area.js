@@ -15,17 +15,10 @@ import { PASSO_MIN, TITOLO_PREDEFINITO } from './constants.js';
 import {
   adessoRoma,
   aggiungiGiorni,
-  chiaveSlot,
   dataEstesa,
-  eColoreEsadecimale,
   elencoGiorni,
-  etichettaGiorno,
-  giorniGrigliaMese,
-  giorniSettimana,
-  minutiDaOra,
   oraTesto,
   origineSlotSocieta,
-  raggruppaSlotInFasce,
 } from './utils.js';
 import {
   annullaGruppo,
@@ -35,20 +28,15 @@ import {
   inviaRichiestaPrenotazione,
   modificaRichiestaInAttesa,
   modificaRicorrenzaInAttesa,
-  ottieniCalendario,
-  ottieniCalendarioMese,
+  ottieniCalendarioSocieta,
+  ottieniCalendarioSocietaMese,
   ottieniProfiloSocieta,
   ottieniRichiesteSocieta,
   richiediAnnullamento,
   richiediModifica,
 } from './api.js';
 import {
-  aggiungiBottoneGiorno,
-  aggiungiBottoneSlot,
-  costruisciGriglia,
-  costruisciGrigliaMese,
   creaBadge,
-  creaVoceMese,
   mostraMessaggio,
   mostraMessaggioConElenco,
   preparaAperturaDettagli,
@@ -57,8 +45,8 @@ import {
   preparaDrillDownGiorno,
   preparaScorciatoiaSlot,
   preparaSelectOrari,
-  rendiCliccabile,
 } from './ui.js';
+import { renderCalendarioMese, renderCalendarioSettimana, renderLegendaCalendario } from './render-calendario.js';
 import { creaVistaCalendario } from './vista-calendario.js';
 import { preparaFormRipetizione } from './form-ripetizione.js';
 import { preparaNavigazione } from './navigazione.js';
@@ -84,24 +72,12 @@ const ORA_PREDEFINITA = '18:00';
 const ORA_FINE_PREDEFINITA = '19:00';
 
 /**
- * Texts of a monthly view entry, per state of its slots. They mirror the three
- * states of the weekly grid: the area calendar never names the other società,
- * so somebody else's booking stays a plain "Occupato".
- * @type {Record<string, {etichetta: string, descrizione: string}>}
- */
-const VOCI_MESE = {
-  mio: { etichetta: 'Tua prenotazione', descrizione: 'la tua prenotazione' },
-  occupato: { etichetta: 'Occupato', descrizione: 'occupato' },
-  'in-attesa': { etichetta: 'In attesa', descrizione: 'la tua richiesta, in attesa di approvazione' },
-};
-
-/**
- * Tooltip text of an own slot, by the kind of item it belongs to (see
- * utils.origineSlotSocieta).
+ * Tooltip text of an own pending slot, by the kind of item it belongs to (see
+ * utils.origineSlotSocieta). Approved bookings need none: on the calendar they
+ * carry the società name like everybody else's.
  * @type {Record<string, string>}
  */
 const DESCRIZIONE_ORIGINE = {
-  approvata: 'la tua prenotazione',
   in_attesa: 'la tua richiesta, in attesa di approvazione',
   modifica: 'la tua richiesta di modifica, in attesa di approvazione',
   ricorrenza: 'la tua richiesta ricorrente, in attesa di approvazione',
@@ -109,6 +85,22 @@ const DESCRIZIONE_ORIGINE = {
 
 /** @type {Record<string, string>} readable name of a request type, for confirms and messages */
 const NOME_TIPO = { annullamento: 'annullamento', modifica: 'modifica' };
+
+/** @type {number|null} id of the logged-in società, from /api/societa/me */
+let g_societaId = null;
+
+/**
+ * How the shared calendar renders for a società: every booking shows the name
+ * and color of its società, but only the own ones open the details popup
+ * (kind 'approvata', so apriDettagli looks the booking up among the cached
+ * richieste); the activity titles never reach the area API.
+ * @type {import('./render-calendario.js').OpzioniCalendario}
+ */
+const OPZIONI_CALENDARIO = {
+  mostraAttivita: false,
+  dettagliDi: (societaId, richiestaId) => (societaId === g_societaId ? { genere: 'approvata', id: richiestaId } : null),
+  oraPredefinita: ORA_PREDEFINITA,
+};
 
 /** @type {object|null} week/month state of the calendar panel (js/vista-calendario.js) */
 let g_vistaCalendario = null;
@@ -149,18 +141,10 @@ async function avvia() {
     return;
   }
 
+  g_societaId = profilo.societa.id;
   elemento('sottotitolo-societa').textContent = profilo.societa.nome;
   elemento('campo-link-ics').value = profilo.link_ics;
   elemento('bottone-esci').hidden = false;
-
-  // Società color on the whole area view: the .con-colore rules recolor the
-  // own slots in the grid AND the matching legend square (defence in depth:
-  // the value is re-validated before touching the inline style).
-  if (eColoreEsadecimale(profilo.societa.colore)) {
-    const vistaArea = elemento('vista-area');
-    vistaArea.classList.add('con-colore');
-    vistaArea.style.setProperty('--colore-societa', profilo.societa.colore);
-  }
 
   preparaNavigazione(elemento('nav-sezioni'));
   preparaForm();
@@ -955,10 +939,12 @@ function caricaCalendario() {
 
 /**
  * Loads and renders the interval the toolbar asks for, a week or a month. The
- * public API answers with the occupied slots only, anonymous by design: the
- * società's own slots are recognized here, from the richieste and ricorrenze
- * already in memory. Stale responses are dropped, so fast navigation always
- * ends on the interval the user last asked for.
+ * area API names the società of every booked slot, so the grid is the same
+ * one the admin sees; what the API cannot know are the società's own requests
+ * still waiting for a decision, which are recognized here from the richieste
+ * and ricorrenze already in memory and drawn over the free slots. Stale
+ * responses are dropped, so fast navigation always ends on the interval the
+ * user last asked for.
  * @param {{vista: 'settimana'|'mese', lunedi: string, mese: string}} intervallo
  * @returns {Promise<void>}
  */
@@ -969,20 +955,16 @@ async function mostraCalendario(intervallo) {
   mostraMessaggio(statoCalendario, 'Caricamento…');
   try {
     const dati = eMese
-      ? await ottieniCalendarioMese(intervallo.mese)
-      : await ottieniCalendario(intervallo.lunedi);
+      ? await ottieniCalendarioSocietaMese(intervallo.mese)
+      : await ottieniCalendarioSocieta(intervallo.lunedi);
     if (versione !== g_versioneCalendario) return;
-    const occupati = new Set(dati.slot_occupati);
-    elemento('cal-griglia').setAttribute(
-      'aria-label',
-      eMese ? 'Calendario mensile con le prenotazioni di ogni giorno' : 'Calendario settimanale degli slot da 30 minuti',
-    );
+    renderLegendaCalendario(elemento('cal-legenda'), dati.prenotazioni);
     if (eMese) {
-      const origini = origineSlotSocieta(g_richieste, g_ricorrenze, dati.dal, dati.al);
-      renderCalendarioMese(intervallo.mese, occupati, origini);
+      const opzioni = { ...OPZIONI_CALENDARIO, inAttesa: slotInAttesa(dati.dal, dati.al) };
+      renderCalendarioMese(elemento('cal-griglia'), intervallo.mese, dati.prenotazioni, opzioni);
     } else {
-      const origini = origineSlotSocieta(g_richieste, g_ricorrenze, intervallo.lunedi, aggiungiGiorni(intervallo.lunedi, 6));
-      renderCalendarioSettimana(intervallo.lunedi, occupati, origini);
+      const opzioni = { ...OPZIONI_CALENDARIO, inAttesa: slotInAttesa(intervallo.lunedi, aggiungiGiorni(intervallo.lunedi, 6)) };
+      renderCalendarioSettimana(elemento('cal-griglia'), intervallo.lunedi, dati.prenotazioni, opzioni);
     }
     mostraMessaggio(statoCalendario, '');
   } catch (errore) {
@@ -992,157 +974,22 @@ async function mostraCalendario(intervallo) {
 }
 
 /**
- * @param {import('./utils.js').OrigineSlot} origine - what an own slot belongs to
- * @returns {number} id of the item (richiesta or ricorrenza)
+ * The società's own slots still waiting for a decision inside a date interval
+ * (pending request, pending change request, pending series), in the shape the
+ * shared calendar draws them. Approved bookings are left out: the API already
+ * returns them, with the società name, like everybody else's.
+ * @param {string} dal - first date of the interval, 'YYYY-MM-DD'
+ * @param {string} al - last date of the interval, 'YYYY-MM-DD'
+ * @returns {Map<string, import('./render-calendario.js').VoceInAttesa>} by slot key
  */
-const idOrigine = (origine) => (origine.genere === 'ricorrenza' ? origine.ricorrenza.id : origine.richiesta.id);
-
-/**
- * @param {string} lunedi - Monday of the week to draw, 'YYYY-MM-DD'
- * @param {Set<string>} occupati - all occupied slot keys of the week
- * @param {Map<string, import('./utils.js').OrigineSlot>} origini - the società's own slots and what they belong to
- * @returns {void}
- */
-function renderCalendarioSettimana(lunedi, occupati, origini) {
-  const adesso = adessoRoma();
-  const chiaveAdesso = chiaveSlot(adesso.data, Math.floor(adesso.minuti / PASSO_MIN) * PASSO_MIN);
-
-  costruisciGriglia(
-    elemento('cal-griglia'),
-    giorniSettimana(lunedi),
-    (cella, giorno, minuti) => {
-      const chiave = chiaveSlot(giorno, minuti);
-      const origine = origini.get(chiave);
-      const mio = origine?.genere === 'approvata';
-      const occupato = occupati.has(chiave);
-      const richiesto = origine !== undefined && !mio;
-      /*
-       * One state per cell, in decreasing priority. "occupato" comes before
-       * "richiesto" on purpose: when somebody else's booking was approved
-       * after this società sent its request, the slot really is gone, so the
-       * cell must not suggest otherwise — the tooltip mentions both.
-       */
-      let descrizione = 'libero';
-      if (mio) {
-        cella.classList.add('mio');
-        descrizione = DESCRIZIONE_ORIGINE.approvata;
-      } else if (occupato) {
-        cella.classList.add('occupato');
-        descrizione = richiesto ? 'occupato · hai una richiesta in attesa su questo slot' : 'occupato';
-      } else if (richiesto) {
-        cella.classList.add('in-attesa');
-        descrizione = DESCRIZIONE_ORIGINE[origine.genere];
-      }
-      const passato = chiave < chiaveAdesso;
-      if (passato) cella.classList.add('passato');
-      if (giorno === adesso.data) cella.classList.add('colonna-oggi');
-      const etichetta = etichettaGiorno(giorno);
-      // Own slots open the details popup; only the first slot of an item is a
-      // tab stop, so a two-hour booking counts once for the keyboard.
-      if (origine !== undefined && (mio || !occupato)) {
-        const precedente = origini.get(chiaveSlot(giorno, minuti - PASSO_MIN));
-        const primoSlot = precedente === undefined || precedente.genere !== origine.genere || idOrigine(precedente) !== idOrigine(origine);
-        rendiCliccabile(cella, origine.genere, idOrigine(origine), `Dettagli: ${descrizione}, ${etichetta.nomeGiorno} ${etichetta.dataBreve} ${oraTesto(minuti)}`, primoSlot);
-      }
-      // Only a free future slot can be requested, so only there the "+"
-      // shortcut makes sense: elsewhere the popup would be born rejected —
-      // or, on a slot already requested, would duplicate a pending request.
-      if (!occupato && !mio && !richiesto && !passato) aggiungiBottoneSlot(cella, giorno, minuti);
-      cella.title = `${etichetta.nomeGiorno} ${etichetta.dataBreve} · ${oraTesto(minuti)}–${oraTesto(minuti + PASSO_MIN)} · ${descrizione}`;
-    },
-    (testata, giorno) => {
-      if (giorno === adesso.data) testata.classList.add('oggi');
-    },
-  );
-}
-
-/**
- * Compresses the taken slots of the shown grid into the entries of the monthly
- * view. Every own slot belongs to one item (booking, pending request, pending
- * change request or pending series): its slots are grouped by item and then
- * compressed into continuous time ranges, so an entry is one clickable item.
- * Somebody else's slots are grouped anonymously into "Occupato" ranges. An
- * own pending slot that somebody else has meanwhile booked shows as occupied,
- * exactly as the weekly grid does.
- * @param {Set<string>} occupati - all occupied slot keys of the grid
- * @param {Map<string, import('./utils.js').OrigineSlot>} origini - the società's own slots and what they belong to
- * @returns {{data: string, oraInizio: string, oraFine: string, stato: string, origine?: import('./utils.js').OrigineSlot}[]} entries in chronological order
- */
-function vociDelMese(occupati, origini) {
-  /** @type {Map<string, {stato: string, origine?: object, chiavi: string[]}>} slot keys by item */
-  const perElemento = new Map();
-  const aggiungi = (chiaveElemento, stato, origine, chiave) => {
-    const gruppo = perElemento.get(chiaveElemento);
-    if (gruppo === undefined) {
-      perElemento.set(chiaveElemento, { stato, origine, chiavi: [chiave] });
-    } else {
-      gruppo.chiavi.push(chiave);
-    }
-  };
-  for (const chiave of new Set([...occupati, ...origini.keys()])) {
-    const origine = origini.get(chiave);
-    if (origine?.genere === 'approvata') {
-      aggiungi(`approvata:${origine.richiesta.id}`, 'mio', origine, chiave);
-    } else if (occupati.has(chiave)) {
-      aggiungi('occupato', 'occupato', undefined, chiave);
-    } else {
-      aggiungi(`${origine.genere}:${idOrigine(origine)}`, 'in-attesa', origine, chiave);
-    }
+function slotInAttesa(dal, al) {
+  const inAttesa = new Map();
+  for (const [chiave, origine] of origineSlotSocieta(g_richieste, g_ricorrenze, dal, al)) {
+    if (origine.genere === 'approvata') continue;
+    const id = origine.genere === 'ricorrenza' ? origine.ricorrenza.id : origine.richiesta.id;
+    inAttesa.set(chiave, { genere: origine.genere, id, descrizione: DESCRIZIONE_ORIGINE[origine.genere] });
   }
-
-  const voci = [];
-  for (const gruppo of perElemento.values()) {
-    for (const fascia of raggruppaSlotInFasce(gruppo.chiavi)) voci.push({ ...fascia, stato: gruppo.stato, origine: gruppo.origine });
-  }
-  return voci.sort((a, b) => (a.data + a.oraInizio).localeCompare(b.data + b.oraInizio));
-}
-
-/**
- * Renders the monthly view: one entry per booking inside the cell of its day.
- * The other società stay anonymous here, exactly as in the weekly view: their
- * bookings are plain "Occupato" entries, while the società's own ones carry its
- * color (or the yellow of an undecided request) and open the details popup.
- * A day with more entries than its cell can show scrolls inside the cell.
- * @param {string} mese - month to draw, 'YYYY-MM'
- * @param {Set<string>} occupati - all occupied slot keys of the grid
- * @param {Map<string, import('./utils.js').OrigineSlot>} origini - the società's own slots and what they belong to
- * @returns {void}
- */
-function renderCalendarioMese(mese, occupati, origini) {
-  /** @type {Map<string, object[]>} entries of the grid, by date */
-  const perGiorno = new Map();
-  for (const voce of vociDelMese(occupati, origini)) {
-    const delGiorno = perGiorno.get(voce.data);
-    if (delGiorno === undefined) {
-      perGiorno.set(voce.data, [voce]);
-    } else {
-      delGiorno.push(voce);
-    }
-  }
-
-  const oggi = adessoRoma().data;
-  costruisciGrigliaMese(elemento('cal-griglia'), mese, giorniGrigliaMese(mese), (cella, voci, giorno) => {
-    if (giorno < oggi) cella.classList.add('passato');
-    if (giorno === oggi) cella.classList.add('oggi');
-    for (const voce of perGiorno.get(giorno) ?? []) {
-      const orario = `${voce.oraInizio}–${voce.oraFine}`;
-      const testi = VOCI_MESE[voce.stato];
-      const descrizione = voce.origine ? DESCRIZIONE_ORIGINE[voce.origine.genere] : testi.descrizione;
-      const elementoVoce = creaVoceMese({
-        orario,
-        etichetta: testi.etichetta,
-        stato: voce.stato,
-        descrizione: `${dataEstesa(giorno)} · ${orario} · ${descrizione}`,
-      });
-      if (voce.origine) {
-        rendiCliccabile(elementoVoce, voce.origine.genere, idOrigine(voce.origine), `Dettagli: ${descrizione}, ${dataEstesa(giorno)} ${orario}`);
-      }
-      voci.append(elementoVoce);
-    }
-    // Only a day that is not over can host a new request, so only there the
-    // "+" shortcut makes sense.
-    if (giorno >= oggi) aggiungiBottoneGiorno(cella, giorno, minutiDaOra(ORA_PREDEFINITA));
-  });
+  return inAttesa;
 }
 
 /* ------------------------------------------------------------- sessione */

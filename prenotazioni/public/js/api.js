@@ -46,6 +46,24 @@ export function ottieniCalendarioMese(mese) {
   return richiestaJson(`/api/calendario?mese=${mese}`);
 }
 
+/**
+ * Calendar of the area società: every booked slot with the società that booked
+ * it (name and color), no activity title nor notes.
+ * @param {string} lunedi - Monday of the requested week, 'YYYY-MM-DD'
+ * @returns {Promise<{settimana: string, prenotazioni: {slot_key: string, societa_id: number, societa: string, colore: string, richiesta_id: number}[]}>}
+ */
+export function ottieniCalendarioSocieta(lunedi) {
+  return richiestaJson(`/api/societa/calendario?settimana=${lunedi}`);
+}
+
+/**
+ * @param {string} mese - requested month, 'YYYY-MM'
+ * @returns {Promise<{mese: string, dal: string, al: string, prenotazioni: {slot_key: string, societa_id: number, societa: string, colore: string, richiesta_id: number}[]}>}
+ */
+export function ottieniCalendarioSocietaMese(mese) {
+  return richiestaJson(`/api/societa/calendario?mese=${mese}`);
+}
+
 /** @returns {Promise<{societa: object, link_ics: string}>} */
 export function ottieniProfiloSocieta() {
   return richiestaJson('/api/societa/me');

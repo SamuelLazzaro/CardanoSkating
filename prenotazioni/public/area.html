@@ -84,16 +84,14 @@
                 </svg>
               </button>
             </div>
-            <div class="legenda" aria-hidden="true">
-              <span class="chip"><span class="quadretto quadretto-mio"></span> Prenotazioni approvate</span>
-              <span class="chip"><span class="quadretto quadretto-in-attesa"></span> Prenotazioni in attesa</span>
-              <span class="chip"><span class="quadretto quadretto-occupato"></span> Occupato</span>
+            <p id="cal-stato" class="stato" role="status" hidden></p>
+            <div id="cal-legenda" class="legenda" aria-label="Legenda dei colori delle società">
+              <span class="chip"><span class="quadretto quadretto-in-attesa"></span> Tue richieste in attesa</span>
               <span class="chip"><span class="quadretto quadretto-libero"></span> Libero</span>
               <span class="chip"><span class="quadretto quadretto-passato"></span> Passato</span>
             </div>
-            <p id="cal-stato" class="stato" role="status" hidden></p>
             <div class="scorri-griglia">
-              <div id="cal-griglia" class="calendario" aria-label="Calendario settimanale degli slot da 30 minuti"></div>
+              <div id="cal-griglia" class="calendario" aria-label="Calendario settimanale con i nomi delle società"></div>
             </div>
           </section>
 

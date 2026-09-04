@@ -223,6 +223,39 @@ export function raggruppaPrenotazioni(prenotazioni) {
   return blocchi.sort((a, b) => (a.data + a.oraInizio).localeCompare(b.data + b.oraInizio));
 }
 
+/**
+ * Compresses the own pending slots of the area calendar into the entries of
+ * the monthly view: one entry per pending item (request, change request or
+ * series) and continuous time range, as raggruppaPrenotazioni does for the
+ * bookings. A pending slot that somebody else has meanwhile booked is left
+ * out: the booking wins, exactly as in the weekly grid, and its own entry
+ * already tells that the slot is gone.
+ * @template {{genere: string, id: number}} V
+ * @param {Map<string, V>} inAttesa - own pending slots, by slot key
+ * @param {Set<string>} occupati - slot keys of the bookings on screen
+ * @returns {{data: string, oraInizio: string, oraFine: string, voce: V}[]} ranges in chronological order
+ */
+export function fasceInAttesa(inAttesa, occupati) {
+  /** @type {Map<string, {voce: V, chiavi: string[]}>} slot keys by pending item */
+  const perElemento = new Map();
+  for (const [chiave, voce] of inAttesa) {
+    if (occupati.has(chiave)) continue;
+    const chiaveElemento = `${voce.genere}:${voce.id}`;
+    const gruppo = perElemento.get(chiaveElemento);
+    if (gruppo === undefined) {
+      perElemento.set(chiaveElemento, { voce, chiavi: [chiave] });
+    } else {
+      gruppo.chiavi.push(chiave);
+    }
+  }
+
+  const fasce = [];
+  for (const gruppo of perElemento.values()) {
+    for (const fascia of raggruppaSlotInFasce(gruppo.chiavi)) fasce.push({ ...fascia, voce: gruppo.voce });
+  }
+  return fasce.sort((a, b) => (a.data + a.oraInizio).localeCompare(b.data + b.oraInizio));
+}
+
 /*
  * Splits the slots a società owns in a date interval into two sets, so the
  * area calendar can paint confirmed bookings and undecided requests

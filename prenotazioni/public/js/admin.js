@@ -14,15 +14,10 @@ import { COLORE_PREDEFINITO, MIN_MOTIVAZIONE, PASSO_MIN, TITOLO_PREDEFINITO } fr
 import {
   adessoRoma,
   aggiungiGiorni,
-  chiaveSlot,
   dataEstesa,
   eColoreEsadecimale,
   elencoGiorni,
-  etichettaGiorno,
   formattaSlotKey,
-  giorniGrigliaMese,
-  giorniSettimana,
-  minutiDaOra,
   numeroItaliano,
   oraTesto,
   raggruppaPrenotazioni,
@@ -52,12 +47,8 @@ import {
   sospendiSocieta,
 } from './api.js';
 import {
-  aggiungiBottoneGiorno,
-  aggiungiBottoneSlot,
-  costruisciGriglia,
-  costruisciGrigliaMese,
   creaBadge,
-  creaVoceMese,
+  creaQuadrettoColore,
   mostraMessaggio,
   preparaAperturaDettagli,
   preparaDialogo,
@@ -65,8 +56,8 @@ import {
   preparaDrillDownGiorno,
   preparaScorciatoiaSlot,
   preparaSelectOrari,
-  rendiCliccabile,
 } from './ui.js';
+import { renderCalendarioMese, renderCalendarioSettimana, renderLegendaCalendario } from './render-calendario.js';
 import { creaVistaCalendario } from './vista-calendario.js';
 import { preparaFormRipetizione } from './form-ripetizione.js';
 import { aggiornaBadgeNotifiche, preparaNavigazione } from './navigazione.js';
@@ -87,6 +78,18 @@ const ORA_PREDEFINITA = '10:00';
 
 /** @type {string} default end time of the direct booking form, 'HH:MM' */
 const ORA_FINE_PREDEFINITA = '11:00';
+
+/**
+ * How the shared calendar renders for the admin: activity titles under the
+ * società names and a details popup on every booking (the admin grid only
+ * holds bookings, so the kind is always 'prenotazione').
+ * @type {import('./render-calendario.js').OpzioniCalendario}
+ */
+const OPZIONI_CALENDARIO = {
+  mostraAttivita: true,
+  dettagliDi: (_societaId, richiestaId) => ({ genere: 'prenotazione', id: richiestaId }),
+  oraPredefinita: ORA_PREDEFINITA,
+};
 
 /** @type {object|null} week/month state of the calendar panel (js/vista-calendario.js) */
 let g_vistaCalendario = null;
@@ -596,19 +599,15 @@ async function mostraCalendario(intervallo) {
       ? await ottieniCalendarioAdminMese(intervallo.mese)
       : await ottieniCalendarioAdmin(intervallo.lunedi);
     if (versione !== g_versioneCalendario) return;
-    elemento('cal-griglia').setAttribute(
-      'aria-label',
-      `Calendario ${eMese ? 'mensile' : 'settimanale'} con i nomi delle società`,
-    );
-    renderLegendaCalendario(dati.prenotazioni);
-    // One block per booking: the source of the details popup, the monthly
-    // entries and the list under the calendar.
+    renderLegendaCalendario(elemento('cal-legenda'), dati.prenotazioni);
+    // One block per booking: the source of the details popup and of the list
+    // under the calendar.
     const blocchi = raggruppaPrenotazioni(dati.prenotazioni);
     g_blocchi = new Map(blocchi.map((blocco) => [blocco.richiestaId, blocco]));
     if (eMese) {
-      renderCalendarioMese(intervallo.mese, blocchi);
+      renderCalendarioMese(elemento('cal-griglia'), intervallo.mese, dati.prenotazioni, OPZIONI_CALENDARIO);
     } else {
-      renderCalendarioSettimana(intervallo.lunedi, dati.prenotazioni);
+      renderCalendarioSettimana(elemento('cal-griglia'), intervallo.lunedi, dati.prenotazioni, OPZIONI_CALENDARIO);
     }
     renderElencoPrenotazioni(blocchi, eMese);
     mostraMessaggio(statoCalendario, '');
@@ -616,169 +615,6 @@ async function mostraCalendario(intervallo) {
     if (versione !== g_versioneCalendario) return;
     mostraMessaggio(statoCalendario, errore.message, 'errore');
   }
-}
-
-/**
- * Small colored square used in the legend and in the società list. The color
- * is re-validated before touching the inline style (defence in depth: it is
- * data coming from the DB).
- * @param {string} colore - '#RRGGBB' società color from the API
- * @returns {HTMLSpanElement}
- */
-function creaQuadrettoColore(colore) {
-  const quadretto = document.createElement('span');
-  quadretto.className = 'quadretto';
-  if (eColoreEsadecimale(colore)) {
-    quadretto.style.background = colore;
-    quadretto.style.borderColor = colore;
-  }
-  return quadretto;
-}
-
-/**
- * Renders the società↔color legend of the shown week (one chip per società
- * with at least one booking).
- * @param {{societa_id: number, societa: string, colore: string}[]} prenotazioni
- * @returns {void}
- */
-function renderLegendaCalendario(prenotazioni) {
-  /** @type {Map<number, {societa: string, colore: string}>} */
-  const perSocieta = new Map(prenotazioni.map((p) => [p.societa_id, p]));
-  const legenda = elemento('cal-legenda');
-  legenda.textContent = '';
-  const ordinate = [...perSocieta.values()].sort((a, b) => a.societa.localeCompare(b.societa));
-  for (const voce of ordinate) {
-    const chip = document.createElement('span');
-    chip.className = 'chip';
-    const nome = document.createElement('span');
-    nome.textContent = voce.societa;
-    chip.append(creaQuadrettoColore(voce.colore), nome);
-    legenda.append(chip);
-  }
-  legenda.hidden = ordinate.length === 0;
-}
-
-/**
- * @param {string} lunedi - Monday of the week to draw, 'YYYY-MM-DD'
- * @param {{slot_key: string, societa: string, colore: string, richiesta_id: number, titolo: string}[]} prenotazioni
- * @returns {void}
- */
-function renderCalendarioSettimana(lunedi, prenotazioni) {
-  /** @type {Map<string, {societa: string, colore: string, richiesta_id: number, titolo: string}>} */
-  const perChiave = new Map(prenotazioni.map((p) => [p.slot_key, p]));
-  const adesso = adessoRoma();
-  const chiaveAdesso = chiaveSlot(adesso.data, Math.floor(adesso.minuti / PASSO_MIN) * PASSO_MIN);
-
-  costruisciGriglia(
-    elemento('cal-griglia'),
-    giorniSettimana(lunedi),
-    (cella, giorno, minuti) => {
-      const chiave = chiaveSlot(giorno, minuti);
-      const prenotazione = perChiave.get(chiave);
-      const etichetta = etichettaGiorno(giorno);
-      let descrizione = 'libero';
-      if (prenotazione) {
-        cella.classList.add('occupato');
-        if (eColoreEsadecimale(prenotazione.colore)) {
-          cella.classList.add('colorato');
-          cella.style.setProperty('--colore-societa', prenotazione.colore);
-        }
-        descrizione = `${prenotazione.societa} · ${prenotazione.titolo}`;
-        /*
-         * Block label: società name plus activity title, written only in the
-         * first slot of each booked block. To keep every grid row at its
-         * fixed height, the label is an absolutely positioned overlay sized
-         * on the number of consecutive slots of the same richiesta (CSS var
-         * --slot-del-blocco, see .blocco-etichetta): the slot height fits
-         * both text lines, the overlay height only clips overflowing text at
-         * the block boundary so it never covers a different booking.
-         */
-        const chiavePrecedente = chiaveSlot(giorno, minuti - PASSO_MIN);
-        const inizioBlocco = perChiave.get(chiavePrecedente)?.richiesta_id !== prenotazione.richiesta_id;
-        // Every slot of a booked block opens its details popup; only the
-        // first one is a tab stop, so the block counts once for the keyboard.
-        rendiCliccabile(
-          cella,
-          'prenotazione',
-          prenotazione.richiesta_id,
-          `Dettagli prenotazione ${prenotazione.societa} ${etichetta.nomeGiorno} ${etichetta.dataBreve} ${oraTesto(minuti)}`,
-          inizioBlocco,
-        );
-        if (inizioBlocco) {
-          let slotDelBlocco = 1;
-          while (perChiave.get(chiaveSlot(giorno, minuti + slotDelBlocco * PASSO_MIN))?.richiesta_id === prenotazione.richiesta_id) {
-            slotDelBlocco += 1;
-          }
-          const etichettaBlocco = document.createElement('span');
-          etichettaBlocco.className = 'blocco-etichetta';
-          etichettaBlocco.style.setProperty('--slot-del-blocco', String(slotDelBlocco));
-          const nome = document.createElement('span');
-          nome.className = 'slot-nome';
-          nome.textContent = prenotazione.societa;
-          const attivita = document.createElement('span');
-          attivita.className = 'slot-attivita';
-          attivita.textContent = prenotazione.titolo;
-          etichettaBlocco.append(nome, attivita);
-          cella.classList.add('con-etichetta');
-          cella.append(etichettaBlocco);
-        }
-      }
-      const passato = chiave < chiaveAdesso;
-      if (passato) cella.classList.add('passato');
-      if (giorno === adesso.data) cella.classList.add('colonna-oggi');
-      // Only a free future slot can be booked, so only there the "+"
-      // shortcut makes sense: elsewhere the popup would be born rejected.
-      if (!prenotazione && !passato) aggiungiBottoneSlot(cella, giorno, minuti);
-      cella.title = `${etichetta.nomeGiorno} ${etichetta.dataBreve} · ${oraTesto(minuti)}–${oraTesto(minuti + PASSO_MIN)} · ${descrizione}`;
-    },
-    (testata, giorno) => {
-      if (giorno === adesso.data) testata.classList.add('oggi');
-    },
-  );
-}
-
-/**
- * Renders the monthly view: one entry per booking inside the cell of its day,
- * painted with the color of the società that booked it. A day with more
- * bookings than its cell can show scrolls inside the cell (see .mese-voci).
- * @param {string} mese - month to draw, 'YYYY-MM'
- * @param {object[]} blocchi - bookings of the grid (utils.raggruppaPrenotazioni), in chronological order
- * @returns {void}
- */
-function renderCalendarioMese(mese, blocchi) {
-  /** @type {Map<string, object[]>} bookings of the grid, by date */
-  const perGiorno = new Map();
-  // Chronological order in, chronological order out: every cell lists its
-  // bookings from the earliest to the latest.
-  for (const blocco of blocchi) {
-    const delGiorno = perGiorno.get(blocco.data);
-    if (delGiorno === undefined) {
-      perGiorno.set(blocco.data, [blocco]);
-    } else {
-      delGiorno.push(blocco);
-    }
-  }
-
-  const oggi = adessoRoma().data;
-  costruisciGrigliaMese(elemento('cal-griglia'), mese, giorniGrigliaMese(mese), (cella, voci, giorno) => {
-    if (giorno < oggi) cella.classList.add('passato');
-    if (giorno === oggi) cella.classList.add('oggi');
-    for (const blocco of perGiorno.get(giorno) ?? []) {
-      const orario = `${blocco.oraInizio}–${blocco.oraFine}`;
-      const voce = creaVoceMese({
-        orario,
-        etichetta: blocco.societa,
-        stato: 'occupato',
-        colore: blocco.colore,
-        descrizione: `${dataEstesa(giorno)} · ${orario} · ${blocco.societa} · ${blocco.titolo}`,
-      });
-      rendiCliccabile(voce, 'prenotazione', blocco.richiestaId, `Dettagli prenotazione ${blocco.societa} ${dataEstesa(giorno)} ${orario}`);
-      voci.append(voce);
-    }
-    // Only a day that is not over can host a new booking, so only there the
-    // "+" shortcut makes sense: elsewhere the popup would be born rejected.
-    if (giorno >= oggi) aggiungiBottoneGiorno(cella, giorno, minutiDaOra(ORA_PREDEFINITA));
-  });
 }
 
 /**

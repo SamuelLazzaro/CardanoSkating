@@ -134,14 +134,13 @@ export function costruisciGrigliaMese(contenitore, mese, giorni, decoraCella) {
 }
 
 /**
- * One booking entry of a day cell in the monthly view: the time range on the
- * first line and a label on the second — the società name in the admin view,
- * the activity (or nothing, for somebody else's anonymous booking) in the area
- * società one. The state class carries the color exactly like the weekly grid
- * cells, so the two views cannot drift apart.
+ * One entry of a day cell in the monthly view: the time range on the first
+ * line and a label on the second — the società name of a booking, "In attesa"
+ * for an own undecided request. The state class carries the color exactly
+ * like the weekly grid cells, so the two views cannot drift apart.
  * @param {{orario: string, etichetta?: string, stato: string, descrizione: string, colore?: string}} dati
- *   stato: 'occupato' | 'mio' | 'in-attesa'; descrizione: full text for the tooltip;
- *   colore: '#RRGGBB' of the società, when the view is allowed to show it
+ *   stato: 'occupato' | 'in-attesa'; descrizione: full text for the tooltip;
+ *   colore: '#RRGGBB' of the società that booked the slots
  * @returns {HTMLElement}
  */
 export function creaVoceMese(dati) {
@@ -167,6 +166,23 @@ export function creaVoceMese(dati) {
     voce.append(etichetta);
   }
   return voce;
+}
+
+/**
+ * Small colored square used in the calendar legend and in the admin's società
+ * list. The color is re-validated before touching the inline style (defence in
+ * depth: it is data coming from the DB).
+ * @param {string} colore - '#RRGGBB' società color from the API
+ * @returns {HTMLSpanElement}
+ */
+export function creaQuadrettoColore(colore) {
+  const quadretto = document.createElement('span');
+  quadretto.className = 'quadretto';
+  if (eColoreEsadecimale(colore)) {
+    quadretto.style.background = colore;
+    quadretto.style.borderColor = colore;
+  }
+  return quadretto;
 }
 
 /**

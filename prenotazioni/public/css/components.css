@@ -199,11 +199,6 @@
     background: var(--passato);
 }
 
-.quadretto-mio {
-    background: var(--accento);
-    border-color: var(--accento);
-}
-
 .quadretto-in-attesa {
     background: var(--in-attesa);
     border-color: var(--in-attesa);
@@ -792,18 +787,17 @@ fieldset.campo {
 }
 
 /*
- * Every "taken" slot — booked by this società, booked by somebody else, or
- * still waiting for a decision — shares one shape: a translucent wash of the
- * state color plus a solid bar on its left edge. The bar is an inset shadow
- * and not a border, so the grid lines drawn with real borders stay untouched.
- * The entries of the monthly view (.mese-voce) reuse the same shape and the
- * same states, so the two views cannot drift apart.
+ * Every "taken" slot — booked by a società or still waiting for a decision —
+ * shares one shape: a translucent wash of the state color plus a solid bar on
+ * its left edge. The bar is an inset shadow and not a border, so the grid
+ * lines drawn with real borders stay untouched. The entries of the monthly
+ * view (.mese-voce) reuse the same shape and the same states, so the two
+ * views cannot drift apart.
  *
  * Each state only declares its own --colore-slot, so the shape is written
  * once and the states cannot drift apart. The .passato variants just thin the
  * wash out and keep the bar: a past slot reads as faded without changing hue.
  */
-.slot.mio,
 .slot.occupato,
 .slot.in-attesa,
 .mese-voce {
@@ -811,19 +805,14 @@ fieldset.campo {
     box-shadow: inset 3px 0 0 var(--colore-slot);
 }
 
-.slot.mio.passato,
 .slot.occupato.passato,
 .slot.in-attesa.passato,
 .mese-giorno.passato .mese-voce {
     background: color-mix(in srgb, var(--colore-slot) 12%, transparent);
 }
 
-/* slots belonging to the logged-in società (area) or highlighted (admin) */
-.slot.mio,
-.mese-voce.mio {
-    --colore-slot: var(--accento);
-}
-
+/* booked slot: neutral red on the public homepage, where nobody is named;
+   the società color everywhere else (see .colorato below) */
 .slot.occupato,
 .mese-voce.occupato {
     --colore-slot: var(--occupato);
@@ -831,9 +820,8 @@ fieldset.campo {
 
 /* own request the admin has not decided yet (area società only): yellow, so
    the società sees at a glance which slots it has already asked for and does
-   not ask for them a second time. The yellow stays fixed even when the
-   società has its own color, because here the message is "undecided", not
-   "whose" — see the .con-colore rule below for the approved ones. */
+   not ask for them a second time. The yellow stays fixed whatever the società
+   color, because here the message is "undecided", not "whose". */
 .slot.in-attesa,
 .mese-voce.in-attesa {
     --colore-slot: var(--in-attesa);
@@ -841,24 +829,12 @@ fieldset.campo {
 
 /* --------------------------------------------------- colori per società */
 
-/* admin calendar: a booked cell (weekly view) or entry (monthly view) carries
-   the color of the società that booked it (--colore-societa set inline by
-   js/admin.js and js/ui.js) */
+/* admin panel and area società: a booked cell (weekly view) or entry (monthly
+   view) carries the color of the società that booked it (--colore-societa set
+   inline by js/render-calendario.js and js/ui.js) */
 .slot.occupato.colorato,
 .mese-voce.colorato {
     --colore-slot: var(--colore-societa);
-}
-
-/* area società: own bookings and matching legend square use the società
-   color when the profile provides one (.con-colore set by js/area.js) */
-.con-colore .slot.mio,
-.con-colore .mese-voce.mio {
-    --colore-slot: var(--colore-societa);
-}
-
-.con-colore .quadretto-mio {
-    background: var(--colore-societa);
-    border-color: var(--colore-societa);
 }
 
 /* first slot of a booked block: anchor for the block label overlay */
@@ -900,12 +876,12 @@ fieldset.campo {
 }
 
 /*
- * Label overlay of a booked block (admin view): società name plus activity
- * title, both fitting inside the first slot of the block. Its height spans
+ * Label overlay of a booked block: società name plus, in the admin panel, the
+ * activity title, fitting inside the first slot of the block. Its height spans
  * the --slot-del-blocco consecutive slots of the same booking (set inline by
- * admin.js) so overflowing text is clipped at the block boundary, never over
- * a different booking. pointer-events: none keeps the per-slot tooltips
- * underneath working.
+ * js/render-calendario.js) so overflowing text is clipped at the block
+ * boundary, never over a different booking. pointer-events: none keeps the
+ * per-slot tooltips underneath working.
  */
 .blocco-etichetta {
     position: absolute;
@@ -916,9 +892,8 @@ fieldset.campo {
     pointer-events: none;
 }
 
-/* Block label of a booked cell (admin view). Every booked cell now carries a
-   light translucent wash, so the label is always dark text — no white variant
-   is needed any more. */
+/* Block label of a booked cell. Every booked cell carries a light translucent
+   wash, so the label is always dark text — no white variant is needed. */
 .slot-nome,
 .slot-attivita {
     display: block;

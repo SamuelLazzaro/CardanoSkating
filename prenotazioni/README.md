@@ -215,10 +215,17 @@ Consiglio: fai un backup prima di ogni `migrate:remote`.
   `audit_log`.
 - **Colore per società** (migrazione `0006`): l'admin assegna a ogni società
   un colore `#RRGGBB` (validato lato server, default `#3b82f6`) alla
-  creazione o dalla modifica. Nel calendario admin ogni prenotazione usa il
-  colore della sua società (sfondo semitrasparente + barra piena, con legenda
-  della settimana); nell'area società le proprie prenotazioni usano il
-  proprio colore. Il calendario pubblico resta neutro e anonimo.
+  creazione o dalla modifica. Nel calendario admin e in quello dell'area
+  società ogni prenotazione usa il colore della sua società (sfondo
+  semitrasparente + barra piena, con il nome nella cella e legenda
+  dell'intervallo mostrato). Il calendario pubblico resta neutro e anonimo.
+- **Calendario dell'area società** (`GET /api/societa/calendario`): stessa
+  vista del pannello admin, con nome e colore della società su ogni fascia
+  prenotata, così ogni società vede chi occupa il palazzetto. Titolo
+  dell'attività e note restano riservati (non escono dall'API), le fasce
+  altrui non sono cliccabili e le proprie richieste ancora in attesa sono
+  evidenziate in giallo. Il rendering della griglia è condiviso con il
+  pannello admin (`public/js/render-calendario.js`).
 - **Tariffe e report mensile** (migrazione `0007`): ogni società ha una
   tariffa oraria (€/h), impostata dall'admin dal suo pannello (la creazione
   parte da 0). La vista "Report mensile" mostra, con una sola query aggregata,
@@ -231,9 +238,8 @@ Consiglio: fai un backup prima di ogni `migrate:remote`.
   calendario si commuta con l'interruttore "Settimana / Mese". La vista mensile
   disegna le settimane intere che contengono il mese (quindi anche i giorni di
   riempimento, in grigio) e mette nella cella di ogni giorno una voce per
-  prenotazione — orario più nome società nel pannello admin, orario più
-  "Tua prenotazione / In attesa / Occupato" nell'area società, che resta
-  anonima come la vista settimanale — con i colori delle società. Se le voci
+  prenotazione — orario più nome società, con il colore della società; nell'area
+  società si aggiungono le voci "In attesa" delle proprie richieste. Se le voci
   non entrano nella cella, quella cella scorre da sola. Il numero del giorno è
   un pulsante e apre la settimana corrispondente; il "+" del giorno apre il
   popup di prenotazione su quella data. Gli endpoint di calendario accettano

@@ -9,6 +9,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+  fasceInAttesa,
   giorniGrigliaMese,
   meseDellaData,
   raggruppaPrenotazioni,
@@ -165,6 +166,51 @@ describe('raggruppaPrenotazioni', () => {
 
   it('su nessuna prenotazione non produce voci', () => {
     expect(raggruppaPrenotazioni([])).toEqual([]);
+  });
+});
+
+describe('fasceInAttesa', () => {
+  const richiesta = { genere: 'in_attesa', id: 3, descrizione: 'la tua richiesta' };
+  const ricorrenza = { genere: 'ricorrenza', id: 5, descrizione: 'la tua richiesta ricorrente' };
+
+  it('comprime gli slot di uno stesso elemento in una fascia, in ordine cronologico', () => {
+    const inAttesa = new Map([
+      ['2026-09-17_0900', ricorrenza],
+      ['2026-09-16_1830', richiesta],
+      ['2026-09-16_1800', richiesta],
+    ]);
+    expect(fasceInAttesa(inAttesa, new Set())).toEqual([
+      { data: '2026-09-16', oraInizio: '18:00', oraFine: '19:00', voce: richiesta },
+      { data: '2026-09-17', oraInizio: '09:00', oraFine: '09:30', voce: ricorrenza },
+    ]);
+  });
+
+  it('tiene separati due elementi diversi anche se le fasce sono attaccate', () => {
+    const altraRichiesta = { genere: 'in_attesa', id: 4, descrizione: 'la tua richiesta' };
+    const inAttesa = new Map([
+      ['2026-09-16_1800', richiesta],
+      ['2026-09-16_1830', altraRichiesta],
+    ]);
+    expect(fasceInAttesa(inAttesa, new Set()).map((f) => `${f.oraInizio}-${f.oraFine} #${f.voce.id}`)).toEqual([
+      '18:00-18:30 #3',
+      '18:30-19:00 #4',
+    ]);
+  });
+
+  it('salta gli slot che qualcun altro ha intanto prenotato', () => {
+    // La prenotazione altrui vince: la voce in attesa resta solo sulla parte
+    // ancora libera, come nella griglia settimanale.
+    const inAttesa = new Map([
+      ['2026-09-16_1800', richiesta],
+      ['2026-09-16_1830', richiesta],
+      ['2026-09-16_1900', richiesta],
+    ]);
+    const occupati = new Set(['2026-09-16_1830']);
+    expect(fasceInAttesa(inAttesa, occupati).map((f) => `${f.oraInizio}-${f.oraFine}`)).toEqual(['18:00-18:30', '19:00-19:30']);
+  });
+
+  it('senza slot in attesa non produce fasce', () => {
+    expect(fasceInAttesa(new Map(), new Set(['2026-09-16_1800']))).toEqual([]);
   });
 });
 

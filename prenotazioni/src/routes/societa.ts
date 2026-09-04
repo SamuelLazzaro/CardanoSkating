@@ -4,6 +4,7 @@ import {
   aggiungiGiorni,
   fineRicorrenza,
   giorniInTesto,
+  intervalloCalendario,
   occorrenzeRicorrenza,
   oraRoma,
   raggruppaSlotInFasce,
@@ -147,6 +148,32 @@ societa.get('/me', (c) => {
     societa: { id: soc.id, nome: soc.nome, referente: soc.referente, email: soc.email, telefono: soc.telefono, colore: soc.colore },
     link_ics: `${origine}/api/ics/${soc.token_accesso}`,
   });
+});
+
+/**
+ * Calendario dell'area società: stessi parametri del calendario pubblico
+ * (`settimana=AAAA-MM-GG` oppure `mese=AAAA-MM`, griglia mensile a settimane
+ * intere), ma ogni slot porta anche la società che lo ha prenotato (id, nome,
+ * colore) e l'id della richiesta, che raggruppa gli slot di uno stesso blocco.
+ * Titolo e note delle prenotazioni restano riservati: le società vedono CHI
+ * occupa una fascia, non cosa ci fa.
+ */
+societa.get('/calendario', async (c) => {
+  const intervallo = intervalloCalendario(c.req.query('settimana'), c.req.query('mese'), new Date());
+  if (intervallo.tipo === 'errore') return c.json({ errore: intervallo.messaggio }, 400);
+  const { results } = await c.env.DB
+    .prepare(
+      `SELECT p.slot_key, p.societa_id, s.nome AS societa, s.colore, p.richiesta_id
+       FROM prenotazioni p
+       JOIN societa s ON s.id = p.societa_id
+       WHERE p.slot_key >= ?1 AND p.slot_key < ?2 ORDER BY p.slot_key`,
+    )
+    .bind(`${intervallo.dal}_0000`, `${aggiungiGiorni(intervallo.al, 1)}_0000`)
+    .all();
+  if (intervallo.tipo === 'mese') {
+    return c.json({ mese: intervallo.mese, dal: intervallo.dal, al: intervallo.al, prenotazioni: results });
+  }
+  return c.json({ settimana: intervallo.lunedi, prenotazioni: results });
 });
 
 societa.get('/richieste', async (c) => {
