@@ -294,6 +294,14 @@
     gap: 0.25rem;
 }
 
+/* the display: flex above would defeat the hidden attribute (author styles
+   win over the UA [hidden] rule): restore it explicitly. Several fields are
+   shown and hidden from JS via .hidden (the "Ripetizione" block, the "fino
+   al" field, the scope of a recurring booking). */
+.campo[hidden] {
+    display: none;
+}
+
 .campo-riga {
     display: flex;
     gap: 0.85rem;
