@@ -90,6 +90,16 @@ export function motivazioneDecisione(valore: unknown): string | null {
 export const COLORE_PREDEFINITO = '#3b82f6';
 
 /**
+ * La società di casa (Cardano Skating), inserita dal seed della migrazione
+ * 0001 come prima riga della tabella: essendo `id` un INTEGER PRIMARY KEY
+ * AUTOINCREMENT su tabella vuota, vale 1 su qualunque database creato dalle
+ * migrazioni. È la società con cui l'admin prenota le proprie attività, quindi
+ * non è eliminabile: senza, il pannello perderebbe le prenotazioni dirette
+ * interne e le ore già svolte resterebbero senza intestatario nei report.
+ */
+export const SOCIETA_DI_CASA_ID = 1;
+
+/**
  * Valida un colore '#RRGGBB' e lo normalizza in minuscolo.
  * Ritorna null (→ 400 nel chiamante) se il formato non è quello atteso.
  */

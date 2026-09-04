@@ -6,20 +6,26 @@
 import { describe, expect, it } from 'vitest';
 import { env } from 'cloudflare:test';
 import app from '../src/index';
-import { aggiungiGiorni, lunediDellaSettimana, oraRoma } from '../src/slots';
+import { aggiungiGiorni, lunediDellaSettimana, oraRoma, slotKeys } from '../src/slots';
 import {
   cookieAdmin,
   cookieSocieta,
+  creaRichiesta,
   creaSocieta,
   creaSocietaConToken,
+  deleteConCookie,
   getConCookie,
   postAdmin,
   postJson,
   slotDiRichiesta,
+  statoRichiesta,
 } from './helpers';
 
 const oggi = oraRoma(new Date()).data;
 const dataFutura = aggiungiGiorni(oggi, 7);
+/** Una data già passata e il suo mese, per i controlli sullo storico dei report. */
+const dataPassata = aggiungiGiorni(oggi, -40);
+const mesePassato = dataPassata.slice(0, 7);
 /** Un lunedì futuro (della settimana fra due settimane), per i test sui giorni della settimana. */
 const lunediFuturo = lunediDellaSettimana(aggiungiGiorni(oggi, 14));
 
@@ -150,6 +156,117 @@ describe('gestione società', () => {
     expect((await getConCookie('/api/societa/me', cookieSoc)).status).toBe(401);
     const nuovoToken = link_accesso.split('/accesso/')[1];
     expect((await app.request(`/accesso/${nuovoToken}`, {}, env)).status).toBe(302);
+  });
+
+  it('la società di casa non è eliminabile nemmeno da sospesa', async () => {
+    const cookieAmm = await cookieAdmin();
+    // La società 1 è Cardano Skating S.R.L. S.S.D. (seed della migrazione iniziale).
+    expect((await postAdmin('/api/admin/societa/1/sospendi', cookieAmm)).status).toBe(200);
+    expect((await deleteConCookie('/api/admin/societa/1', cookieAmm)).status).toBe(409);
+    const riga = await env.DB
+      .prepare('SELECT eliminata_at FROM societa WHERE id = 1')
+      .first<{ eliminata_at: string | null }>();
+    expect(riga?.eliminata_at).toBeNull();
+
+    // E il pannello non mostra nemmeno il pulsante: `di_casa` distingue la
+    // società di casa da una qualsiasi altra, anch'essa sospesa.
+    const idOspite = await creaSocieta('Ospite Sospesa');
+    await env.DB.prepare("UPDATE societa SET stato = 'sospesa' WHERE id = ?1").bind(idOspite).run();
+    const elenco = await getConCookie('/api/admin/societa', cookieAmm);
+    const { societa } = (await elenco.json()) as { societa: { id: number; di_casa: boolean }[] };
+    expect(societa.find((s) => s.id === 1)?.di_casa).toBe(true);
+    expect(societa.find((s) => s.id === idOspite)?.di_casa).toBe(false);
+  });
+
+  it('una società attiva non è eliminabile', async () => {
+    const id = await creaSocieta('Ancora Attiva');
+    const cookieAmm = await cookieAdmin();
+    expect((await deleteConCookie(`/api/admin/societa/${id}`, cookieAmm)).status).toBe(409);
+    const riga = await env.DB
+      .prepare('SELECT eliminata_at FROM societa WHERE id = ?1')
+      .bind(id)
+      .first<{ eliminata_at: string | null }>();
+    expect(riga?.eliminata_at).toBeNull();
+  });
+
+  it("l'eliminazione tiene le prenotazioni passate nel report e cancella quelle future", async () => {
+    const { id, token } = await creaSocietaConToken('Da Eliminare');
+    const cookieSoc = await cookieSocieta(token);
+    const cookieAmm = await cookieAdmin();
+    // Tariffa non nulla: serve a verificare che il report resti calcolabile.
+    await env.DB.prepare('UPDATE societa SET tariffa_oraria = 30 WHERE id = ?1').bind(id).run();
+
+    // Storico: un'ora già svolta il mese scorso, inserita direttamente su DB
+    // perché le API non permettono (giustamente) di prenotare nel passato.
+    const idPassata = await creaRichiesta(id, dataPassata, '18:00', '19:00');
+    await env.DB.prepare("UPDATE richieste SET stato = 'approvata' WHERE id = ?1").bind(idPassata).run();
+    for (const chiave of slotKeys(dataPassata, '18:00', '19:00')) {
+      await env.DB
+        .prepare('INSERT INTO prenotazioni (slot_key, societa_id, richiesta_id) VALUES (?1, ?2, ?3)')
+        .bind(chiave, id, idPassata)
+        .run();
+    }
+
+    // Futuro ancora aperto al momento dell'eliminazione: una prenotazione
+    // approvata e una ricorrenza in attesa. Lo stato viene portato a 'sospesa'
+    // direttamente su DB, saltando la cascata della sospensione: è l'unico
+    // modo di verificare che sia l'eliminazione a liberare gli slot.
+    const creazione = await postJson('/api/societa/richieste', cookieSoc, {
+      data: dataFutura, ora_inizio: '18:00', ora_fine: '19:00',
+    });
+    const { id: idFutura } = (await creazione.json()) as { id: number };
+    expect((await postAdmin(`/api/admin/richieste/${idFutura}/approva`, cookieAmm, { motivazione: 'Ok' })).status).toBe(200);
+    expect((await slotDiRichiesta(idFutura)).length).toBe(2);
+    await postJson('/api/societa/richieste', cookieSoc, {
+      data: dataFutura, ora_inizio: '20:00', ora_fine: '21:00', ripeti_fino_al: aggiungiGiorni(dataFutura, 21),
+    });
+    await env.DB.prepare("UPDATE societa SET stato = 'sospesa' WHERE id = ?1").bind(id).run();
+
+    const eliminazione = await deleteConCookie(`/api/admin/societa/${id}`, cookieAmm);
+    expect(eliminazione.status).toBe(200);
+    expect((await eliminazione.json()) as { slot_liberati: number }).toMatchObject({ slot_liberati: 2 });
+
+    // Cascata sul futuro, identica a quella della sospensione.
+    expect(await slotDiRichiesta(idFutura)).toEqual([]);
+    expect(await statoRichiesta(idFutura)).toBe('annullata');
+    const ricorrenza = await env.DB
+      .prepare('SELECT stato FROM ricorrenze WHERE societa_id = ?1')
+      .bind(id)
+      .first<{ stato: string }>();
+    expect(ricorrenza?.stato).toBe('annullata');
+
+    // Il passato resta: slot in tabella e ore nel report del mese scorso.
+    expect((await slotDiRichiesta(idPassata)).length).toBe(2);
+    const report = await getConCookie(`/api/admin/report?mese=${mesePassato}`, cookieAmm);
+    const { righe } = (await report.json()) as { righe: { societa: string; ore: number; importo: number }[] };
+    const riga = righe.find((r) => r.societa === 'Da Eliminare');
+    expect(riga).toMatchObject({ ore: 1, importo: 30 });
+
+    // La società sparisce dal pannello ma la riga resta marcata sul DB.
+    const elenco = await getConCookie('/api/admin/societa', cookieAmm);
+    const { societa } = (await elenco.json()) as { societa: { id: number }[] };
+    expect(societa.some((s) => s.id === id)).toBe(false);
+    const marcata = await env.DB
+      .prepare('SELECT eliminata_at FROM societa WHERE id = ?1')
+      .bind(id)
+      .first<{ eliminata_at: string | null }>();
+    expect(marcata?.eliminata_at).not.toBeNull();
+
+    // Accessi chiusi e nessuna via di ritorno.
+    expect((await getConCookie('/api/societa/me', cookieSoc)).status).toBe(401);
+    expect((await app.request(`/accesso/${token}`, {}, env)).status).toBe(404);
+    expect((await postAdmin(`/api/admin/societa/${id}/riattiva`, cookieAmm)).status).toBe(409);
+    expect((await postAdmin(`/api/admin/societa/${id}/rigenera-token`, cookieAmm)).status).toBe(404);
+    expect((await deleteConCookie(`/api/admin/societa/${id}`, cookieAmm)).status).toBe(404);
+    const patch = await app.request(
+      `/api/admin/societa/${id}`,
+      { method: 'PATCH', headers: { Cookie: cookieAmm, 'Content-Type': 'application/json' }, body: JSON.stringify({ nome: 'Rinata' }) },
+      env,
+    );
+    expect(patch.status).toBe(404);
+    expect((await postJson('/api/admin/prenotazioni', cookieAmm, {
+      societa_id: id, data: dataFutura, ora_inizio: '10:00', ora_fine: '11:00',
+    })).status).toBe(404);
   });
 });
 

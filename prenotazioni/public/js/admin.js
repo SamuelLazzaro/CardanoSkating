@@ -31,6 +31,7 @@ import {
   approvaRichiesta,
   creaPrenotazioneDiretta,
   creaSocietaAdmin,
+  eliminaSocieta,
   esciAdmin,
   modificaPrenotazioneAdmin,
   ottieniCalendarioAdmin,
@@ -1008,6 +1009,12 @@ function renderSocieta(societa) {
         ? bottoneAzione('Sospendi', 'btn btn-pericolo', () => sospendi(soc))
         : bottoneAzione('Riattiva', 'btn', () => riattiva(soc)),
     );
+    // L'eliminazione è irreversibile e si applica solo a una società già
+    // sospesa: il pulsante compare quindi accanto a Riattiva, mai da solo.
+    // Esclusa la società di casa, che il server rifiuta comunque di eliminare.
+    if (soc.stato === 'sospesa' && !soc.di_casa) {
+      azioni.append(bottoneAzione('Elimina', 'btn btn-pericolo', () => elimina(soc)));
+    }
     riga.append(azioni);
     lista.append(riga);
   }
@@ -1143,6 +1150,43 @@ async function riattiva(soc) {
     await riattivaSocieta(soc.id);
     mostraMessaggio(elemento('esito-societa'), `${soc.nome} riattivata (le prenotazioni annullate NON vengono ripristinate).`, 'ok');
     await caricaSocieta();
+  } catch (errore) {
+    mostraMessaggio(elemento('esito-societa'), errore.message, 'errore');
+  }
+}
+
+/**
+ * Deletes a suspended società. Being irreversible, it asks the admin to retype
+ * the name instead of a plain confirm(): a stray click on a long list of
+ * similarly named società must not be enough. The comparison ignores case and
+ * surrounding spaces, so only a genuinely different name is rejected.
+ * @param {object} soc - suspended società to delete
+ * @returns {Promise<void>}
+ */
+async function elimina(soc) {
+  const digitato = prompt(
+    `ELIMINAZIONE DEFINITIVA di ${soc.nome}.\n\n`
+      + 'Le prenotazioni già svolte restano nei report per la contabilizzazione delle ore; '
+      + 'le eventuali prenotazioni future e le richieste ancora aperte vengono cancellate. '
+      + 'La società non sarà più riattivabile.\n\n'
+      + `Per confermare, scrivi il nome della società:\n${soc.nome}`,
+  );
+  if (digitato === null) return;
+  const nomeConfermato = digitato.trim().toLowerCase() === soc.nome.trim().toLowerCase();
+  if (!nomeConfermato) {
+    mostraMessaggio(elemento('esito-societa'), 'Nome non corrispondente: eliminazione annullata.', 'errore');
+    return;
+  }
+  try {
+    const risposta = await eliminaSocieta(soc.id);
+    mostraMessaggio(
+      elemento('esito-societa'),
+      `${soc.nome} eliminata: liberati ${risposta.slot_liberati} slot, annullate ${risposta.richieste_annullate} richieste. Le prenotazioni passate restano nei report.`,
+      'ok',
+    );
+    await caricaSocieta();
+    await caricaInAttesa();
+    await caricaCalendario();
   } catch (errore) {
     mostraMessaggio(elemento('esito-societa'), errore.message, 'errore');
   }

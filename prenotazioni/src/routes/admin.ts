@@ -65,6 +65,7 @@ import {
   MIN_MOTIVAZIONE,
   motivazioneDecisione,
   scriviAudit,
+  SOCIETA_DI_CASA_ID,
   tariffaOraria,
   testo,
   titoloAttivita,
@@ -936,12 +937,17 @@ admin.post('/ricorrenze/:id/rifiuta', async (c) => {
 admin.get('/societa', async (c) => {
   const origine = new URL(c.req.url).origin;
   const { results } = await c.env.DB
-    .prepare('SELECT id, nome, referente, email, telefono, stato, colore, tariffa_oraria, token_accesso, created_at FROM societa ORDER BY nome')
-    .all<{ token_accesso: string } & Record<string, unknown>>();
+    .prepare(
+      `SELECT id, nome, referente, email, telefono, stato, colore, tariffa_oraria, token_accesso, created_at
+       FROM societa WHERE eliminata_at IS NULL ORDER BY nome`,
+    )
+    .all<{ id: number; token_accesso: string } & Record<string, unknown>>();
   // Il token non viene esposto così com'è: si restituisce direttamente il
-  // link di accesso pronto da consegnare alla società.
+  // link di accesso pronto da consegnare alla società. `di_casa` evita che il
+  // pannello mostri il pulsante Elimina dove il server lo rifiuterebbe.
   const elenco = results.map(({ token_accesso, ...resto }) => ({
     ...resto,
+    di_casa: resto.id === SOCIETA_DI_CASA_ID,
     link_accesso: `${origine}/accesso/${token_accesso}`,
   }));
   return c.json({ societa: elenco });
@@ -1035,7 +1041,7 @@ admin.patch('/societa/:id', async (c) => {
   if (assegnazioni.length === 0) return c.json({ errore: 'Nessun campo da aggiornare' }, 400);
 
   const esito = await c.env.DB
-    .prepare(`UPDATE societa SET ${assegnazioni.join(', ')} WHERE id = ?`)
+    .prepare(`UPDATE societa SET ${assegnazioni.join(', ')} WHERE id = ? AND eliminata_at IS NULL`)
     .bind(...parametri, id)
     .run();
   if ((esito.meta.changes ?? 0) === 0) return c.json({ errore: 'Società non trovata' }, 404);
@@ -1053,7 +1059,7 @@ admin.post('/societa/:id/sospendi', async (c) => {
   const id = intero(c.req.param('id'));
   if (id === null) return c.json({ errore: 'Identificativo non valido' }, 400);
   const soc = await c.env.DB
-    .prepare('SELECT id, nome, email, stato FROM societa WHERE id = ?1')
+    .prepare('SELECT id, nome, email, stato FROM societa WHERE id = ?1 AND eliminata_at IS NULL')
     .bind(id)
     .first<{ nome: string; email: string; stato: string }>();
   if (!soc) return c.json({ errore: 'Società non trovata' }, 404);
@@ -1095,7 +1101,7 @@ admin.post('/societa/:id/riattiva', async (c) => {
   const id = intero(c.req.param('id'));
   if (id === null) return c.json({ errore: 'Identificativo non valido' }, 400);
   const esito = await c.env.DB
-    .prepare("UPDATE societa SET stato = 'attiva' WHERE id = ?1 AND stato = 'sospesa'")
+    .prepare("UPDATE societa SET stato = 'attiva' WHERE id = ?1 AND stato = 'sospesa' AND eliminata_at IS NULL")
     .bind(id)
     .run();
   if ((esito.meta.changes ?? 0) === 0) return c.json({ errore: 'Società non trovata o già attiva' }, 409);
@@ -1103,12 +1109,81 @@ admin.post('/societa/:id/riattiva', async (c) => {
   return c.json({ ok: true });
 });
 
+/**
+ * Eliminazione LOGICA di una società già sospesa (vedi migrazione 0010).
+ *
+ * Non si cancella la riga: nome e tariffa oraria servono ancora ai report dei
+ * mesi passati, che li leggono con una JOIN su societa.id. Si marca invece
+ * `eliminata_at`, e da quel momento la società sparisce dall'elenco admin,
+ * dalle società prenotabili e da ogni possibilità di modifica o riattivazione.
+ *
+ * Le prenotazioni PASSATE restano intatte (sono le ore da contabilizzare);
+ * quelle future vengono liberate insieme alle richieste e alle ricorrenze
+ * ancora aperte, con la stessa cascata della sospensione. Di norma la
+ * sospensione ha già ripulito tutto, ma la cascata va ripetuta comunque: una
+ * società può essere stata riattivata, aver riprenotato ed essere stata
+ * sospesa di nuovo, e soprattutto l'eliminazione non deve poter lasciare
+ * slot occupati da una società che non esiste più. Batch atomico, numero di
+ * statement fisso.
+ *
+ * Unica società non eliminabile: quella di casa (vedi SOCIETA_DI_CASA_ID).
+ */
+admin.delete('/societa/:id', async (c) => {
+  const id = intero(c.req.param('id'));
+  if (id === null) return c.json({ errore: 'Identificativo non valido' }, 400);
+  // La società di casa è quella con cui l'admin prenota le attività interne:
+  // eliminarla svuoterebbe le prenotazioni dirette. Il controllo precede la
+  // lettura dal DB perché non dipende dallo stato della riga.
+  if (id === SOCIETA_DI_CASA_ID) {
+    return c.json({ errore: 'La società di casa non può essere eliminata' }, 409);
+  }
+  const soc = await c.env.DB
+    .prepare('SELECT id, nome, stato FROM societa WHERE id = ?1 AND eliminata_at IS NULL')
+    .bind(id)
+    .first<{ nome: string; stato: string }>();
+  if (!soc) return c.json({ errore: 'Società non trovata' }, 404);
+  if (soc.stato !== 'sospesa') return c.json({ errore: 'Solo una società sospesa può essere eliminata' }, 409);
+
+  const adesso = oraRoma(new Date());
+  const esiti = await c.env.DB.batch([
+    c.env.DB
+      .prepare("UPDATE societa SET eliminata_at = datetime('now') WHERE id = ?1 AND eliminata_at IS NULL")
+      .bind(id),
+    // Slot strettamente futuri: quello eventualmente in corso resta a storico.
+    c.env.DB.prepare('DELETE FROM prenotazioni WHERE societa_id = ?1 AND slot_key > ?2').bind(id, slotKeyCorrente(new Date())),
+    // Stessi criteri della sospensione: richieste con almeno una parte ancora
+    // da svolgersi, escluse quelle di annullamento/modifica già approvate, che
+    // sono atti amministrativi conclusi.
+    c.env.DB
+      .prepare(
+        `UPDATE richieste SET stato = 'annullata', annullata_at = datetime('now')
+         WHERE societa_id = ?1 AND stato IN ('in_attesa', 'approvata')
+           AND (tipo = 'nuova' OR stato = 'in_attesa')
+           AND (data > ?2 OR (data = ?2 AND ora_fine > ?3))`,
+      )
+      .bind(id, adesso.data, adesso.ora),
+    c.env.DB.prepare("UPDATE ricorrenze SET stato = 'annullata' WHERE societa_id = ?1 AND stato = 'in_attesa'").bind(id),
+  ]);
+  const slotLiberati = esiti[1].meta.changes ?? 0;
+  const richiesteAnnullate = esiti[2].meta.changes ?? 0;
+  await scriviAudit(
+    c.env.DB,
+    'societa_eliminata',
+    `società ${id} (${soc.nome}): liberati ${slotLiberati} slot, annullate ${richiesteAnnullate} richieste`,
+    'admin',
+  );
+  return c.json({ ok: true, slot_liberati: slotLiberati, richieste_annullate: richiesteAnnullate });
+});
+
 /** Rigenera il link personale: il vecchio token e le sessioni emesse decadono subito. */
 admin.post('/societa/:id/rigenera-token', async (c) => {
   const id = intero(c.req.param('id'));
   if (id === null) return c.json({ errore: 'Identificativo non valido' }, 400);
   const token = crypto.randomUUID();
-  const esito = await c.env.DB.prepare('UPDATE societa SET token_accesso = ?1 WHERE id = ?2').bind(token, id).run();
+  const esito = await c.env.DB
+    .prepare('UPDATE societa SET token_accesso = ?1 WHERE id = ?2 AND eliminata_at IS NULL')
+    .bind(token, id)
+    .run();
   if ((esito.meta.changes ?? 0) === 0) return c.json({ errore: 'Società non trovata' }, 404);
   await scriviAudit(c.env.DB, 'token_rigenerato', `società ${id}`, 'admin');
   const origine = new URL(c.req.url).origin;
@@ -1257,7 +1332,7 @@ admin.post('/prenotazioni', async (c) => {
   const ripetiFinoAl = typeof corpo.ripeti_fino_al === 'string' ? corpo.ripeti_fino_al.trim() : '';
 
   const soc = await c.env.DB
-    .prepare('SELECT id, nome, email, stato FROM societa WHERE id = ?1')
+    .prepare('SELECT id, nome, email, stato FROM societa WHERE id = ?1 AND eliminata_at IS NULL')
     .bind(societaId)
     .first<SocietaDiretta>();
   if (!soc) return c.json({ errore: 'Società non trovata' }, 404);

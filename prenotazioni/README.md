@@ -157,6 +157,17 @@ Consiglio: fai un backup prima di ogni `migrate:remote`.
 - **Sospensione**: cancella anche tutte le prenotazioni future della società
   e annulla le sue richieste in attesa (operazione atomica, tracciata in
   `audit_log`). La riattivazione non ripristina nulla.
+- **Eliminazione** (migrazione `0010`): una società già sospesa può essere
+  eliminata dall'admin (`DELETE /api/admin/societa/:id`, conferma digitando il
+  nome). È un'eliminazione *logica*: la riga viene marcata con `eliminata_at`
+  e sparisce da elenco, società prenotabili e accessi, ma non viene cancellata
+  dal database, perché report e CSV leggono nome e tariffa oraria con una JOIN
+  su `societa.id` e le ore già svolte devono restare contabilizzabili. Le
+  prenotazioni passate quindi restano; quelle future vengono liberate con la
+  stessa cascata della sospensione. Non è reversibile dal pannello. La società
+  di casa (id 1, seed della migrazione `0001`, con cui l'admin prenota le
+  attività interne) non è eliminabile: il server risponde 409 e il pannello
+  non mostra il pulsante, riconoscendola dal campo `di_casa` dell'elenco.
 - **Ricorrenze** (migrazione `0008`): una richiesta può chiedere lo stesso
   orario per più giorni della settimana (es. lunedì, mercoledì e venerdì) e/o
   ripetersi ogni settimana, per massimo 4 settimane piene (finestra di 28

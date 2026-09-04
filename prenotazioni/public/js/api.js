@@ -313,6 +313,15 @@ export function riattivaSocieta(idSocieta) {
 }
 
 /**
+ * Logical deletion: past bookings are kept for reporting, future ones dropped.
+ * @param {number} idSocieta
+ * @returns {Promise<{ok: boolean, slot_liberati: number, richieste_annullate: number}>}
+ */
+export function eliminaSocieta(idSocieta) {
+  return richiestaJson(`/api/admin/societa/${idSocieta}`, { method: 'DELETE' });
+}
+
+/**
  * @param {number} idSocieta
  * @returns {Promise<{ok: boolean, link_accesso: string}>}
  */

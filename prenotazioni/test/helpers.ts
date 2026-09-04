@@ -98,6 +98,11 @@ export async function postAdmin(percorso: string, cookie: string, corpo?: unknow
   return await postJson(percorso, cookie, corpo);
 }
 
+/** DELETE autenticato. */
+export async function deleteConCookie(percorso: string, cookie: string): Promise<Response> {
+  return await app.request(percorso, { method: 'DELETE', headers: { Cookie: cookie } }, env);
+}
+
 /** slot_key prenotati per una richiesta, in ordine. */
 export async function slotDiRichiesta(richiestaId: number): Promise<string[]> {
   const { results } = await env.DB

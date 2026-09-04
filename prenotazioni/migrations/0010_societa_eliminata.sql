@@ -1,0 +1,20 @@
+-- 0010: eliminazione LOGICA delle società.
+--
+-- L'admin può eliminare una società già sospesa. La riga NON viene cancellata
+-- dal database: il report mensile e l'export CSV leggono nome e tariffa oraria
+-- dalla tabella `societa` con una JOIN sull'id (vedi routes/admin.ts), quindi
+-- un DELETE fisico farebbe sparire dai conteggi tutte le ore già svolte dalla
+-- società, che è esattamente il dato da conservare per la contabilizzazione.
+--
+-- La riga viene invece marcata con `eliminata_at` (timestamp UTC, stessa
+-- convenzione di annullata_at/decisa_at su `richieste`): da quel momento la
+-- società non compare più nell'elenco dell'admin né fra quelle prenotabili,
+-- e non è più modificabile. Le prenotazioni PASSATE restano intatte e
+-- continuano ad alimentare report e calendario storico.
+--
+-- Lo `stato` resta 'sospesa' (eliminabile è solo chi è già sospesa): il
+-- vincolo CHECK su societa.stato non è alterabile in SQLite e ricostruire la
+-- tabella significherebbe toccare le foreign key di ricorrenze, richieste e
+-- prenotazioni. Come effetto collaterale l'accesso resta bloccato senza
+-- modificare auth.ts, che nega già la sessione a ogni società non 'attiva'.
+ALTER TABLE societa ADD COLUMN eliminata_at TEXT;
