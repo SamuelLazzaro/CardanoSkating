@@ -242,12 +242,9 @@
     margin: var(--grid-gap-lg) auto 0;
 }
 
-/* palazzetto photo strip: same gutter as the venue gallery, but only
-   three photos and inside the section container */
-.booking-photos {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 10px;
+/* palazzetto media carousel: sits inside the section container, below the
+   intro text (the component itself is styled in components.css) */
+.carousel {
     margin-top: var(--grid-gap-lg);
 }
 
@@ -271,13 +268,6 @@
 
     .contacts-grid {
         grid-template-columns: repeat(2, 1fr);
-    }
-}
-
-/* three photos side by side as soon as each column stays readable */
-@media (min-width: 700px) {
-    .booking-photos {
-        grid-template-columns: repeat(3, 1fr);
     }
 }
 

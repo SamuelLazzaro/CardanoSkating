@@ -3,6 +3,7 @@
  * language FAB. All the behaviour lives in ui.js and i18n.js.
  */
 
+import { initCarousels } from "./carousel.js";
 import { initCookieConsent } from "./cookie.js";
 import { initI18n, toggleLanguage } from "./i18n.js";
 import { initTapFeedback } from "./tap-feedback.js";
@@ -23,6 +24,7 @@ initTopbar();
 initNav();
 initScrollReveal();
 initHeroVideo();
+initCarousels();
 initLightbox();
 initFooterYear();
 initCookieConsent();

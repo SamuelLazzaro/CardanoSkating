@@ -20,6 +20,23 @@ export const NAV_OVERLAY_FADE_MS = 350;
  */
 export const SCROLLEND_FALLBACK_MS = 1500;
 
+/* ----- media carousel (see carousel.js) ----- */
+
+/** @type {number} pause (ms) between two automatic slide changes */
+export const CAROUSEL_AUTOPLAY_MS = 5000;
+
+/**
+ * @type {number} share of a slide that must be inside the track before
+ * it counts as the active one (dots, video start/stop)
+ */
+export const CAROUSEL_ACTIVE_SLIDE_RATIO = 0.6;
+
+/**
+ * @type {number} share of the carousel that must be on screen for it to
+ * auto-advance and for its video to play
+ */
+export const CAROUSEL_VIEWPORT_RATIO = 0.5;
+
 /* ----- touch tap feedback (see tap-feedback.js) ----- */
 
 /**
@@ -93,6 +110,8 @@ export const TRANSLATIONS = {
         "a11y.mainNav": "Navigazione principale",
         "a11y.scrollDown": "Scorri alla sezione successiva",
         "a11y.closeImage": "Chiudi l'immagine",
+        "a11y.prevSlide": "Slide precedente",
+        "a11y.nextSlide": "Slide successiva",
         "a11y.switchLang": "Switch to English",
         "a11y.cookieBanner": "Preferenze cookie",
 
@@ -142,9 +161,14 @@ export const TRANSLATIONS = {
         "booking.p1": "Oltre al pattinodromo all'aperto, le nostre attività passano anche dal palazzetto: uno spazio coperto dove allenarsi tutto l'anno, in ogni condizione meteo.",
         "booking.p2": "Il palazzetto è disponibile anche per le società esterne, che possono prenotarlo per i propri allenamenti.",
         "booking.contact": "Per richiedere il link personale con cui prenotare il palazzetto, scrivi a",
-        "booking.photo1": "L'interno del palazzetto",
-        "booking.photo2": "Il campo di gioco del palazzetto",
-        "booking.photo3": "Gli spazi del palazzetto",
+        "booking.carouselLabel": "Foto e video del palazzetto",
+        "booking.video": "Video del palazzetto di Cardano al Campo",
+        // photo alts: numbers match the palazzetto_N.jpeg files (no 4: that
+        // photo is not in the carousel)
+        "booking.photo1": "Il parquet del palazzetto visto dalla tribuna",
+        "booking.photo2": "Il campo di gioco e la tribuna del palazzetto",
+        "booking.photo3": "Gli ingressi e gli striscioni delle società sul lato lungo",
+        "booking.photo5": "Vista d'insieme del campo, della tribuna e del tabellone",
 
         "courses.title": "In pista si comincia da piccoli o da grandi.",
         "courses.p1": "Dai primi passi sui pattini fino all'agonismo: i nostri corsi accompagnano bambini, ragazzi e adulti con lo staff tecnico della società. Scrivici per conoscere giorni, orari e come provare.",
@@ -264,6 +288,8 @@ export const TRANSLATIONS = {
         "a11y.mainNav": "Main navigation",
         "a11y.scrollDown": "Scroll to the next section",
         "a11y.closeImage": "Close image",
+        "a11y.prevSlide": "Previous slide",
+        "a11y.nextSlide": "Next slide",
         "a11y.switchLang": "Passa all'italiano",
         "a11y.cookieBanner": "Cookie preferences",
 
@@ -313,9 +339,14 @@ export const TRANSLATIONS = {
         "booking.p1": "Alongside the outdoor skating track, our activities also run through the sports hall: an indoor space to train all year round, whatever the weather.",
         "booking.p2": "The hall is also available to external clubs, which can book it for their own training sessions.",
         "booking.contact": "To request the personal link to book the hall, write to",
-        "booking.photo1": "Inside the sports hall",
-        "booking.photo2": "The sports hall floor",
-        "booking.photo3": "The sports hall spaces",
+        "booking.carouselLabel": "Photos and video of the sports hall",
+        "booking.video": "Video of the Cardano al Campo sports hall",
+        // photo alts: numbers match the palazzetto_N.jpeg files (no 4: that
+        // photo is not in the carousel)
+        "booking.photo1": "The sports hall wooden floor seen from the stands",
+        "booking.photo2": "The court and the stands of the sports hall",
+        "booking.photo3": "The entrances and the clubs' banners along the long side",
+        "booking.photo5": "Overview of the court, the stands and the scoreboard",
 
         "courses.title": "You can start young or as an adult.",
         "courses.p1": "From the very first steps on skates to competitive racing: our courses support kids, teens and adults with the club's technical staff. Write to us to find out days, times and how to try.",
