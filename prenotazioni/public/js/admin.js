@@ -33,6 +33,7 @@ import {
   creaSocietaAdmin,
   eliminaSocieta,
   esciAdmin,
+  inviaLinkSocieta,
   modificaPrenotazioneAdmin,
   ottieniCalendarioAdmin,
   ottieniCalendarioAdminMese,
@@ -1001,8 +1002,11 @@ function renderSocieta(societa) {
 
     const azioni = document.createElement('div');
     azioni.className = 'riga-azioni';
+    azioni.append(bottoneAzione('Copia link', 'btn', (bottone) => copiaLink(soc, bottone)));
+    // The home società never receives email (same address as the admin), so
+    // offering to send the link there would only produce a misleading "sent".
+    if (!soc.di_casa) azioni.append(bottoneAzione('Invia link', 'btn', () => inviaLink(soc)));
     azioni.append(
-      bottoneAzione('Copia link', 'btn', (bottone) => copiaLink(soc, bottone)),
       bottoneAzione('Modifica', 'btn', () => apriModificaSocieta(soc)),
       bottoneAzione('Rigenera link', 'btn', () => rigenera(soc)),
       soc.stato === 'attiva'
@@ -1049,6 +1053,20 @@ async function copiaLink(soc, bottone) {
     setTimeout(() => { bottone.textContent = testoOriginale; }, 2000);
   } catch {
     mostraMessaggio(elemento('esito-societa'), `Link di ${soc.nome}: ${soc.link_accesso}`, 'ok');
+  }
+}
+
+/**
+ * Re-sends the current personal link to the società by email.
+ * @param {object} soc - società row
+ * @returns {Promise<void>}
+ */
+async function inviaLink(soc) {
+  try {
+    await inviaLinkSocieta(soc.id);
+    mostraMessaggio(elemento('esito-societa'), `Link personale di ${soc.nome} inviato via email a ${soc.email}.`, 'ok');
+  } catch (errore) {
+    mostraMessaggio(elemento('esito-societa'), errore.message, 'errore');
   }
 }
 
@@ -1105,7 +1123,7 @@ async function salvaSocieta(evento) {
       mostraMessaggio(elemento('esito-societa'), 'Società aggiornata.', 'ok');
     } else {
       const creata = await creaSocietaAdmin(corpo);
-      mostraMessaggio(elemento('esito-societa'), `Società creata. Link personale da consegnare: ${creata.link_accesso}`, 'ok');
+      mostraMessaggio(elemento('esito-societa'), `Società creata. Link personale inviato via email a ${corpo.email}: ${creata.link_accesso}`, 'ok');
     }
     elemento('dialogo-societa').close();
     await caricaSocieta();
@@ -1201,7 +1219,7 @@ async function rigenera(soc) {
   if (!conferma) return;
   try {
     const risposta = await rigeneraTokenSocieta(soc.id);
-    mostraMessaggio(elemento('esito-societa'), `Nuovo link per ${soc.nome}: ${risposta.link_accesso}`, 'ok');
+    mostraMessaggio(elemento('esito-societa'), `Nuovo link per ${soc.nome}, inviato via email a ${soc.email}: ${risposta.link_accesso}`, 'ok');
     await caricaSocieta();
   } catch (errore) {
     mostraMessaggio(elemento('esito-societa'), errore.message, 'errore');

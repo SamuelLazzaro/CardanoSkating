@@ -146,7 +146,8 @@ describe('invio notifiche', () => {
     expect(corpo!.subject).toContain('15/01/2027');
     expect(corpo!.textContent).toContain('dalle 18:00 alle 19:00');
     expect(corpo!.textContent).toContain('Motivazione: Ok');
-    // Minimizzazione: il token del link personale non deve MAI viaggiare via email.
+    // Minimizzazione: le notifiche sugli eventi non contengono il token del
+    // link personale (viaggia solo nell'email dedicata di consegna del link).
     expect(corpo!.textContent).not.toContain(token);
     expect(await conteggioNotificheFallite()).toBe(0);
   });
@@ -187,6 +188,100 @@ describe('invio notifiche', () => {
     expect(perAdmin.textContent).not.toContain('Note:');
     // Minimizzazione: il token non deve comparire nemmeno nell'email admin.
     expect(perAdmin.textContent).not.toContain(token);
+  });
+
+  describe('consegna del link personale', () => {
+    const anagrafica = { nome: 'ASD Link', referente: 'Referente Link', email: 'link@example.com', tariffa_oraria: 20 };
+
+    async function conteggioAudit(azione: string): Promise<number> {
+      const riga = await env.DB.prepare('SELECT COUNT(*) AS n FROM audit_log WHERE azione = ?1').bind(azione).first<{ n: number }>();
+      return riga?.n ?? 0;
+    }
+
+    it('alla creazione la società riceve una sola email con il link personale', async () => {
+      const cattura = intercettaBrevo();
+
+      const risposta = await postConContesto('/api/admin/societa', await cookieAdmin(), anagrafica);
+      expect(risposta.status).toBe(201);
+      const { link_accesso } = (await risposta.json()) as { link_accesso: string };
+
+      const corpo = cattura.corpo();
+      expect(corpo).not.toBeNull();
+      expect(corpo!.to[0].email).toBe('link@example.com');
+      expect(corpo!.to[0].name).toBe('ASD Link');
+      expect(corpo!.replyTo.email).toBe(ADMIN_TEST);
+      expect(corpo!.cc).toBeUndefined();
+      expect(corpo!.subject).toContain('Link personale per le prenotazioni');
+      expect(corpo!.textContent).toContain('Gentile ASD Link,');
+      expect(corpo!.textContent).toContain("l'amministratore ha registrato la società");
+      expect(corpo!.textContent).toContain(`Link personale: ${link_accesso}`);
+      expect(corpo!.textContent).toContain('non va condiviso');
+      expect(await conteggioNotificheFallite()).toBe(0);
+    });
+
+    it('la rigenerazione invia il nuovo link, senza il vecchio token', async () => {
+      const { id, token: vecchioToken } = await creaSocietaConToken();
+      const cattura = intercettaBrevo();
+
+      const risposta = await postConContesto(`/api/admin/societa/${id}/rigenera-token`, await cookieAdmin());
+      expect(risposta.status).toBe(200);
+      const { link_accesso } = (await risposta.json()) as { link_accesso: string };
+
+      const corpo = cattura.corpo();
+      expect(corpo).not.toBeNull();
+      expect(corpo!.to[0].email).toBe('test@example.com');
+      expect(corpo!.subject).toContain('Nuovo link personale');
+      expect(corpo!.textContent).toContain('il link precedente non funziona più');
+      expect(corpo!.textContent).toContain(`Link personale: ${link_accesso}`);
+      expect(corpo!.textContent).not.toContain(vecchioToken);
+      expect(await conteggioNotificheFallite()).toBe(0);
+    });
+
+    it('la rigenerazione su una società sospesa non invia nulla', async () => {
+      const { id } = await creaSocietaConToken();
+      await env.DB.prepare("UPDATE societa SET stato = 'sospesa' WHERE id = ?1").bind(id).run();
+
+      // Nessuna intercettazione: una fetch qui fallirebbe e lascerebbe una
+      // notifica_fallita in audit.
+      const risposta = await postConContesto(`/api/admin/societa/${id}/rigenera-token`, await cookieAdmin());
+      expect(risposta.status).toBe(200);
+      expect(await conteggioNotificheFallite()).toBe(0);
+    });
+
+    it('il reinvio manda il link corrente e lascia traccia in audit', async () => {
+      const { id, token } = await creaSocietaConToken();
+      const cattura = intercettaBrevo();
+
+      const risposta = await postConContesto(`/api/admin/societa/${id}/invia-link`, await cookieAdmin());
+      expect(risposta.status).toBe(200);
+
+      const corpo = cattura.corpo();
+      expect(corpo).not.toBeNull();
+      expect(corpo!.to[0].email).toBe('test@example.com');
+      expect(corpo!.subject).toContain('Link personale per le prenotazioni');
+      expect(corpo!.textContent).toContain("su richiesta dell'amministratore");
+      expect(corpo!.textContent).toContain(`/accesso/${token}`);
+      expect(await conteggioAudit('link_inviato')).toBe(1);
+      // Il token non viene rigenerato: il link di prima continua a funzionare.
+      expect((await app.request(`/accesso/${token}`, {}, env)).status).toBe(302);
+      expect(await conteggioNotificheFallite()).toBe(0);
+    });
+
+    it('il reinvio rifiuta società inesistente, sospesa o di casa, senza inviare', async () => {
+      const cookieAmm = await cookieAdmin();
+
+      expect((await postConContesto('/api/admin/societa/999999/invia-link', cookieAmm)).status).toBe(404);
+
+      const { id: sospesaId } = await creaSocietaConToken('Sospesa');
+      await env.DB.prepare("UPDATE societa SET stato = 'sospesa' WHERE id = ?1").bind(sospesaId).run();
+      expect((await postConContesto(`/api/admin/societa/${sospesaId}/invia-link`, cookieAmm)).status).toBe(409);
+
+      const esito = await env.DB.prepare("INSERT INTO societa (nome, referente, email, token_accesso) VALUES ('Casa', 'Referente', ?1, ?2)").bind(ADMIN_TEST, crypto.randomUUID()).run();
+      expect((await postConContesto(`/api/admin/societa/${esito.meta.last_row_id}/invia-link`, cookieAmm)).status).toBe(409);
+
+      // Nessuna intercettazione registrata: nessuna email deve essere partita.
+      expect(await conteggioNotificheFallite()).toBe(0);
+    });
   });
 
   it('le note multilinea sono rese come blocco citato, non falsificabili come dettagli di sistema', async () => {

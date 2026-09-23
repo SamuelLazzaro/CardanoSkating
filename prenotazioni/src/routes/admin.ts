@@ -30,6 +30,7 @@ import { eConflittoSlot, trovaConflitti } from '../conflitti';
 import {
   notificaAnnullamentoApprovato,
   notificaAnnullataDaAdmin,
+  notificaLinkAccesso,
   notificaModificaApprovata,
   notificaModificataDaAdmin,
   notificaPrenotazioneDiretta,
@@ -986,7 +987,11 @@ admin.post('/societa', async (c) => {
     .run();
   await scriviAudit(c.env.DB, 'societa_creata', `società ${esito.meta.last_row_id} (${nome})`, 'admin');
   const origine = new URL(c.req.url).origin;
-  return c.json({ id: esito.meta.last_row_id, nome, link_accesso: `${origine}/accesso/${token}` }, 201);
+  const linkAccesso = `${origine}/accesso/${token}`;
+  // La società riceve subito via email il link con cui prenotare; l'admin
+  // vede comunque il link nella risposta per consegnarlo anche di persona.
+  notificaLinkAccesso(c, { nome, email }, linkAccesso, 'creazione');
+  return c.json({ id: esito.meta.last_row_id, nome, link_accesso: linkAccesso }, 201);
 });
 
 /** Aggiornamento anagrafica (nome, referente, email, telefono, colore) e
@@ -1187,7 +1192,34 @@ admin.post('/societa/:id/rigenera-token', async (c) => {
   if ((esito.meta.changes ?? 0) === 0) return c.json({ errore: 'Società non trovata' }, 404);
   await scriviAudit(c.env.DB, 'token_rigenerato', `società ${id}`, 'admin');
   const origine = new URL(c.req.url).origin;
-  return c.json({ ok: true, link_accesso: `${origine}/accesso/${token}` });
+  const linkAccesso = `${origine}/accesso/${token}`;
+  // La SELECT serve solo ai dettagli dell'email: la guardia resta nell'UPDATE.
+  // Il vecchio link è già morto, quindi la società riceve subito il nuovo;
+  // a una società sospesa non si manda nulla, perché il link non funzionerebbe.
+  const soc = await c.env.DB.prepare('SELECT nome, email, stato FROM societa WHERE id = ?1').bind(id).first<{ nome: string; email: string; stato: string }>();
+  if (soc && soc.stato === 'attiva') notificaLinkAccesso(c, { nome: soc.nome, email: soc.email }, linkAccesso, 'rigenerazione');
+  return c.json({ ok: true, link_accesso: linkAccesso });
+});
+
+/**
+ * Reinvia via email il link personale corrente, senza rigenerarlo: serve
+ * quando l'invio automatico è fallito (è best effort) o la società ha perso
+ * l'email. Con società sospesa il link non funzionerebbe, quindi 409; la
+ * società di casa non riceve email per progetto (vedi notifiche.ts), quindi
+ * un "inviato" sarebbe falso: anche qui 409, con spiegazione.
+ */
+admin.post('/societa/:id/invia-link', async (c) => {
+  const id = intero(c.req.param('id'));
+  if (id === null) return c.json({ errore: 'Identificativo non valido' }, 400);
+  const soc = await c.env.DB.prepare('SELECT nome, email, stato, token_accesso FROM societa WHERE id = ?1 AND eliminata_at IS NULL').bind(id).first<{ nome: string; email: string; stato: string; token_accesso: string }>();
+  if (!soc) return c.json({ errore: 'Società non trovata' }, 404);
+  if (soc.stato !== 'attiva') return c.json({ errore: 'Società sospesa: il link personale non funzionerebbe' }, 409);
+  const eSocietaDiCasa = soc.email.toLowerCase() === (c.env.EMAIL_ADMIN ?? '').toLowerCase();
+  if (eSocietaDiCasa) return c.json({ errore: "La società di casa non riceve email: usa 'Copia link'" }, 409);
+  const origine = new URL(c.req.url).origin;
+  await scriviAudit(c.env.DB, 'link_inviato', `società ${id}`, 'admin');
+  notificaLinkAccesso(c, { nome: soc.nome, email: soc.email }, `${origine}/accesso/${soc.token_accesso}`, 'reinvio');
+  return c.json({ ok: true });
 });
 
 // ---------------------------------------------------------------------------

@@ -150,10 +150,18 @@ Consiglio: fai un backup prima di ogni `migrate:remote`.
   approvazioni avvengono in un `db.batch()` atomico e, se anche un solo slot
   è occupato, l'intera operazione viene annullata e l'admin vede quali slot
   confliggono e con chi.
-- **Società**: non si registrano da sole. L'admin le crea dal pannello e
-  consegna il link personale `/accesso/<token>`; visitarlo imposta un cookie
-  di sessione firmato (HMAC-SHA256 con `ADMIN_SECRET`). Rigenerare il link o
-  sospendere la società invalida immediatamente ogni sessione già emessa.
+- **Società**: non si registrano da sole. L'admin le crea dal pannello e la
+  società riceve via email il link personale `/accesso/<token>` (anche dopo
+  ogni «Rigenera link», e su richiesta con «Invia link»); il pannello mostra
+  comunque il link, da consegnare a mano se l'email non arriva. Visitarlo
+  imposta un cookie di sessione firmato (HMAC-SHA256 con `ADMIN_SECRET`).
+  Rigenerare il link o sospendere la società invalida immediatamente ogni
+  sessione già emessa.
+  Nota di sicurezza: il link è la credenziale della società e l'email non è
+  un canale sicuro (scelta consapevole del committente per semplificare la
+  consegna). Chi legge quell'email può prenotare a nome della società: in
+  caso di dubbio l'admin rigenera il link dal pannello e il vecchio smette
+  subito di funzionare. Le altre notifiche non contengono mai il link.
 - **Sospensione**: cancella anche tutte le prenotazioni future della società
   e annulla le sue richieste in attesa (operazione atomica, tracciata in
   `audit_log`). La riattivazione non ripristina nulla.

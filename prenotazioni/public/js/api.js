@@ -312,6 +312,15 @@ export function rigeneraTokenSocieta(idSocieta) {
 }
 
 /**
+ * Re-sends the current personal link to the società by email (no regeneration).
+ * @param {number} idSocieta
+ * @returns {Promise<{ok: boolean}>}
+ */
+export function inviaLinkSocieta(idSocieta) {
+  return richiestaJson(`/api/admin/societa/${idSocieta}/invia-link`, { method: 'POST' });
+}
+
+/**
  * @param {string} lunedi - Monday of the requested week
  * @returns {Promise<{settimana: string, prenotazioni: {slot_key: string, societa_id: number, societa: string, colore: string, richiesta_id: number, titolo: string, note: string|null, ricorrenza_id: number|null}[]}>}
  */

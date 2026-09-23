@@ -26,9 +26,15 @@ import { scriviAudit } from './util';
  *    dettaglio a testa): i contenuti multilinea vanno resi come blocco
  *    citato, altrimenti restano falsificabili come righe di sistema —
  *    vedi righeNote.
- *  - Minimizzazione (art. 5.1.c GDPR): nelle email non compare MAI il
- *    link personale col token di accesso — l'email non è un canale
- *    sicuro — né altri dati oltre quelli necessari a capire l'evento.
+ *  - Minimizzazione (art. 5.1.c GDPR): le notifiche sugli eventi delle
+ *    prenotazioni non contengono il link personale col token di accesso né
+ *    altri dati oltre quelli necessari a capire l'evento. UNICA eccezione,
+ *    scelta dal committente (2026-09-23): l'email di consegna del link
+ *    personale (notificaLinkAccesso), inviata alla creazione della società,
+ *    alla rigenerazione del link e su richiesta esplicita dell'admin. Il
+ *    link È la credenziale della società e l'email non è un canale sicuro:
+ *    chi legge quel messaggio può prenotare a nome della società finché
+ *    l'admin non rigenera il link (mitigazione documentata nel README).
  *  - Con BREVO_API_KEY assente l'invio è disattivato: sviluppo locale e
  *    test girano così, senza toccare la rete.
  */
@@ -610,6 +616,45 @@ export function notificaPrenotazioneDirettaRicorrente(
     oggetto: `Nuova prenotazione ricorrente registrata — dal ${dataItaliana(ricorrenza.valida_dal)}`,
     messaggio: "l'amministratore ha registrato una prenotazione ricorrente a nome della società: le date elencate sono ora prenotate.",
     dettagli: [...righeRicorrenza(ricorrenza), `Date prenotate: ${date.map(dataItaliana).join(', ')}`],
+    societa,
+  });
+}
+
+/**
+ * Perché viene consegnato il link personale: alla creazione della società,
+ * dopo la rigenerazione del link (il vecchio non funziona più) oppure su
+ * richiesta esplicita dell'admin dal pannello (reinvio).
+ */
+export type MotivoLinkAccesso = 'creazione' | 'rigenerazione' | 'reinvio';
+
+const TESTI_LINK_ACCESSO: Record<MotivoLinkAccesso, { oggetto: string; messaggio: string }> = {
+  creazione: {
+    oggetto: 'Link personale per le prenotazioni',
+    messaggio: "l'amministratore ha registrato la società nel sistema di prenotazione del Palazzetto dello Sport. Da questo momento è possibile richiedere le prenotazioni dall'area riservata, raggiungibile con il link personale riportato sotto.",
+  },
+  rigenerazione: {
+    oggetto: 'Nuovo link personale per le prenotazioni',
+    messaggio: "l'amministratore ha rigenerato il link personale della società: il link precedente non funziona più. Da ora l'area riservata si raggiunge con il link riportato sotto.",
+  },
+  reinvio: {
+    oggetto: 'Link personale per le prenotazioni',
+    messaggio: "su richiesta dell'amministratore, ecco di nuovo il link personale con cui la società accede all'area riservata delle prenotazioni.",
+  },
+};
+
+const AVVISO_LINK_PERSONALE = 'Il link è personale e non va condiviso: chi lo conosce può prenotare a nome della società. Conviene salvarlo tra i preferiti; in caso di smarrimento o sospetto uso improprio, chiedere all\'amministratore di rigenerarlo.';
+
+/**
+ * Admin: consegna del link personale alla società. È l'unica notifica che
+ * contiene il token di accesso (vedi la nota sulla minimizzazione in testa
+ * al file): parte solo per azioni dell'admin, quindi nessuna email all'admin.
+ */
+export function notificaLinkAccesso(c: ContestoNotifica, societa: SocietaDaNotificare, linkAccesso: string, motivo: MotivoLinkAccesso): void {
+  const testi = TESTI_LINK_ACCESSO[motivo];
+  inviaNotifica(c, {
+    oggetto: testi.oggetto,
+    messaggio: `${testi.messaggio} ${AVVISO_LINK_PERSONALE}`,
+    dettagli: [`Link personale: ${linkAccesso}`],
     societa,
   });
 }
