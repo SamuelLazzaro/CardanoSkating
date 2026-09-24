@@ -1,0 +1,947 @@
+/* ===========================================================================
+   components.css — reusable components: buttons, status messages, panels,
+   forms, dialogs, badges, lists, tables. Taken from prenotazioni/ without the
+   calendar-specific parts; the warehouse-specific components (cards of the
+   two warehouses, signature pad, ...) are appended in their own sections.
+   =========================================================================== */
+
+/* -------------------------------------------------------------- bottoni */
+
+.btn {
+    /* shared between :hover, :focus-visible and .is-tapped; the variants
+       below override these two properties instead of redeclaring rules.
+       The active border uses the darker orange: the bright fill would sit
+       below the 3:1 non-text contrast threshold on a white button */
+    --btn-fondo-attivo: var(--accento-tinta);
+    --btn-bordo-attivo: var(--accento-scuro);
+    font: inherit;
+    color: var(--testo);
+    background: var(--superficie);
+    border: 1px solid var(--bordo-forte);
+    border-radius: var(--raggio);
+    padding: 0.45rem 0.9rem;
+    cursor: pointer;
+    transition: background-color var(--t-veloce), border-color var(--t-veloce), color var(--t-veloce);
+}
+
+@media (pointer: fine) {
+    .btn:hover:not(:disabled) {
+        background: var(--btn-fondo-attivo);
+        border-color: var(--btn-bordo-attivo);
+    }
+}
+
+.btn.is-tapped {
+    background: var(--btn-fondo-attivo);
+    border-color: var(--btn-bordo-attivo);
+}
+
+.btn:focus-visible {
+    background: var(--btn-fondo-attivo);
+    border-color: var(--btn-bordo-attivo);
+}
+
+.btn:disabled {
+    opacity: 0.45;
+    cursor: default;
+}
+
+.btn-testo {
+    --btn-fondo-attivo: transparent;
+    --btn-bordo-attivo: transparent;
+    --btn-testo-colore-attivo: var(--accento-testo-scuro);
+    border: none;
+    background: none;
+    padding: 0.1rem 0.3rem;
+    font-size: 0.82rem;
+    color: var(--accento-testo);
+    text-decoration: underline;
+}
+
+@media (pointer: fine) {
+    .btn-testo:hover:not(:disabled) {
+        color: var(--btn-testo-colore-attivo);
+    }
+}
+
+.btn-testo.is-tapped {
+    color: var(--btn-testo-colore-attivo);
+}
+
+.btn-testo:focus-visible {
+    color: var(--btn-testo-colore-attivo);
+}
+
+/* brand orange fill, like the main site CTAs */
+.btn-primario {
+    --btn-fondo-attivo: var(--accento-scuro);
+    --btn-bordo-attivo: var(--accento-scuro);
+    background: var(--accento);
+    border-color: var(--accento);
+    color: var(--c-white);
+    font-weight: 600;
+}
+
+.btn-pericolo {
+    --btn-fondo-attivo: #faf0ed;
+    --btn-bordo-attivo: var(--errore);
+    color: var(--errore);
+    border-color: #dcc0b8;
+}
+
+.btn-piccolo {
+    padding: 0.25rem 0.6rem;
+    font-size: 0.8rem;
+}
+
+.btn-con-icona {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.btn-con-icona svg {
+    /* the inline SVG uses stroke="currentColor": the icon inherits the
+       button text color and its color transition from .btn */
+    display: block;
+    width: 1em;
+    height: 1em;
+    flex-shrink: 0;
+}
+
+.riga-azioni {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+}
+
+/* ------------------------------------------------------- messaggi stato */
+
+.stato {
+    margin: 0.5rem 0;
+    padding: 0.6rem 0.9rem;
+    border-radius: var(--raggio);
+    background: var(--superficie);
+    border: 1px solid var(--bordo);
+    font-size: 0.9rem;
+}
+
+.stato.errore {
+    border-color: var(--errore);
+    color: var(--errore);
+}
+
+.stato.ok {
+    border-color: var(--ok);
+    color: var(--ok);
+}
+
+/* ------------------------------------------------------------- pannelli */
+
+.pannello {
+    background: var(--superficie);
+    border: 1px solid var(--bordo);
+    border-radius: var(--raggio);
+    padding: 1rem 1.1rem 1.2rem;
+    margin-bottom: 1.25rem;
+}
+
+.pannello > h2,
+.pannello-testata h2,
+.dialogo-testata h2 {
+    margin: 0 0 0.75rem;
+    font-size: 1.05rem;
+    font-weight: 600;
+}
+
+/* panel header row: title on the left, action button top-right */
+.pannello-testata {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.75rem;
+}
+
+.pannello-testata h2 {
+    margin: 0;
+}
+
+.pannello h3 {
+    margin: 1.25rem 0 0.5rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+}
+
+.testo-tenue {
+    color: var(--testo-tenue);
+    font-size: 0.85rem;
+}
+
+/* ---------------------------------------------------------------- moduli */
+
+.modulo {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    max-width: 34rem;
+}
+
+.campo {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+/* the display: flex above would defeat the hidden attribute (author styles
+   win over the UA [hidden] rule): restore it explicitly */
+.campo[hidden] {
+    display: none;
+}
+
+.campo-riga {
+    display: flex;
+    gap: 0.85rem;
+    flex-wrap: wrap;
+}
+
+.campo-riga .campo {
+    flex: 1 1 8rem;
+}
+
+.campo label,
+.campo legend {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--testo);
+}
+
+.campo input,
+.campo select,
+.campo textarea {
+    font: inherit;
+    color: var(--testo);
+    background: var(--superficie);
+    border: 1px solid var(--bordo-forte);
+    border-radius: var(--raggio);
+    padding: 0.45rem 0.6rem;
+}
+
+.campo input:focus-visible,
+.campo select:focus-visible,
+.campo textarea:focus-visible {
+    /* darker orange: the bright fill is below 3:1 against white */
+    outline: 2px solid var(--accento-scuro);
+    outline-offset: 1px;
+}
+
+.campo textarea {
+    resize: vertical;
+}
+
+fieldset.campo {
+    border: 1px dashed var(--bordo-forte);
+    border-radius: var(--raggio);
+    padding: 0.6rem 0.8rem 0.8rem;
+    margin: 0;
+}
+
+.etichetta-check {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+
+.suggerimento {
+    margin: 0.25rem 0 0;
+    font-size: 0.78rem;
+    color: var(--testo-tenue);
+}
+
+/* --------------------------------------------------------------- dialogo */
+
+/* The <dialog> itself has no padding: the content padding lives on
+   .dialogo-contenuto, so a click whose target is the dialog element can
+   only come from the ::backdrop — that is how preparaDialogo() (js/ui.js)
+   closes the popup on an outside click. */
+.dialogo {
+    border: 1px solid var(--bordo);
+    border-radius: var(--raggio);
+    padding: 0;
+    width: min(36rem, calc(100vw - 2rem));
+    background: var(--superficie);
+    color: var(--testo);
+}
+
+.dialogo::backdrop {
+    background: rgba(10, 10, 10, 0.55);
+}
+
+.dialogo-contenuto {
+    padding: 1rem 1.1rem 1.2rem;
+}
+
+.dialogo-testata {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+
+.dialogo-testata h2 {
+    margin: 0;
+}
+
+.dialogo-testata .btn-testo {
+    font-size: 1rem;
+    text-decoration: none;
+}
+
+/* ----------------------------------------------------------------- badge */
+
+.badge {
+    display: inline-block;
+    border-radius: 999px;
+    padding: 0.1rem 0.6rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+/* the two warehouses */
+.badge-ghiaccio {
+    background: var(--ghiaccio-tinta);
+    color: var(--ghiaccio-testo);
+}
+
+.badge-corsa {
+    background: var(--corsa-tinta);
+    color: var(--corsa-testo);
+}
+
+/* movement types */
+.badge-entrata {
+    background: #e2f2e9;
+    color: var(--ok);
+}
+
+.badge-consegna {
+    background: #e3eef8;
+    color: #2d5a87;
+}
+
+.badge-restituzione {
+    background: #ece7f6;
+    color: #5b4a8a;
+}
+
+/* athletes and categories */
+.badge-attivo {
+    background: #e2f2e9;
+    color: var(--ok);
+}
+
+.badge-disattivato {
+    background: #eceae7;
+    color: var(--testo-tenue);
+}
+
+/* item conditions, from best to worst */
+.badge-stato-nuovo {
+    background: #e2f2e9;
+    color: var(--ok);
+}
+
+.badge-stato-buono {
+    background: #e3eef8;
+    color: #2d5a87;
+}
+
+.badge-stato-usurato {
+    background: #fdf3dd;
+    color: #8a6116;
+}
+
+.badge-stato-da-riparare {
+    background: #fbe9e3;
+    color: var(--errore);
+}
+
+.badge-stato-fuori-uso {
+    background: #eceae7;
+    color: var(--testo-tenue);
+}
+
+/* ----------------------------------------------------------------- liste */
+
+.lista {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.lista li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    padding: 0.55rem 0.2rem;
+    border-top: 1px solid var(--bordo);
+}
+
+.lista li:first-child {
+    border-top: none;
+}
+
+.riga-info {
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+}
+
+.riga-info strong {
+    font-size: 0.92rem;
+}
+
+.riga-nota {
+    flex-basis: 100%;
+    margin: 0;
+    font-size: 0.82rem;
+    color: var(--testo-tenue);
+}
+
+.vuoto {
+    margin: 0.25rem 0;
+    font-size: 0.88rem;
+    color: var(--testo-tenue);
+}
+
+/* --------------------------------------------------------------- tabelle */
+
+.scorri-tabella {
+    overflow-x: auto;
+}
+
+.tabella {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 0.88rem;
+}
+
+.tabella th,
+.tabella td {
+    border-bottom: 1px solid var(--bordo);
+    padding: 0.45rem 0.6rem;
+    text-align: left;
+    vertical-align: top;
+}
+
+.tabella thead th {
+    border-bottom: 2px solid var(--bordo-forte);
+}
+
+.tabella .cella-numero {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.tabella .cella-azioni {
+    text-align: right;
+    white-space: nowrap;
+}
+
+/* text buttons inside cells sit on the text baseline like plain text */
+.tabella .btn-testo {
+    padding: 0;
+    font-size: inherit;
+    text-align: left;
+}
+
+/* the whole tables are hidden when empty (riempiTabella): the .vuoto
+   paragraph takes their place */
+.tabella[hidden] {
+    display: none;
+}
+
+/* ------------------------------------------------- filtri e ricerca */
+
+/* filter row: segmented warehouse filter on the left, search box growing on the right */
+.barra-filtri {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.75rem;
+}
+
+.filtri {
+    display: flex;
+}
+
+.filtri .btn:not(:first-child) {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    /* adjacent buttons share one border instead of drawing two */
+    margin-left: -1px;
+}
+
+.filtri .btn:not(:last-child) {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+}
+
+/* the pressed filter: same fill as .btn-primario, including the darker
+   hover/tap fill inherited from .btn through these two custom properties */
+.btn-filtro[aria-pressed="true"] {
+    --btn-fondo-attivo: var(--accento-scuro);
+    --btn-bordo-attivo: var(--accento-scuro);
+    background: var(--accento);
+    border-color: var(--accento);
+    color: var(--c-white);
+    font-weight: 600;
+}
+
+.campo-ricerca {
+    flex: 1 1 14rem;
+    font: inherit;
+    color: var(--testo);
+    background: var(--superficie);
+    border: 1px solid var(--bordo-forte);
+    border-radius: var(--raggio);
+    padding: 0.45rem 0.6rem;
+}
+
+.campo-ricerca:focus-visible {
+    outline: 2px solid var(--accento-scuro);
+    outline-offset: 1px;
+}
+
+/* ------------------------------------------------- moduli del magazzino */
+
+/* one-line add form in a panel header (athlete, category): input + button */
+.modulo-in-riga {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.modulo-in-riga input {
+    flex: 1 1 12rem;
+    font: inherit;
+    color: var(--testo);
+    background: var(--superficie);
+    border: 1px solid var(--bordo-forte);
+    border-radius: var(--raggio);
+    padding: 0.45rem 0.6rem;
+}
+
+.modulo-in-riga input:focus-visible {
+    outline: 2px solid var(--accento-scuro);
+    outline-offset: 1px;
+}
+
+/* forms with several fields per row (movement, new item) use the full panel */
+.modulo-largo {
+    max-width: none;
+}
+
+/* a field taking twice the room of its row mates */
+.campo-riga .campo-largo {
+    flex: 2 1 16rem;
+}
+
+/* label-like heading of a control without a labelable element (canvas) */
+.etichetta-gruppo {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--testo);
+}
+
+/* radio choices side by side */
+.scelte-in-riga {
+    display: flex;
+    gap: 1.25rem;
+    flex-wrap: wrap;
+}
+
+/* the "Nuovo articolo" panel of the movement form: warm tint, like the
+   original gestionale, so it reads as a distinct step */
+.pannello-nuovo-articolo {
+    background: var(--accento-tinta);
+    border-style: solid;
+    border-color: #ffd5ad;
+}
+
+.pannello-nuovo-articolo legend {
+    color: var(--accento-testo);
+    padding: 0 0.3rem;
+}
+
+.pannello-movimento {
+    border-top: 4px solid var(--accento);
+}
+
+/* inline warning under a select */
+.suggerimento.avviso {
+    color: var(--errore);
+}
+
+/* signature pad */
+.firma {
+    display: block;
+    width: 100%;
+    height: 180px;
+    background: var(--superficie);
+    border: 1px dashed var(--bordo-forte);
+    border-radius: var(--raggio);
+    /* let the pad receive the strokes instead of scrolling the page */
+    touch-action: none;
+}
+
+/* ------------------------------------------------------ home: marchio */
+
+.marchio-home {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    background: var(--superficie);
+    border: 1px solid var(--bordo);
+    border-radius: var(--raggio);
+    padding: 1rem 1.25rem;
+    margin-bottom: 1.25rem;
+}
+
+.marchio-home img {
+    width: 84px;
+    height: 84px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+.marchio-home h2 {
+    margin: 0;
+    font-size: 1.4rem;
+    font-weight: 600;
+}
+
+.marchio-home-sopra {
+    margin: 0;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accento-testo);
+}
+
+.marchio-home .testo-tenue {
+    margin: 0.15rem 0 0;
+}
+
+/* -------------------------------------------- home: schede magazzino */
+
+.schede-magazzino {
+    display: grid;
+    gap: 1.25rem;
+    grid-template-columns: 1fr;
+}
+
+/*
+ * One card per warehouse, with its photo (from the original gestionale) as
+ * background and the text kept on the left half where the photos are quiet.
+ * The numbers sit on a translucent white strip so they stay readable
+ * whatever the photo shows behind them.
+ */
+.scheda-magazzino {
+    --scheda-colore: var(--accento);
+    --scheda-colore-testo: var(--accento-testo);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    min-height: 335px;
+    padding: 1.5rem;
+    padding-right: 46%;
+    border: 1px solid var(--bordo);
+    border-radius: var(--raggio);
+    background-color: var(--superficie);
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    overflow: hidden;
+}
+
+.scheda-magazzino.ghiaccio {
+    --scheda-colore: var(--ghiaccio);
+    --scheda-colore-testo: var(--ghiaccio-testo);
+    background-image: url("../assets/img/magazzino-ghiaccio-clean.jpg");
+}
+
+.scheda-magazzino.corsa {
+    background-image: url("../assets/img/magazzino-corsa-clean.jpg");
+}
+
+.scheda-magazzino-sopra {
+    margin: 0;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--scheda-colore-testo);
+}
+
+.scheda-magazzino h2 {
+    margin: 0.1rem 0 0.35rem;
+    font-size: 1.5rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--scheda-colore-testo);
+}
+
+.scheda-magazzino p {
+    margin: 0;
+    font-size: 0.9rem;
+}
+
+.scheda-magazzino .numeri {
+    display: flex;
+    gap: 1.5rem;
+    margin: auto 0 0;
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--raggio);
+    background: rgba(255, 255, 255, 0.88);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.numeri div {
+    /* label under the number, though the markup keeps dt before dd */
+    display: flex;
+    flex-direction: column-reverse;
+}
+
+.numeri dd {
+    margin: 0;
+    font-size: 1.7rem;
+    font-weight: 600;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+}
+
+.numeri dt {
+    font-size: 0.7rem;
+    color: var(--testo-tenue);
+}
+
+.scheda-magazzino .btn-magazzino {
+    margin-top: 0.75rem;
+    background: var(--scheda-colore);
+    border-color: var(--scheda-colore);
+}
+
+@media (min-width: 900px) {
+    .schede-magazzino {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+@media (max-width: 640px) {
+    .scheda-magazzino {
+        min-height: 420px;
+        padding: 1.25rem;
+        padding-bottom: 190px;
+        background-position: center bottom;
+    }
+}
+
+/* --------------------------------------------- home: vista magazzino */
+
+/* colored header of a warehouse dashboard: ice blue or race orange gradient */
+.testata-magazzino {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    padding: 1.25rem 1.5rem;
+    border-radius: var(--raggio);
+    color: #fff;
+    background: linear-gradient(120deg, #d94e00, var(--accento));
+    margin-bottom: 1rem;
+}
+
+.testata-magazzino.ghiaccio {
+    background: linear-gradient(120deg, #0752a6, var(--ghiaccio));
+}
+
+.testata-magazzino h2 {
+    margin: 0;
+    font-size: 1.4rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.testata-magazzino-sopra {
+    margin: 0;
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    opacity: 0.85;
+}
+
+/* stat tiles: two per row on a phone, four on desktop */
+.riquadri {
+    display: grid;
+    gap: 0.75rem;
+    grid-template-columns: repeat(2, 1fr);
+    margin-bottom: 1rem;
+}
+
+.riquadro {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    padding: 0.9rem 1rem;
+    background: var(--superficie);
+    border: 1px solid var(--bordo);
+    border-radius: var(--raggio);
+}
+
+.riquadro small {
+    font-size: 0.78rem;
+    color: var(--testo-tenue);
+}
+
+.riquadro strong {
+    font-size: 1.9rem;
+    font-weight: 600;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+}
+
+.azioni-magazzino {
+    margin-bottom: 1.25rem;
+}
+
+@media (min-width: 900px) {
+    .riquadri {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
+
+/* ----------------------------------------------- scheda materiale (popup) */
+
+.dialogo-largo {
+    width: min(44rem, calc(100vw - 2rem));
+}
+
+.sottotitolo-scheda {
+    margin: 0.2rem 0 0;
+}
+
+/* details on the left, QR code on the right; stacked on a phone */
+.scheda-materiale {
+    display: flex;
+    gap: 1.25rem;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+}
+
+.scheda-materiale .dettagli {
+    flex: 1;
+    margin: 0;
+}
+
+/* label/value rows: two columns on wide screens, one below the other on a phone */
+.dettagli {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 0.35rem 1rem;
+    margin: 0 0 1rem;
+    font-size: 0.92rem;
+}
+
+.dettagli dt {
+    font-weight: 600;
+    color: var(--testo-tenue);
+}
+
+.dettagli dd {
+    margin: 0;
+    /* notes are free text and may be long: keep them inside the popup */
+    overflow-wrap: anywhere;
+    white-space: pre-line;
+}
+
+.qr {
+    margin: 0;
+    flex-shrink: 0;
+    text-align: center;
+    font-size: 0.75rem;
+}
+
+.qr img {
+    display: block;
+    width: 150px;
+    height: 150px;
+    margin: 0 auto 0.3rem;
+    border: 1px solid var(--bordo);
+    border-radius: var(--raggio);
+    background: #fff;
+}
+
+@media (max-width: 480px) {
+    .scheda-materiale {
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .scheda-materiale .dettagli {
+        width: 100%;
+    }
+
+    .dettagli {
+        grid-template-columns: 1fr;
+        gap: 0.1rem;
+    }
+
+    .dettagli dd {
+        margin-bottom: 0.5rem;
+    }
+}
+
+/* ---------------------------------------------------------- bottone ok */
+
+/* green outlined action (reactivate) */
+.btn-ok {
+    --btn-fondo-attivo: #e2f2e9;
+    --btn-bordo-attivo: var(--ok);
+    color: var(--ok);
+    border-color: #b9dcc8;
+}
+
+/* ----------------------------------------------------------------- login */
+
+/* the login panel sits alone in the page: centered, with the club crest */
+.pannello-login {
+    max-width: 24rem;
+    margin: 2rem auto;
+    text-align: center;
+}
+
+.pannello-login .modulo {
+    text-align: left;
+}
+
+.login-logo {
+    width: 110px;
+    height: 110px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin-bottom: 0.75rem;
+}

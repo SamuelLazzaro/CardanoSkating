@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex">
+  <title>Gestionale magazzino — Cardano Skating S.R.L. S.S.D.</title>
+  <link rel="icon" href="/assets/img/logo-cardano.jpg">
+  <link rel="stylesheet" href="/css/main.css">
+  <script type="module" src="/js/app.js"></script>
+</head>
+<body>
+  <header class="testata">
+    <div class="testata-interno">
+      <div class="testata-marchio">
+        <img class="testata-logo" src="/assets/img/logo-cardano.jpg" alt="">
+        <div>
+          <h1>Gestionale magazzino</h1>
+          <p class="sottotitolo">Cardano Skating S.R.L. S.S.D.</p>
+        </div>
+      </div>
+      <nav class="testata-nav">
+        <span id="utente-corrente" class="utente-corrente" hidden></span>
+        <button id="bottone-esci" type="button" hidden>Esci</button>
+      </nav>
+    </div>
+  </header>
+
+  <div class="disposizione">
+    <nav id="nav-sezioni" class="nav-sezioni" aria-label="Sezioni del gestionale" hidden>
+      <button type="button" class="nav-voce attiva" data-sezione="sezione-home" aria-current="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+          <polyline points="9 22 9 12 15 12 15 22"></polyline>
+        </svg>
+        <span>Home</span>
+      </button>
+      <button type="button" class="nav-voce" data-sezione="sezione-atleti">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+          <circle cx="9" cy="7" r="4"></circle>
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+          <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+        </svg>
+        <span>Atleti</span>
+      </button>
+      <button type="button" class="nav-voce" data-sezione="sezione-materiali">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+          <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+          <line x1="12" y1="22.08" x2="12" y2="12"></line>
+        </svg>
+        <span>Materiali</span>
+      </button>
+      <button type="button" class="nav-voce" data-sezione="sezione-movimento">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <polyline points="17 1 21 5 17 9"></polyline>
+          <path d="M3 11V9a4 4 0 0 1 4-4h14"></path>
+          <polyline points="7 23 3 19 7 15"></polyline>
+          <path d="M21 13v2a4 4 0 0 1-4 4H3"></path>
+        </svg>
+        <span>Movimento</span>
+      </button>
+      <button type="button" class="nav-voce" data-sezione="sezione-storico">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="10"></circle>
+          <polyline points="12 6 12 12 16 14"></polyline>
+        </svg>
+        <span>Storico</span>
+      </button>
+    </nav>
+
+    <main class="contenitore">
+      <p id="vista-caricamento" class="stato" role="status">Caricamento…</p>
+
+      <section id="vista-login" class="pannello pannello-login" hidden>
+        <img class="login-logo" src="/assets/img/logo-cardano.jpg" alt="Cardano Skating">
+        <h2>Accesso</h2>
+        <form id="form-login" class="modulo">
+          <div class="campo">
+            <label for="campo-utente">Utente</label>
+            <select id="campo-utente" autocomplete="username" required></select>
+          </div>
+          <div class="campo">
+            <label for="campo-password">Password</label>
+            <input type="password" id="campo-password" autocomplete="current-password" required>
+          </div>
+          <div>
+            <button type="submit" class="btn btn-primario" id="bottone-entra">Entra</button>
+          </div>
+        </form>
+        <p id="esito-login" class="stato" role="status" hidden></p>
+      </section>
+
+      <div id="vista-app" hidden>
+
+        <!-- ============================================================ Home -->
+        <div id="sezione-home">
+          <div id="vista-magazzini">
+            <div class="marchio-home">
+              <img src="/assets/img/logo-cardano.jpg" alt="">
+              <div>
+                <p class="marchio-home-sopra">Cardano Skating</p>
+                <h2>Gestionale magazzino</h2>
+                <p class="testo-tenue">Seleziona il magazzino con cui vuoi operare.</p>
+              </div>
+            </div>
+            <div class="schede-magazzino">
+              <article class="scheda-magazzino ghiaccio">
+                <p class="scheda-magazzino-sopra">Magazzino</p>
+                <h2>Pattinaggio ghiaccio</h2>
+                <p>Gestione separata del materiale dedicato al ghiaccio.</p>
+                <dl class="numeri">
+                  <div><dt>Totali</dt><dd id="ghiaccio-articoli">0</dd></div>
+                  <div><dt>Disponibili</dt><dd id="ghiaccio-disponibili">0</dd></div>
+                  <div><dt>Assegnati</dt><dd id="ghiaccio-assegnati">0</dd></div>
+                </dl>
+                <button type="button" class="btn btn-primario btn-magazzino" data-disciplina="Ghiaccio">Entra nel magazzino ghiaccio →</button>
+              </article>
+              <article class="scheda-magazzino corsa">
+                <p class="scheda-magazzino-sopra">Magazzino</p>
+                <h2>Pattinaggio corsa</h2>
+                <p>Gestione separata del materiale dedicato alla corsa.</p>
+                <dl class="numeri">
+                  <div><dt>Totali</dt><dd id="corsa-articoli">0</dd></div>
+                  <div><dt>Disponibili</dt><dd id="corsa-disponibili">0</dd></div>
+                  <div><dt>Assegnati</dt><dd id="corsa-assegnati">0</dd></div>
+                </dl>
+                <button type="button" class="btn btn-primario btn-magazzino" data-disciplina="Corsa">Entra nel magazzino corsa →</button>
+              </article>
+            </div>
+          </div>
+
+          <div id="vista-magazzino" hidden>
+            <div id="testata-magazzino" class="testata-magazzino">
+              <div>
+                <p class="testata-magazzino-sopra">Cardano Skating · Magazzino</p>
+                <h2 id="titolo-magazzino">Pattinaggio</h2>
+              </div>
+              <button type="button" class="btn" id="bottone-cambia-magazzino">← Cambia magazzino</button>
+            </div>
+            <p id="esito-magazzino" class="stato" role="status" hidden></p>
+            <div class="riquadri">
+              <div class="riquadro"><small>Materiali totali</small><strong id="mag-articoli">0</strong></div>
+              <div class="riquadro"><small>Disponibili</small><strong id="mag-disponibili">0</strong></div>
+              <div class="riquadro"><small>Assegnati</small><strong id="mag-assegnati">0</strong></div>
+              <div class="riquadro"><small>Da riparare</small><strong id="mag-da-riparare">0</strong></div>
+            </div>
+            <div class="riga-azioni azioni-magazzino">
+              <button type="button" class="btn btn-primario" id="mag-azione-materiali">Materiali</button>
+              <button type="button" class="btn" id="mag-azione-movimento">+ Nuovo movimento</button>
+              <button type="button" class="btn" id="mag-azione-storico">Storico</button>
+              <button type="button" class="btn" id="mag-azione-atleti">Atleti</button>
+            </div>
+            <section class="pannello">
+              <h2 id="titolo-ultimi-movimenti">Ultime movimentazioni</h2>
+              <div class="scorri-tabella">
+                <table class="tabella" id="tabella-ultimi-movimenti">
+                  <thead>
+                    <tr><th scope="col">Data</th><th scope="col">Tipo</th><th scope="col">Materiale</th><th scope="col">Atleta</th><th scope="col" class="cella-numero">Q.tà</th></tr>
+                  </thead>
+                  <tbody id="righe-ultimi-movimenti"></tbody>
+                </table>
+              </div>
+              <p id="vuoto-ultimi-movimenti" class="vuoto" hidden>Nessun movimento.</p>
+            </section>
+          </div>
+        </div>
+
+        <!-- ========================================================== Atleti -->
+        <div id="sezione-atleti" hidden>
+          <section class="pannello">
+            <div class="pannello-testata">
+              <h2>Atleti</h2>
+              <form id="form-atleta" class="modulo-in-riga">
+                <input type="text" id="campo-nome-atleta" maxlength="160" placeholder="Nome e cognome" aria-label="Nome e cognome" required>
+                <button type="submit" class="btn btn-primario">Aggiungi</button>
+              </form>
+            </div>
+            <p id="esito-atleti" class="stato" role="status" hidden></p>
+            <div class="scorri-tabella">
+              <table class="tabella" id="tabella-atleti">
+                <thead>
+                  <tr><th scope="col">Nome</th><th scope="col">Stato</th><th scope="col"></th></tr>
+                </thead>
+                <tbody id="righe-atleti"></tbody>
+              </table>
+            </div>
+            <p id="vuoto-atleti" class="vuoto" hidden>Nessun atleta.</p>
+          </section>
+        </div>
+
+        <!-- ======================================================= Materiali -->
+        <div id="sezione-materiali" hidden>
+          <section class="pannello">
+            <div class="pannello-testata">
+              <h2>Materiali</h2>
+              <button type="button" class="btn btn-primario btn-con-icona" id="bottone-nuovo-materiale">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <line x1="12" y1="5" x2="12" y2="19"></line>
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                Nuovo materiale
+              </button>
+            </div>
+            <p class="testo-tenue">Materiale separato tra pattinaggio su ghiaccio e pattinaggio corsa.</p>
+            <div class="barra-filtri">
+              <div id="filtro-materiali" class="filtri" role="group" aria-label="Filtra per magazzino">
+                <button type="button" class="btn btn-piccolo btn-filtro" data-valore="" aria-pressed="true">Tutto</button>
+                <button type="button" class="btn btn-piccolo btn-filtro" data-valore="Ghiaccio" aria-pressed="false">Ghiaccio</button>
+                <button type="button" class="btn btn-piccolo btn-filtro" data-valore="Corsa" aria-pressed="false">Corsa</button>
+              </div>
+              <input type="search" id="ricerca-materiali" class="campo-ricerca" placeholder="Cerca codice, descrizione, marca o seriale" aria-label="Cerca materiale">
+            </div>
+            <p id="esito-materiali" class="stato" role="status" hidden></p>
+            <div class="scorri-tabella">
+              <table class="tabella" id="tabella-materiali">
+                <thead>
+                  <tr><th scope="col">Magazzino</th><th scope="col">Codice</th><th scope="col">Materiale</th><th scope="col">Misura</th><th scope="col" class="cella-numero">Totale</th><th scope="col" class="cella-numero">Disponibili</th><th scope="col">Stato</th></tr>
+                </thead>
+                <tbody id="righe-materiali"></tbody>
+              </table>
+            </div>
+            <p id="vuoto-materiali" class="vuoto" hidden>Nessun materiale.</p>
+          </section>
+
+          <section class="pannello">
+            <div class="pannello-testata">
+              <h2>Categorie materiale</h2>
+              <form id="form-categoria" class="modulo-in-riga">
+                <input type="text" id="campo-nome-categoria" maxlength="80" placeholder="Es. Borse, Guanti…" aria-label="Nome categoria" required>
+                <button type="submit" class="btn btn-primario">Aggiungi</button>
+              </form>
+            </div>
+            <p class="testo-tenue">Categorie utilizzate nei due magazzini.</p>
+            <p id="esito-categorie" class="stato" role="status" hidden></p>
+            <div class="scorri-tabella">
+              <table class="tabella" id="tabella-categorie">
+                <thead>
+                  <tr><th scope="col">Categoria</th><th scope="col">Stato</th><th scope="col"></th></tr>
+                </thead>
+                <tbody id="righe-categorie"></tbody>
+              </table>
+            </div>
+            <p id="vuoto-categorie" class="vuoto" hidden>Nessuna categoria.</p>
+          </section>
+        </div>
+
+        <!-- ======================================================= Movimento -->
+        <div id="sezione-movimento" hidden>
+          <section class="pannello pannello-movimento">
+            <div class="pannello-testata">
+              <div>
+                <h2>Nuovo movimento</h2>
+                <p class="testo-tenue">Seleziona magazzino, categoria e materiale.</p>
+              </div>
+            </div>
+            <form id="form-movimento" class="modulo modulo-largo">
+              <div class="campo-riga">
+                <div class="campo">
+                  <label for="mov-tipo">Tipo movimento</label>
+                  <select id="mov-tipo">
+                    <option value="CONSEGNA">Consegna all'atleta</option>
+                    <option value="RESTITUZIONE">Restituzione</option>
+                    <option value="ENTRATA">Entrata in magazzino</option>
+                  </select>
+                </div>
+                <div class="campo">
+                  <label for="mov-disciplina">Magazzino</label>
+                  <select id="mov-disciplina">
+                    <option value="Ghiaccio">Pattinaggio ghiaccio</option>
+                    <option value="Corsa" selected>Pattinaggio corsa</option>
+                  </select>
+                </div>
+                <div class="campo">
+                  <label for="mov-categoria">Categoria materiale</label>
+                  <select id="mov-categoria"></select>
+                </div>
+              </div>
+
+              <div class="campo" id="mov-blocco-articolo">
+                <label for="mov-articolo">Materiale</label>
+                <select id="mov-articolo" required></select>
+                <p id="mov-nessun-articolo" class="suggerimento avviso" hidden>Nessun articolo corrisponde al magazzino e alla categoria selezionati.</p>
+              </div>
+
+              <fieldset class="campo" id="mov-blocco-entrata" hidden>
+                <legend>Per l'entrata in magazzino</legend>
+                <div class="scelte-in-riga">
+                  <label class="etichetta-check"><input type="radio" name="modo-entrata" value="esistente" checked><span>Aggiungi quantità a un articolo esistente</span></label>
+                  <label class="etichetta-check"><input type="radio" name="modo-entrata" value="nuovo"><span>Crea un nuovo articolo</span></label>
+                </div>
+              </fieldset>
+
+              <fieldset class="campo pannello-nuovo-articolo" id="mov-blocco-nuovo" hidden>
+                <legend>Nuovo articolo</legend>
+                <div class="campo-riga">
+                  <div class="campo">
+                    <label for="mov-nuovo-codice">Codice*</label>
+                    <input type="text" id="mov-nuovo-codice" maxlength="80">
+                  </div>
+                  <div class="campo campo-largo">
+                    <label for="mov-nuovo-descrizione">Descrizione*</label>
+                    <input type="text" id="mov-nuovo-descrizione" maxlength="200" placeholder="Es. Pattino Edea, Ruota Matter 110 mm…">
+                  </div>
+                </div>
+                <div class="campo-riga">
+                  <div class="campo">
+                    <label for="mov-nuovo-marca">Marca</label>
+                    <input type="text" id="mov-nuovo-marca" maxlength="120">
+                  </div>
+                  <div class="campo">
+                    <label for="mov-nuovo-modello">Modello</label>
+                    <input type="text" id="mov-nuovo-modello" maxlength="120">
+                  </div>
+                  <div class="campo">
+                    <label for="mov-nuovo-taglia">Taglia / misura</label>
+                    <input type="text" id="mov-nuovo-taglia" maxlength="120">
+                  </div>
+                  <div class="campo">
+                    <label for="mov-nuovo-seriale">Seriale</label>
+                    <input type="text" id="mov-nuovo-seriale" maxlength="120">
+                  </div>
+                  <div class="campo">
+                    <label for="mov-nuovo-valore">Valore €</label>
+                    <input type="number" id="mov-nuovo-valore" min="0" step="0.01" value="0">
+                  </div>
+                </div>
+                <p class="suggerimento">Il nuovo articolo prende il magazzino e la categoria selezionati sopra.</p>
+              </fieldset>
+
+              <div class="campo-riga">
+                <div class="campo campo-largo" id="mov-blocco-atleta">
+                  <label for="mov-atleta">Atleta</label>
+                  <select id="mov-atleta"></select>
+                </div>
+                <div class="campo">
+                  <label for="mov-quantita">Quantità</label>
+                  <input type="number" id="mov-quantita" min="1" step="1" value="1" required>
+                </div>
+                <div class="campo">
+                  <label for="mov-data">Data</label>
+                  <input type="date" id="mov-data" required>
+                </div>
+              </div>
+
+              <div class="campo-riga">
+                <div class="campo">
+                  <label for="mov-condizione">Stato materiale</label>
+                  <select id="mov-condizione">
+                    <option value="">— invariato —</option>
+                  </select>
+                </div>
+                <div class="campo campo-largo">
+                  <label for="mov-note">Note</label>
+                  <textarea id="mov-note" rows="2" maxlength="1000"></textarea>
+                </div>
+              </div>
+
+              <div class="campo" id="mov-blocco-firma">
+                <span class="etichetta-gruppo" id="mov-etichetta-firma">Firma alla consegna/restituzione (facoltativa)</span>
+                <canvas id="mov-firma" class="firma" role="img" aria-labelledby="mov-etichetta-firma"></canvas>
+                <div>
+                  <button type="button" class="btn btn-piccolo" id="mov-cancella-firma">Cancella firma</button>
+                </div>
+              </div>
+
+              <div>
+                <button type="submit" class="btn btn-primario" id="bottone-registra-movimento">Registra movimento</button>
+              </div>
+            </form>
+            <p id="esito-movimento" class="stato" role="status" hidden></p>
+          </section>
+        </div>
+
+        <!-- ========================================================= Storico -->
+        <div id="sezione-storico" hidden>
+          <section class="pannello">
+            <div class="pannello-testata">
+              <h2>Storico movimenti</h2>
+              <a class="btn" id="link-export-csv" href="/api/movimenti/export.csv" download="movimenti_magazzino.csv">Esporta CSV</a>
+            </div>
+            <div class="barra-filtri">
+              <div id="filtro-storico" class="filtri" role="group" aria-label="Filtra per magazzino">
+                <button type="button" class="btn btn-piccolo btn-filtro" data-valore="" aria-pressed="true">Tutto</button>
+                <button type="button" class="btn btn-piccolo btn-filtro" data-valore="Ghiaccio" aria-pressed="false">Ghiaccio</button>
+                <button type="button" class="btn btn-piccolo btn-filtro" data-valore="Corsa" aria-pressed="false">Corsa</button>
+              </div>
+              <input type="search" id="ricerca-storico" class="campo-ricerca" placeholder="Cerca codice o materiale" aria-label="Cerca nello storico">
+            </div>
+            <div class="scorri-tabella">
+              <table class="tabella" id="tabella-storico">
+                <thead>
+                  <tr><th scope="col">Data</th><th scope="col">Magazzino</th><th scope="col">Tipo</th><th scope="col">Materiale</th><th scope="col">Atleta</th><th scope="col" class="cella-numero">Q.tà</th><th scope="col">Operatore</th></tr>
+                </thead>
+                <tbody id="righe-storico"></tbody>
+              </table>
+            </div>
+            <p id="vuoto-storico" class="vuoto" hidden>Nessun movimento.</p>
+          </section>
+        </div>
+      </div>
+
+      <!-- ================================================= Dialog: scheda atleta -->
+      <dialog id="dialogo-atleta" class="dialogo dialogo-largo" aria-labelledby="titolo-dialogo-atleta">
+        <div class="dialogo-contenuto">
+          <div class="dialogo-testata">
+            <h2 id="titolo-dialogo-atleta">Atleta</h2>
+            <button type="button" class="btn btn-testo" id="bottone-chiudi-atleta" aria-label="Chiudi">✕</button>
+          </div>
+          <h3>Materiale attualmente assegnato</h3>
+          <ul id="lista-assegnati" class="lista"></ul>
+          <p id="vuoto-assegnati" class="vuoto" hidden>Nessun materiale assegnato.</p>
+          <h3>Storico</h3>
+          <div class="scorri-tabella">
+            <table class="tabella" id="tabella-storico-atleta">
+              <thead>
+                <tr><th scope="col">Data</th><th scope="col">Tipo</th><th scope="col">Materiale</th><th scope="col" class="cella-numero">Q.tà</th><th scope="col">Stato</th><th scope="col">Firma</th></tr>
+              </thead>
+              <tbody id="righe-storico-atleta"></tbody>
+            </table>
+          </div>
+          <p id="vuoto-storico-atleta" class="vuoto" hidden>Nessun movimento.</p>
+        </div>
+      </dialog>
+
+      <!-- ============================================ Dialog: nuovo materiale -->
+      <dialog id="dialogo-nuovo-materiale" class="dialogo dialogo-largo" aria-labelledby="titolo-dialogo-nuovo-materiale">
+        <div class="dialogo-contenuto">
+          <div class="dialogo-testata">
+            <h2 id="titolo-dialogo-nuovo-materiale">Nuovo materiale</h2>
+            <button type="button" class="btn btn-testo" id="bottone-chiudi-nuovo-materiale" aria-label="Chiudi">✕</button>
+          </div>
+          <form id="form-nuovo-materiale" class="modulo modulo-largo">
+            <div class="campo-riga">
+              <div class="campo">
+                <label for="nuovo-disciplina">Disciplina*</label>
+                <select id="nuovo-disciplina" required>
+                  <option value="Corsa">Pattinaggio corsa</option>
+                  <option value="Ghiaccio">Pattinaggio ghiaccio</option>
+                </select>
+              </div>
+              <div class="campo">
+                <label for="nuovo-codice">Codice*</label>
+                <input type="text" id="nuovo-codice" maxlength="80" required>
+              </div>
+              <div class="campo">
+                <label for="nuovo-categoria">Categoria*</label>
+                <input type="text" id="nuovo-categoria" maxlength="80" list="elenco-categorie" required>
+              </div>
+            </div>
+            <div class="campo">
+              <label for="nuovo-descrizione">Descrizione*</label>
+              <input type="text" id="nuovo-descrizione" maxlength="200" required>
+            </div>
+            <div class="campo-riga">
+              <div class="campo">
+                <label for="nuovo-marca">Marca</label>
+                <input type="text" id="nuovo-marca" maxlength="120">
+              </div>
+              <div class="campo">
+                <label for="nuovo-modello">Modello</label>
+                <input type="text" id="nuovo-modello" maxlength="120">
+              </div>
+              <div class="campo">
+                <label for="nuovo-taglia">Taglia / misura</label>
+                <input type="text" id="nuovo-taglia" maxlength="120">
+              </div>
+              <div class="campo">
+                <label for="nuovo-seriale">Seriale</label>
+                <input type="text" id="nuovo-seriale" maxlength="120">
+              </div>
+            </div>
+            <div class="campo-riga">
+              <div class="campo">
+                <label for="nuovo-quantita">Quantità</label>
+                <input type="number" id="nuovo-quantita" min="1" step="1" value="1">
+              </div>
+              <div class="campo">
+                <label for="nuovo-valore">Valore €</label>
+                <input type="number" id="nuovo-valore" min="0" step="0.01" value="0">
+              </div>
+              <div class="campo">
+                <label for="nuovo-stato">Stato</label>
+                <select id="nuovo-stato"></select>
+              </div>
+            </div>
+            <div class="campo">
+              <label for="nuovo-note">Note</label>
+              <textarea id="nuovo-note" rows="2" maxlength="1000"></textarea>
+            </div>
+            <div>
+              <button type="submit" class="btn btn-primario" id="bottone-salva-materiale">Salva materiale</button>
+            </div>
+          </form>
+          <p id="esito-nuovo-materiale" class="stato" role="status" hidden></p>
+        </div>
+      </dialog>
+
+      <!-- ============================================ Dialog: scheda materiale -->
+      <dialog id="dialogo-materiale" class="dialogo dialogo-largo" aria-labelledby="titolo-dialogo-materiale">
+        <div class="dialogo-contenuto">
+          <div class="dialogo-testata">
+            <div>
+              <h2 id="titolo-dialogo-materiale">Materiale</h2>
+              <p id="sottotitolo-materiale" class="testo-tenue sottotitolo-scheda"></p>
+            </div>
+            <button type="button" class="btn btn-testo" id="bottone-chiudi-materiale" aria-label="Chiudi">✕</button>
+          </div>
+          <div class="scheda-materiale">
+            <dl id="dettagli-materiale" class="dettagli"></dl>
+            <figure class="qr">
+              <img id="qr-materiale" alt="QR code della scheda" width="150" height="150">
+              <figcaption class="testo-tenue">Scansiona per aprire questa scheda</figcaption>
+            </figure>
+          </div>
+          <div class="riga-azioni">
+            <button type="button" class="btn btn-primario" id="bottone-movimento-materiale">Registra movimento</button>
+            <button type="button" class="btn btn-pericolo" id="bottone-elimina-materiale">Elimina</button>
+          </div>
+          <p id="esito-scheda-materiale" class="stato" role="status" hidden></p>
+        </div>
+      </dialog>
+
+      <datalist id="elenco-categorie"></datalist>
+    </main>
+  </div>
+</body>
+</html>
