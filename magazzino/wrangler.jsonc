@@ -1,0 +1,44 @@
+/**
+ * Configurazione Cloudflare Workers — gestionale magazzino.
+ *
+ * Gli utenti che possono accedere sono elencati in chiaro in `vars.UTENTI`
+ * (solo nomi: non sono segreti). La password di ogni utente è un secret del
+ * Worker con nome PASSWORD_<NOME IN MAIUSCOLO>, mai in questo file, mai in git:
+ *   wrangler secret put ADMIN_SECRET       # chiave HMAC per la firma dei cookie di sessione
+ *   wrangler secret put PASSWORD_DANIELE   # password dell'utente "Daniele"
+ *   wrangler secret put PASSWORD_DAVIDE    # password dell'utente "Davide"
+ * Per aggiungere un utente: nome in UTENTI, secret put della sua password, deploy.
+ * Per lo sviluppo locale: copiare .dev.vars.example in .dev.vars e valorizzarlo.
+ */
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "cardanoskating-magazzino",
+	"main": "src/index.ts",
+	// Allineata alla versione di workerd inclusa in wrangler ~4.35 (usata anche
+	// dalla pool di test): non alzarla oltre senza aggiornare wrangler.
+	"compatibility_date": "2025-09-01",
+	// Gli asset statici vengono serviti PRIMA del Worker (zero CPU consumata):
+	// gli header di sicurezza per queste risposte stanno in public/_headers.
+	"assets": {
+		"directory": "./public",
+		"binding": "ASSETS"
+	},
+	"vars": {
+		// Nomi utente ammessi, separati da virgola (lettere, cifre e _). Il nome
+		// scritto qui è quello mostrato nel pannello e registrato come operatore
+		// dei movimenti; al login il confronto ignora maiuscole/minuscole.
+		"UTENTI": "Daniele,Davide"
+	},
+	"d1_databases": [
+		{
+			// "binding" è il nome della variabile con cui il codice vede il DB
+			// (c.env.DB): non deve coincidere col nome del database.
+			"binding": "DB",
+			"database_name": "cardanoskating-magazzino",
+			// Segnaposto: sostituire con l'id restituito da
+			//   npx wrangler d1 create cardanoskating-magazzino
+			"database_id": "00000000-0000-0000-0000-000000000000",
+			"migrations_dir": "./migrations"
+		}
+	]
+}

@@ -1,0 +1,7 @@
+# Copiare questo file in .dev.vars (ignorato da git) e valorizzarlo
+# per lo sviluppo locale. In produzione usare `wrangler secret put`.
+ADMIN_SECRET=stringa-casuale-lunga-almeno-32-caratteri
+# Una password per ogni nome elencato in UTENTI (wrangler.jsonc):
+# la chiave è PASSWORD_ seguito dal nome in maiuscolo.
+PASSWORD_DANIELE=password-di-daniele
+PASSWORD_DAVIDE=password-di-davide

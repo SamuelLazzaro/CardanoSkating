@@ -1,0 +1,5 @@
+node_modules/
+.wrangler/
+.dev.vars
+# Database dumps (contain athlete names and signatures): never commit them.
+backup*.sql
