@@ -35,9 +35,8 @@
 			// (c.env.DB): non deve coincidere col nome del database.
 			"binding": "DB",
 			"database_name": "cardanoskating-magazzino",
-			// Segnaposto: sostituire con l'id restituito da
-			//   npx wrangler d1 create cardanoskating-magazzino
-			"database_id": "00000000-0000-0000-0000-000000000000",
+			// Id restituito da `npx wrangler d1 create cardanoskating-magazzino`.
+			"database_id": "957fb899-282d-40dc-a3a4-d2b28f78d68d",
 			"migrations_dir": "./migrations"
 		}
 	]
