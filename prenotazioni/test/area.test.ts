@@ -13,6 +13,7 @@ import {
   cookieAdmin,
   cookieSocieta,
   creaRichiesta,
+  creaRicorrenza,
   creaSocieta,
   creaSocietaConToken,
   getConCookie,
@@ -387,5 +388,72 @@ describe('annullamento dalla società', () => {
     const { id } = (await creazione.json()) as { id: number };
     const tentativo = await postJson(`/api/societa/richieste/${id}/annulla`, cookieB, {});
     expect(tentativo.status).toBe(404);
+  });
+});
+
+/**
+ * Inserisce su DB `quante` richieste approvate di un'ora, una al giorno: per
+ * scarto >= 0 la prima è oggi e le altre seguono, per scarto < 0 la prima è
+ * ieri e le altre precedono (una CTE ricorsiva evita centinaia di statement).
+ */
+async function inserisciRichiesteGiornaliere(societaId: number, quante: number, versoIlPassato: boolean): Promise<void> {
+  const segno = versoIlPassato ? '-' : '+';
+  const primoScarto = versoIlPassato ? 1 : 0;
+  await env.DB
+    .prepare(
+      `WITH RECURSIVE n(i) AS (SELECT ?2 UNION ALL SELECT i + 1 FROM n WHERE i < ?2 + ?3 - 1)
+       INSERT INTO richieste (societa_id, data, ora_inizio, ora_fine, stato)
+       SELECT ?1, date(?4, '${segno}' || i || ' days'), '18:00', '19:00', 'approvata' FROM n`,
+    )
+    .bind(societaId, primoScarto, quante, oggi)
+    .run();
+}
+
+/** Inserisce su DB `quante` ricorrenze approvate del lunedì, tutte già scadute (validità di una settimana, a ritroso da ieri). */
+async function inserisciRicorrenzeScadute(societaId: number, quante: number): Promise<void> {
+  await env.DB
+    .prepare(
+      `WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < ?2)
+       INSERT INTO ricorrenze (societa_id, giorni, ora_inizio, ora_fine, valida_dal, valida_al, stato, titolo)
+       SELECT ?1, '0', '18:00', '19:00', date(?3, '-' || (i * 7 + 6) || ' days'), date(?3, '-' || i || ' days'), 'approvata', 'Allenamento' FROM n`,
+    )
+    .bind(societaId, quante, oggi)
+    .run();
+}
+
+describe('elenco richieste e ricorrenze della società', () => {
+  it('riporta TUTTE le richieste da oggi in poi anche oltre il limite dello storico, e del passato solo le ultime 200', async () => {
+    const { id: societaId, token } = await creaSocietaConToken();
+    await inserisciRichiesteGiornaliere(societaId, 250, false);
+    await inserisciRichiesteGiornaliere(societaId, 250, true);
+
+    const elenco = await getConCookie('/api/societa/richieste', await cookieSocieta(token));
+    expect(elenco.status).toBe(200);
+    const corpo = (await elenco.json()) as { richieste: { data: string }[] };
+    const future = corpo.richieste.filter((richiesta) => richiesta.data >= oggi);
+    const passate = corpo.richieste.filter((richiesta) => richiesta.data < oggi);
+    expect(future).toHaveLength(250);
+    expect(passate).toHaveLength(200);
+    // Il taglio dello storico lascia le più recenti: da ieri a 200 giorni fa.
+    expect(passate[0].data).toBe(aggiungiGiorni(oggi, -1));
+    expect(passate[199].data).toBe(aggiungiGiorni(oggi, -200));
+  });
+
+  it('riporta le ricorrenze in attesa o ancora valide anche oltre il limite dello storico, e delle scadute solo le ultime 50', async () => {
+    const { id: societaId, token } = await creaSocietaConToken();
+    const idInAttesa = await creaRicorrenza(societaId, [0], '18:00', '19:00', aggiungiGiorni(oggi, -30), aggiungiGiorni(oggi, -10));
+    const idValida = await creaRicorrenza(societaId, [0], '18:00', '19:00', aggiungiGiorni(oggi, -6), aggiungiGiorni(oggi, 14));
+    await env.DB.prepare("UPDATE ricorrenze SET stato = 'approvata' WHERE id = ?1").bind(idValida).run();
+    // Le scadute vengono create dopo, quindi sono le più recenti per created_at.
+    await inserisciRicorrenzeScadute(societaId, 60);
+
+    const elenco = await getConCookie('/api/societa/richieste', await cookieSocieta(token));
+    expect(elenco.status).toBe(200);
+    const corpo = (await elenco.json()) as { ricorrenze: { id: number; stato: string; valida_al: string }[] };
+    const ids = corpo.ricorrenze.map((ricorrenza) => ricorrenza.id);
+    expect(ids).toContain(idInAttesa);
+    expect(ids).toContain(idValida);
+    const scadute = corpo.ricorrenze.filter((ricorrenza) => ricorrenza.stato !== 'in_attesa' && ricorrenza.valida_al < oggi);
+    expect(scadute).toHaveLength(50);
   });
 });

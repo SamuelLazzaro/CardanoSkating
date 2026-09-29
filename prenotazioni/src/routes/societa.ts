@@ -39,6 +39,17 @@ import {
 } from '../variazioni';
 
 const MAX_GIORNI_FUTURO = 365;
+
+/*
+ * Limiti dello STORICO negli elenchi della società (GET /richieste). Le righe
+ * ancora attuali arrivano sempre tutte: l'area le usa per aprire il popup di
+ * una prenotazione cliccata sul calendario, per evidenziare gli slot in attesa
+ * e per sapere quali variazioni sono pendenti, quindi una riga futura mancante
+ * rende la prenotazione muta al click. Solo il passato è limitato, perché
+ * cresce senza fine e nell'area serve unicamente alla lista "storico".
+ */
+const MAX_STORICO_RICHIESTE = 200;
+const MAX_STORICO_RICORRENZE = 50;
 const ERRORE_GRUPPO = 'La richiesta fa parte di un gruppo: si ritira tutto il gruppo insieme';
 const ERRORE_PENDENTE = "C'è già una richiesta di annullamento o di modifica in attesa per questa prenotazione";
 
@@ -178,25 +189,34 @@ societa.get('/calendario', async (c) => {
 
 societa.get('/richieste', async (c) => {
   const soc = c.get('societa');
+  const oggi = oraRoma(new Date()).data;
   // Per le richieste di annullamento e di modifica si allegano gli estremi
   // ATTUALI della prenotazione riferita (rif_*), così l'area mostra "prima →
-  // dopo" senza una seconda chiamata.
+  // dopo" senza una seconda chiamata. Da oggi in poi si prende tutto, del
+  // passato solo le ultime MAX_STORICO_RICHIESTE (vedi il commento in testa).
   const richieste = await c.env.DB
     .prepare(
       `SELECT r.id, r.data, r.ora_inizio, r.ora_fine, r.stato, r.tipo, r.richiesta_riferimento_id, r.gruppo_id,
               r.titolo, r.note, r.motivazione, r.ricorrenza_id, r.created_at, r.decisa_at, r.annullata_at,
               o.data AS rif_data, o.ora_inizio AS rif_ora_inizio, o.ora_fine AS rif_ora_fine, o.titolo AS rif_titolo
        FROM richieste r LEFT JOIN richieste o ON o.id = r.richiesta_riferimento_id
-       WHERE r.societa_id = ?1 ORDER BY r.data DESC, r.ora_inizio DESC LIMIT 200`,
+       WHERE r.societa_id = ?1
+         AND (r.data >= ?2 OR r.id IN (SELECT id FROM richieste WHERE societa_id = ?1 AND data < ?2 ORDER BY data DESC, ora_inizio DESC LIMIT ?3))
+       ORDER BY r.data DESC, r.ora_inizio DESC`,
     )
-    .bind(soc.id)
+    .bind(soc.id, oggi, MAX_STORICO_RICHIESTE)
     .all<RichiestaRow>();
+  // Una ricorrenza è attuale finché è in attesa o finché la sua validità non
+  // è scaduta; delle altre restano le ultime MAX_STORICO_RICORRENZE create.
   const ricorrenze = await c.env.DB
     .prepare(
       `SELECT id, giorni, ora_inizio, ora_fine, valida_dal, valida_al, stato, titolo, note, motivazione, created_at
-       FROM ricorrenze WHERE societa_id = ?1 ORDER BY created_at DESC LIMIT 50`,
+       FROM ricorrenze
+       WHERE societa_id = ?1
+         AND (stato = 'in_attesa' OR valida_al >= ?2 OR id IN (SELECT id FROM ricorrenze WHERE societa_id = ?1 AND stato <> 'in_attesa' AND valida_al < ?2 ORDER BY created_at DESC LIMIT ?3))
+       ORDER BY created_at DESC`,
     )
-    .bind(soc.id)
+    .bind(soc.id, oggi, MAX_STORICO_RICORRENZE)
     .all<RicorrenzaRow>();
   return c.json({ richieste: richieste.results, ricorrenze: ricorrenze.results.map(ricorrenzaConGiorni) });
 });
