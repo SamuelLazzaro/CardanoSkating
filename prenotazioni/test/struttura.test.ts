@@ -49,14 +49,14 @@ describe('GET /api/struttura', () => {
   it('risponde senza sessione con il solo nome ed etichetta della struttura', async () => {
     const risposta = await app.request('/api/struttura', {}, env);
     expect(risposta.status).toBe(200);
-    expect(await risposta.json()).toEqual({ nome: 'Palazzetto dello Sport', etichetta: 'Palazzetto' });
+    expect(await risposta.json()).toEqual({ nome: 'Palazzetto dello Sport', sigla: 'palazzetto', etichetta: 'Palazzetto' });
   });
 
   it("segue le vars dell'istanza", async () => {
     env.NOME_STRUTTURA = 'Circuito stradale';
     env.SIGLA_STRUTTURA = 'circuito';
     const risposta = await app.request('/api/struttura', {}, env);
-    expect(await risposta.json()).toEqual({ nome: 'Circuito stradale', etichetta: 'Circuito' });
+    expect(await risposta.json()).toEqual({ nome: 'Circuito stradale', sigla: 'circuito', etichetta: 'Circuito' });
   });
 });
 

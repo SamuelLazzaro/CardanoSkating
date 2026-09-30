@@ -23,22 +23,25 @@ const SELETTORE_CELLA = '.slot, .mese-giorno';
 const NS_SVG = 'http://www.w3.org/2000/svg';
 
 /**
- * Writes the facility served by this instance (palazzetto / circuito
- * stradale) into the page header and the document title. The HTML ships with
- * the owner only, since the same static pages serve both instances; the name
- * arrives from /api/struttura at load time. With a società name (area after
- * login) the subtitle reads "<società> · <struttura>", otherwise
- * "<struttura> · <owner>".
+ * Applies the facility served by this instance (palazzetto / circuito
+ * stradale) to the page: header subtitle, document title and color theme.
+ * The HTML ships with the owner only and the orange theme, since the same
+ * static pages serve both instances; the facility arrives from
+ * /api/struttura at load time. The theme is the data-struttura attribute on
+ * <html>, matched by the per-instance token overrides in css/base.css. With a
+ * società name (area after login) the subtitle reads "<società> ·
+ * <struttura>", otherwise "<struttura> · <owner>".
  * @param {HTMLElement} sottotitolo - subtitle element under the page <h1>
- * @param {string} nomeStruttura - facility name, e.g. 'Palazzetto dello Sport'
+ * @param {{nome: string, sigla: string}} struttura - facility, e.g. {nome: 'Palazzetto dello Sport', sigla: 'palazzetto'}
  * @param {string} [nomeSocieta] - logged-in società, when known
  * @returns {void}
  */
-export function mostraStruttura(sottotitolo, nomeStruttura, nomeSocieta = '') {
-  const parti = nomeSocieta !== '' ? [nomeSocieta, nomeStruttura] : [nomeStruttura, RAGIONE_SOCIALE];
+export function mostraStruttura(sottotitolo, struttura, nomeSocieta = '') {
+  const parti = nomeSocieta !== '' ? [nomeSocieta, struttura.nome] : [struttura.nome, RAGIONE_SOCIALE];
   sottotitolo.textContent = parti.join(' · ');
   const titoloPagina = document.querySelector('h1')?.textContent ?? '';
-  document.title = `${titoloPagina} — ${nomeStruttura} · ${RAGIONE_SOCIALE}`;
+  document.title = `${titoloPagina} — ${struttura.nome} · ${RAGIONE_SOCIALE}`;
+  document.documentElement.dataset.struttura = struttura.sigla;
 }
 
 /**

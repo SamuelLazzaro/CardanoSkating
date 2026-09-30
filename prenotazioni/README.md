@@ -101,7 +101,11 @@ sloggerebbero a vicenda.
 
 Ciò che cambia tra le istanze sono le `vars` `NOME_STRUTTURA` e
 `SIGLA_STRUTTURA` (lette da `strutturaDa()` in `src/util.ts`): titoli e testate
-delle pagine (via `GET /api/struttura`, pubblico), nome mittente e prefisso
+delle pagine (via `GET /api/struttura`, pubblico), **tema colore** (arancione
+brand per il palazzetto, verde acceso per il circuito: attributo
+`data-struttura` su `<html>` e override dei token `--accento-*` in
+`public/css/base.css`, così le due istanze si distinguono a colpo d'occhio;
+`privacy.html` non ha JS e resta arancione), nome mittente e prefisso
 dell'oggetto delle email (`Prenotazioni Palazzetto` / `[Palazzetto]`), firma in
 calce, nome del calendario ICS, nome del file `.ics` e **UID degli eventi ICS**
 (`richiesta-<id>@<sigla>.prenotazioni.cardanoskating`): gli id delle richieste

@@ -20,12 +20,13 @@ pubblico.get('/', (c) => c.redirect('/area', 302));
 /**
  * Nome della struttura servita da questa istanza (palazzetto / circuito
  * stradale), per titoli e testate delle pagine, che sono asset statici
- * condivisi dalle due istanze. Pubblico perché serve anche prima del login;
- * espone solo il nome e l'etichetta, mai dati del database.
+ * condivisi dalle due istanze; la sigla seleziona il tema colore (attributo
+ * data-struttura in public/css/base.css). Pubblico perché serve anche prima
+ * del login; espone solo nome, sigla ed etichetta, mai dati del database.
  */
 pubblico.get('/api/struttura', (c) => {
-  const { nome, etichetta } = strutturaDa(c.env);
-  return c.json({ nome, etichetta });
+  const { nome, sigla, etichetta } = strutturaDa(c.env);
+  return c.json({ nome, sigla, etichetta });
 });
 
 /**

@@ -39,13 +39,15 @@
     --accento-testo-scuro: #7d3e00; /* hover state of colored text */
     --accento-tinta: #fff3e5;     /* pale orange wash for hover backgrounds */
     --testo-tenue-scuro: #b5b5b5; /* muted gray on the dark surfaces (header, nav) */
+    /* per-instance accent (see [data-struttura] below): today's column wash
+       follows the accent hue, so it is declared next to the accent tokens */
+    --oggi: #fff8ef;              /* pale orange wash on today's column */
     /* calendar slot states: each one is washed out and given a left bar by the
        .slot rules in components.css, so only the base hue lives here. Past
        slots reuse the same hue with a thinner wash — no separate token. */
     --occupato: #ff0000;          /* booked by somebody else */
     --in-attesa: #ffd400;         /* own request still awaiting a decision */
     --passato: #edebe7;
-    --oggi: #fff8ef;              /* pale orange wash on today's column */
     --ok: #2e7d54;
     --errore: #a8442f;
 
@@ -59,6 +61,25 @@
     --t-tap: 0.25s ease;    /* tap feedback ramp-in (see .is-tapped below) */
     /* stacking of the sticky calendar cells: day headers, corner one above */
     --z-cal-giorno: 5;
+}
+
+/*
+ * Per-instance accent. The same static pages serve every bookable facility
+ * (see wrangler.jsonc): the palazzetto keeps the brand orange above, the
+ * circuito stradale switches to a bright green so admin and società tell the
+ * two calendars apart at a glance (owner's choice, 2026-09-30). The JS sets
+ * data-struttura on <html> from GET /api/struttura (ui.mostraStruttura), so
+ * the first paint is orange and turns green as soon as the answer arrives.
+ * Same role split and contrast targets as the orange set: fill 8.7:1 with
+ * dark text, hover/outline 3.3:1 on white (non-text), text 5:1 on white.
+ */
+:root[data-struttura="circuito"] {
+    --accento: #22c55e;
+    --accento-scuro: #16a34a;
+    --accento-testo: #15803d;
+    --accento-testo-scuro: #166534;
+    --accento-tinta: #e8f8ee;
+    --oggi: #f0faf3;
 }
 
 * {

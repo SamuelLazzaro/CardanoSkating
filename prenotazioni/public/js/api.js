@@ -31,8 +31,9 @@ async function richiestaJson(url, opzioni = {}) {
 /**
  * Facility served by this instance (palazzetto / circuito stradale): the pages
  * are shared static assets, so the name comes from the server at load time.
- * Public endpoint, no session needed.
- * @returns {Promise<{nome: string, etichetta: string}>}
+ * Public endpoint, no session needed. The sigla selects the color theme
+ * (data-struttura attribute, see css/base.css).
+ * @returns {Promise<{nome: string, sigla: string, etichetta: string}>}
  */
 export function ottieniStruttura() {
   return richiestaJson('/api/struttura');

@@ -128,28 +128,28 @@ let g_modifica = null;
 /* ------------------------------------------------------------------ init */
 
 /**
- * Facility of this instance for header and title. Best effort: without it
- * the static header (owner only) stays. Fetched alongside the profile, since
- * the two calls are independent.
- * @returns {Promise<string>} facility name, '' if the lookup failed
+ * Facility of this instance for header, title and color theme. Best effort:
+ * without it the static header (owner only, orange theme) stays. Fetched
+ * alongside the profile, since the two calls are independent.
+ * @returns {Promise<{nome: string, sigla: string}|null>} facility, null if the lookup failed
  */
-async function nomeStrutturaCorrente() {
+async function strutturaCorrente() {
   try {
-    return (await ottieniStruttura()).nome;
+    return await ottieniStruttura();
   } catch {
-    return '';
+    return null;
   }
 }
 
 /** @returns {Promise<void>} */
 async function avvia() {
-  const nomeStrutturaInArrivo = nomeStrutturaCorrente();
+  const strutturaInArrivo = strutturaCorrente();
   let profilo;
   try {
     profilo = await ottieniProfiloSocieta();
   } catch (errore) {
-    const nomeStruttura = await nomeStrutturaInArrivo;
-    if (nomeStruttura !== '') mostraStruttura(elemento('sottotitolo-societa'), nomeStruttura);
+    const struttura = await strutturaInArrivo;
+    if (struttura !== null) mostraStruttura(elemento('sottotitolo-societa'), struttura);
     elemento('vista-caricamento').hidden = true;
     if (errore.status === 401) {
       elemento('vista-negato').hidden = false;
@@ -161,9 +161,9 @@ async function avvia() {
   }
 
   g_societaId = profilo.societa.id;
-  const nomeStruttura = await nomeStrutturaInArrivo;
-  if (nomeStruttura !== '') {
-    mostraStruttura(elemento('sottotitolo-societa'), nomeStruttura, profilo.societa.nome);
+  const struttura = await strutturaInArrivo;
+  if (struttura !== null) {
+    mostraStruttura(elemento('sottotitolo-societa'), struttura, profilo.societa.nome);
   } else {
     elemento('sottotitolo-societa').textContent = profilo.societa.nome;
   }

@@ -151,7 +151,7 @@ async function avvia() {
 async function mostraStrutturaInTestata() {
   try {
     const struttura = await ottieniStruttura();
-    mostraStruttura(elemento('sottotitolo-struttura'), struttura.nome);
+    mostraStruttura(elemento('sottotitolo-struttura'), struttura);
   } catch {
     // Header left as shipped in the HTML.
   }
