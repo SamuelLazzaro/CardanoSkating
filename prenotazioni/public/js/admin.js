@@ -41,6 +41,7 @@ import {
   ottieniReport,
   ottieniRichiesteAdmin,
   ottieniRicorrenzeAdmin,
+  ottieniStruttura,
   riattivaSocieta,
   rifiutaGruppo,
   rifiutaRicorrenza,
@@ -52,6 +53,7 @@ import {
   creaBadge,
   creaQuadrettoColore,
   mostraMessaggio,
+  mostraStruttura,
   preparaAperturaDettagli,
   preparaDialogo,
   preparaDialogoDettagli,
@@ -126,6 +128,7 @@ let g_modifica = null;
 /** @returns {Promise<void>} */
 async function avvia() {
   preparaEventi();
+  mostraStrutturaInTestata();
   try {
     await caricaPannello();
   } catch (errore) {
@@ -137,6 +140,20 @@ async function avvia() {
       mostraMessaggio(elemento('vista-caricamento'), errore.message, 'errore');
       elemento('vista-caricamento').hidden = false;
     }
+  }
+}
+
+/**
+ * Header and title with the facility of this instance. Best effort: if the
+ * lookup fails the static header (owner only) stays, the panel still works.
+ * @returns {Promise<void>}
+ */
+async function mostraStrutturaInTestata() {
+  try {
+    const struttura = await ottieniStruttura();
+    mostraStruttura(elemento('sottotitolo-struttura'), struttura.nome);
+  } catch {
+    // Header left as shipped in the HTML.
   }
 }
 

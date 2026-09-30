@@ -2,7 +2,11 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { createExecutionContext, env, fetchMock, waitOnExecutionContext } from 'cloudflare:test';
 import app from '../src/index';
 import { corpoNotifica, corpoNotificaAdmin, dataItaliana, elencoGiorni } from '../src/notifiche';
+import { strutturaDa } from '../src/util';
 import { cookieAdmin, cookieSocieta, creaRichiesta, creaSocietaConToken } from './helpers';
+
+/** Struttura di prova per i test sui corpi delle email. */
+const STRUTTURA_TEST = strutturaDa({ NOME_STRUTTURA: 'Pista di prova', SIGLA_STRUTTURA: 'pista' });
 
 /**
  * Test delle notifiche email (src/notifiche.ts): l'invio verso l'API Brevo è
@@ -98,11 +102,15 @@ describe('formattazione', () => {
         societa: { nome: 'Polisportiva Test', email: 'test@example.com' },
       },
       'https://prenotazioni.example',
+      STRUTTURA_TEST,
     );
     expect(corpo).toContain('Gentile Polisportiva Test,');
     expect(corpo).toContain('è successo qualcosa.');
     expect(corpo).toContain('Data: 19/08/2026, dalle 18:00 alle 19:00');
     expect(corpo).toContain('https://prenotazioni.example/privacy.html');
+    // La firma in calce nomina la struttura dell'istanza, non un nome fisso.
+    expect(corpo).toContain('sistema prenotazioni: Pista di prova');
+    expect(corpo).not.toContain('Palazzetto');
   });
 
   it('corpoNotificaAdmin usa il messaggio admin, senza saluto alla società', () => {
@@ -115,11 +123,69 @@ describe('formattazione', () => {
         societa: { nome: 'Polisportiva Test', email: 'test@example.com' },
       },
       'https://prenotazioni.example',
+      STRUTTURA_TEST,
     );
     expect(corpo).toContain('La società Polisportiva Test ha inviato una richiesta.');
     expect(corpo).not.toContain('Gentile');
     expect(corpo).toContain('Data: 19/08/2026, dalle 18:00 alle 19:00');
     expect(corpo).toContain('https://prenotazioni.example/privacy.html');
+    expect(corpo).toContain('sistema prenotazioni: Pista di prova');
+  });
+});
+
+describe('struttura nelle email', () => {
+  /** Esegue `azione` con le vars della struttura sostituite, poi le ripristina. */
+  async function conStruttura(nome: string, sigla: string, azione: () => Promise<void>): Promise<void> {
+    const nomeOriginale = env.NOME_STRUTTURA;
+    const siglaOriginale = env.SIGLA_STRUTTURA;
+    env.NOME_STRUTTURA = nome;
+    env.SIGLA_STRUTTURA = sigla;
+    try {
+      await azione();
+    } finally {
+      env.NOME_STRUTTURA = nomeOriginale;
+      env.SIGLA_STRUTTURA = siglaOriginale;
+    }
+  }
+
+  it("con le vars del palazzetto (livello base di wrangler.jsonc) mittente e oggetto restano quelli storici", async () => {
+    // I test girano con le vars del livello base: è l'istanza storica.
+    expect(env.SIGLA_STRUTTURA).toBe('palazzetto');
+    const { id: societaId } = await creaSocietaConToken();
+    const richiestaId = await creaRichiesta(societaId, '2027-01-18', '18:00', '19:00');
+    const cattura = intercettaBrevo();
+
+    expect((await postConContesto(`/api/admin/richieste/${richiestaId}/approva`, await cookieAdmin(), { motivazione: 'Ok' })).status).toBe(200);
+
+    const corpo = cattura.corpo();
+    expect(corpo!.sender.name).toBe('Prenotazioni Palazzetto');
+    expect(corpo!.subject.startsWith('[Palazzetto] ')).toBe(true);
+    expect(corpo!.textContent).toContain('sistema prenotazioni: Palazzetto dello Sport');
+  });
+
+  it("nell'istanza del circuito mittente, prefisso e firma seguono le sue vars, in entrambe le email", async () => {
+    await conStruttura('Circuito stradale', 'circuito', async () => {
+      const { token } = await creaSocietaConToken();
+      const cattura = intercettaBrevo(201, 2);
+
+      expect((await postConContesto('/api/societa/richieste', await cookieSocieta(token), { data: '2027-03-11', ora_inizio: '10:00', ora_fine: '11:00' })).status).toBe(201);
+
+      for (const corpo of cattura.corpi()) {
+        expect(corpo.sender.name).toBe('Prenotazioni Circuito');
+        expect(corpo.subject.startsWith('[Circuito] ')).toBe(true);
+        expect(corpo.textContent).toContain('sistema prenotazioni: Circuito stradale');
+        expect(corpo.textContent).not.toContain('Palazzetto');
+      }
+    });
+  });
+
+  it("l'email di creazione della società nomina la struttura a cui dà accesso", async () => {
+    await conStruttura('Circuito stradale', 'circuito', async () => {
+      const cattura = intercettaBrevo();
+      const anagrafica = { nome: 'ASD Circuito', referente: 'Referente', email: 'circuito@example.com', tariffa_oraria: 10 };
+      expect((await postConContesto('/api/admin/societa', await cookieAdmin(), anagrafica)).status).toBe(201);
+      expect(cattura.corpo()!.textContent).toContain('sistema di prenotazione: Circuito stradale');
+    });
   });
 });
 

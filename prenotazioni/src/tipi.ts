@@ -12,6 +12,14 @@ export type Bindings = {
    * avviati dalle società ed è il Reply-To delle email alle società.
    */
   EMAIL_ADMIN?: string;
+  /**
+   * Struttura prenotabile servita da questa istanza del Worker (vedi
+   * wrangler.jsonc: livello base = palazzetto, env.circuito = circuito
+   * stradale). Nome esteso per i testi e sigla breve per gli identificativi;
+   * letti tramite strutturaDa() in util.ts, che applica i default.
+   */
+  NOME_STRUTTURA?: string;
+  SIGLA_STRUTTURA?: string;
 };
 
 export type StatoSocieta = 'attiva' | 'sospesa';

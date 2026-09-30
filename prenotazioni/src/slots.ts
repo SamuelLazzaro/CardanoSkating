@@ -12,8 +12,10 @@
  * unit-tested in isolation.
  */
 
-export const ORA_APERTURA_MIN = 8 * 60; // il palazzetto apre alle 08:00
-export const ORA_CHIUSURA_MIN = 24 * 60; // e chiude alle 24:00
+// Opening hours, shared by every bookable facility (palazzetto and circuito
+// stradale run the same code with the same hours: owner's decision, 2026-09-30).
+export const ORA_APERTURA_MIN = 8 * 60; // apertura alle 08:00
+export const ORA_CHIUSURA_MIN = 24 * 60; // chiusura alle 24:00
 
 // Project decision (confirmed by the owner): a single recurring request may
 // span at most 4 weeks. The window is 4 full weeks (28 days, both ends
@@ -70,8 +72,8 @@ export function validaIntervallo(data: string, oraInizio: string, oraFine: strin
   const inizio = minutiDaMezzanotte(oraInizio);
   const fine = minutiDaMezzanotte(oraFine);
   if (inizio >= fine) return "L'ora di inizio deve precedere l'ora di fine";
-  if (inizio < ORA_APERTURA_MIN) return 'Il palazzetto apre alle 08:00';
-  if (fine > ORA_CHIUSURA_MIN) return 'Il palazzetto chiude alle 24:00';
+  if (inizio < ORA_APERTURA_MIN) return "L'orario di inizio precede l'apertura (08:00)";
+  if (fine > ORA_CHIUSURA_MIN) return "L'orario di fine supera la chiusura (24:00)";
   return null;
 }
 

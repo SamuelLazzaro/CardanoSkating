@@ -7,6 +7,8 @@
  * (the stored times are already Italian civil time).
  */
 
+import type { Struttura } from './util';
+
 export type EventoICS = {
   id: number;
   data: string; // 'YYYY-MM-DD'
@@ -66,13 +68,19 @@ function utcICS(istante: Date): string {
   return istante.toISOString().replace(/[-:]/g, '').slice(0, 15) + 'Z';
 }
 
-export function generaICS(nomeSocieta: string, eventi: EventoICS[], adesso: Date): string {
+/**
+ * The facility (palazzetto / circuito stradale) is part of every UID: each
+ * facility has its own database, so request ids restart from 1 in each of
+ * them and a società subscribed to both feeds would otherwise see events with
+ * identical UIDs overwrite each other in its calendar client.
+ */
+export function generaICS(nomeSocieta: string, eventi: EventoICS[], adesso: Date, struttura: Struttura): string {
   const righe: string[] = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//Cardano Skating//Prenotazioni Palazzetto//IT',
+    `PRODID:-//Cardano Skating//Prenotazioni ${struttura.etichetta}//IT`,
     'CALSCALE:GREGORIAN',
-    `X-WR-CALNAME:${testoICS(`Palazzetto — ${nomeSocieta}`)}`,
+    `X-WR-CALNAME:${testoICS(`${struttura.etichetta} — ${nomeSocieta}`)}`,
     ...VTIMEZONE_ROMA,
   ];
 
@@ -85,11 +93,11 @@ export function generaICS(nomeSocieta: string, eventi: EventoICS[], adesso: Date
     const oraFine = fineAMezzanotte ? '00:00' : evento.ora_fine;
     righe.push(
       'BEGIN:VEVENT',
-      `UID:richiesta-${evento.id}@prenotazioni.cardanoskating`,
+      `UID:richiesta-${evento.id}@${struttura.sigla}.prenotazioni.cardanoskating`,
       `DTSTAMP:${marcaTemporale}`,
       `DTSTART;TZID=Europe/Rome:${dataOraICS(evento.data, evento.ora_inizio)}`,
       `DTEND;TZID=Europe/Rome:${dataOraICS(dataFine, oraFine)}`,
-      `SUMMARY:${testoICS(`Allenamento palazzetto — ${nomeSocieta}`)}`,
+      `SUMMARY:${testoICS(`Allenamento ${struttura.sigla} — ${nomeSocieta}`)}`,
     );
     if (evento.note) righe.push(`DESCRIPTION:${testoICS(evento.note)}`);
     righe.push('END:VEVENT');

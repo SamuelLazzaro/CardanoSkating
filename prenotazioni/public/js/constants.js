@@ -18,6 +18,9 @@ export const MAX_SETTIMANE_RICORRENZA = 4;
  */
 export const MAX_GIORNI_FINESTRA_RICORRENZA = MAX_SETTIMANE_RICORRENZA * 7 - 1;
 
+/** @type {string} owner of the booking system, shown in page titles and headers */
+export const RAGIONE_SOCIALE = 'Cardano Skating S.R.L. S.S.D.';
+
 /** @type {string} default activity title of a booking (mirrors the server default) */
 export const TITOLO_PREDEFINITO = 'Allenamento';
 

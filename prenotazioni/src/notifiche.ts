@@ -1,5 +1,5 @@
 import type { Bindings } from './tipi';
-import { scriviAudit } from './util';
+import { scriviAudit, strutturaDa, type Struttura } from './util';
 
 /**
  * Notifiche email sugli eventi del ciclo di vita delle prenotazioni,
@@ -40,9 +40,21 @@ import { scriviAudit } from './util';
  */
 
 const URL_API_BREVO = 'https://api.brevo.com/v3/smtp/email';
-const NOME_MITTENTE = 'Prenotazioni Palazzetto';
-const PREFISSO_OGGETTO = '[Palazzetto]';
 const TIMEOUT_INVIO_MS = 10_000;
+
+/**
+ * Nome mittente e prefisso dell'oggetto dipendono dalla struttura servita
+ * dall'istanza (es. "Prenotazioni Palazzetto" / "[Palazzetto]", oppure
+ * "Prenotazioni Circuito" / "[Circuito]"): la casella è la stessa per tutte
+ * le strutture, quindi sono questi due elementi a dire di quale si parla.
+ */
+function nomeMittente(struttura: Struttura): string {
+  return `Prenotazioni ${struttura.etichetta}`;
+}
+
+function prefissoOggetto(struttura: Struttura): string {
+  return `[${struttura.etichetta}]`;
+}
 
 /** Nomi dei giorni secondo la convenzione di progetto (0 = lunedì). */
 const GIORNI_SETTIMANA = ['lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato', 'domenica'];
@@ -218,7 +230,7 @@ function righeRicorrenza(ricorrenza: EstremiRicorrenza): string[] {
 }
 
 /** Corpo in testo semplice dell'email alla società (esportato per i test). */
-export function corpoNotifica(notifica: Notifica, origine: string): string {
+export function corpoNotifica(notifica: Notifica, origine: string, struttura: Struttura): string {
   return [
     `Gentile ${notifica.societa.nome},`,
     '',
@@ -227,7 +239,7 @@ export function corpoNotifica(notifica: Notifica, origine: string): string {
     ...notifica.dettagli.map((riga) => `  ${riga}`),
     '',
     '—',
-    'Notifica automatica del sistema prenotazioni del Palazzetto dello Sport,',
+    `Notifica automatica del sistema prenotazioni: ${struttura.nome},`,
     'Cardano Skating S.R.L. S.S.D. Per domande è possibile rispondere a questa email.',
     "Le prenotazioni si gestiscono dall'area riservata, tramite il proprio link personale.",
     `Informativa privacy: ${origine}/privacy.html`,
@@ -235,14 +247,14 @@ export function corpoNotifica(notifica: Notifica, origine: string): string {
 }
 
 /** Corpo in testo semplice dell'email all'admin (esportato per i test). */
-export function corpoNotificaAdmin(notifica: Notifica, origine: string): string {
+export function corpoNotificaAdmin(notifica: Notifica, origine: string, struttura: Struttura): string {
   return [
     notifica.messaggioAdmin ?? '',
     '',
     ...notifica.dettagli.map((riga) => `  ${riga}`),
     '',
     '—',
-    'Notifica automatica del sistema prenotazioni del Palazzetto dello Sport,',
+    `Notifica automatica del sistema prenotazioni: ${struttura.nome},`,
     'Cardano Skating S.R.L. S.S.D. Rispondendo a questa email si scrive direttamente alla società.',
     `Informativa privacy: ${origine}/privacy.html`,
   ].join('\n');
@@ -272,14 +284,18 @@ async function eseguiInvio(env: Bindings, origine: string, notifica: Notifica): 
   // che gestisce sia la società sia le prenotazioni — nessuna email.
   if (notifica.societa.email.toLowerCase() === env.EMAIL_ADMIN.toLowerCase()) return;
 
+  const struttura = strutturaDa(env);
+  const mittente = { name: nomeMittente(struttura), email: env.EMAIL_MITTENTE };
+  const prefisso = prefissoOggetto(struttura);
+
   await inviaEmailBrevo(
     env,
     {
-      sender: { name: NOME_MITTENTE, email: env.EMAIL_MITTENTE },
+      sender: mittente,
       to: [{ email: notifica.societa.email, name: notifica.societa.nome }],
       replyTo: { email: env.EMAIL_ADMIN },
-      subject: `${PREFISSO_OGGETTO} ${notifica.oggetto}`,
-      textContent: corpoNotifica(notifica, origine),
+      subject: `${prefisso} ${notifica.oggetto}`,
+      textContent: corpoNotifica(notifica, origine, struttura),
     },
     `"${notifica.oggetto}" per ${notifica.societa.nome}`,
   );
@@ -290,12 +306,12 @@ async function eseguiInvio(env: Bindings, origine: string, notifica: Notifica): 
     await inviaEmailBrevo(
       env,
       {
-        sender: { name: NOME_MITTENTE, email: env.EMAIL_MITTENTE },
+        sender: mittente,
         to: [{ email: env.EMAIL_ADMIN }],
         // Rispondendo alla notifica l'admin scrive direttamente alla società.
         replyTo: { email: notifica.societa.email, name: notifica.societa.nome },
-        subject: `${PREFISSO_OGGETTO} ${oggettoAdmin}`,
-        textContent: corpoNotificaAdmin(notifica, origine),
+        subject: `${prefisso} ${oggettoAdmin}`,
+        textContent: corpoNotificaAdmin(notifica, origine, struttura),
       },
       `"${oggettoAdmin}" per l'amministratore (società ${notifica.societa.nome})`,
     );
@@ -627,20 +643,26 @@ export function notificaPrenotazioneDirettaRicorrente(
  */
 export type MotivoLinkAccesso = 'creazione' | 'rigenerazione' | 'reinvio';
 
-const TESTI_LINK_ACCESSO: Record<MotivoLinkAccesso, { oggetto: string; messaggio: string }> = {
-  creazione: {
-    oggetto: 'Link personale per le prenotazioni',
-    messaggio: "l'amministratore ha registrato la società nel sistema di prenotazione del Palazzetto dello Sport. Da questo momento è possibile richiedere le prenotazioni dall'area riservata, raggiungibile con il link personale riportato sotto.",
-  },
-  rigenerazione: {
-    oggetto: 'Nuovo link personale per le prenotazioni',
-    messaggio: "l'amministratore ha rigenerato il link personale della società: il link precedente non funziona più. Da ora l'area riservata si raggiunge con il link riportato sotto.",
-  },
-  reinvio: {
-    oggetto: 'Link personale per le prenotazioni',
-    messaggio: "su richiesta dell'amministratore, ecco di nuovo il link personale con cui la società accede all'area riservata delle prenotazioni.",
-  },
-};
+/** Testi dell'email di consegna del link; la creazione nomina la struttura a cui il link dà accesso. */
+function testiLinkAccesso(motivo: MotivoLinkAccesso, struttura: Struttura): { oggetto: string; messaggio: string } {
+  switch (motivo) {
+    case 'creazione':
+      return {
+        oggetto: 'Link personale per le prenotazioni',
+        messaggio: `l'amministratore ha registrato la società nel sistema di prenotazione: ${struttura.nome}. Da questo momento è possibile richiedere le prenotazioni dall'area riservata, raggiungibile con il link personale riportato sotto.`,
+      };
+    case 'rigenerazione':
+      return {
+        oggetto: 'Nuovo link personale per le prenotazioni',
+        messaggio: "l'amministratore ha rigenerato il link personale della società: il link precedente non funziona più. Da ora l'area riservata si raggiunge con il link riportato sotto.",
+      };
+    case 'reinvio':
+      return {
+        oggetto: 'Link personale per le prenotazioni',
+        messaggio: "su richiesta dell'amministratore, ecco di nuovo il link personale con cui la società accede all'area riservata delle prenotazioni.",
+      };
+  }
+}
 
 const AVVISO_LINK_PERSONALE = 'Il link è personale e non va condiviso: chi lo conosce può prenotare a nome della società. Conviene salvarlo tra i preferiti; in caso di smarrimento o sospetto uso improprio, chiedere all\'amministratore di rigenerarlo.';
 
@@ -650,7 +672,7 @@ const AVVISO_LINK_PERSONALE = 'Il link è personale e non va condiviso: chi lo c
  * al file): parte solo per azioni dell'admin, quindi nessuna email all'admin.
  */
 export function notificaLinkAccesso(c: ContestoNotifica, societa: SocietaDaNotificare, linkAccesso: string, motivo: MotivoLinkAccesso): void {
-  const testi = TESTI_LINK_ACCESSO[motivo];
+  const testi = testiLinkAccesso(motivo, strutturaDa(c.env));
   inviaNotifica(c, {
     oggetto: testi.oggetto,
     messaggio: `${testi.messaggio} ${AVVISO_LINK_PERSONALE}`,

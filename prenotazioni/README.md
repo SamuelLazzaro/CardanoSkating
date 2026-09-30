@@ -1,10 +1,14 @@
-# Prenotazioni palazzetto — Cardano Skating S.R.L. S.S.D.
+# Prenotazioni strutture sportive — Cardano Skating S.R.L. S.S.D.
 
-Sistema di prenotazione delle fasce orarie del palazzetto dello sport per le
-società sportive esterne autorizzate. Le società richiedono slot da 30 minuti
-(08:00–24:00, 7 giorni su 7), l'amministratore approva o rifiuta; il vincolo
-`UNIQUE` sul database garantisce che uno slot non possa mai essere prenotato
-due volte.
+Sistema di prenotazione delle fasce orarie delle strutture sportive
+(palazzetto dello sport e circuito stradale) per le società sportive esterne
+autorizzate. Le società richiedono slot da 30 minuti (08:00–24:00, 7 giorni su
+7), l'amministratore approva o rifiuta; il vincolo `UNIQUE` sul database
+garantisce che uno slot non possa mai essere prenotato due volte.
+
+Lo stesso codice è pubblicato **una volta per struttura**, con Worker,
+database, secret e hostname separati (vedi [Due istanze: palazzetto e
+circuito stradale](#due-istanze-palazzetto-e-circuito-stradale)).
 
 **Stack**: Cloudflare Workers + [Hono](https://hono.dev) (TypeScript),
 database Cloudflare D1, frontend statico vanilla (HTML/CSS/JS) servito dallo
@@ -73,17 +77,58 @@ npm run typecheck     # tsc --noEmit
 I test applicano automaticamente le migrazioni a un D1 isolato: non toccano
 il database di sviluppo.
 
+## Due istanze: palazzetto e circuito stradale
+
+Il sistema non ha un concetto di "struttura" nel database: il vincolo
+anti-doppia-prenotazione è su `slot_key` (data + ora) e vale per un intero
+database. Per usare lo stesso gestionale su due strutture con calendari
+indipendenti, il codice viene pubblicato due volte tramite gli *environments*
+di wrangler ([wrangler.jsonc](wrangler.jsonc)):
+
+| | Palazzetto dello Sport | Circuito stradale |
+|---|---|---|
+| Ambiente wrangler | livello base (nessun `--env`) | `--env circuito` |
+| Worker | `cardanoskating-prenotazioni` | `cardanoskating-circuito` |
+| Database D1 | `cardanoskating-prenotazioni` | `cardanoskating-circuito` |
+| Secret locali | `.dev.vars` | `.dev.vars.circuito` |
+| Script npm | `dev`, `deploy`, `migrate:*` | `dev:circuito`, `deploy:circuito`, `migrate:*:circuito` |
+
+Le due istanze sono del tutto indipendenti: società (ogni società riceve un
+link personale per struttura), prenotazioni, report mensile, secret e sessioni.
+Devono stare su **hostname distinti**: i cookie di sessione hanno path `/` e il
+frontend usa percorsi assoluti, quindi sullo stesso hostname le due istanze si
+sloggerebbero a vicenda.
+
+Ciò che cambia tra le istanze sono le `vars` `NOME_STRUTTURA` e
+`SIGLA_STRUTTURA` (lette da `strutturaDa()` in `src/util.ts`): titoli e testate
+delle pagine (via `GET /api/struttura`, pubblico), nome mittente e prefisso
+dell'oggetto delle email (`Prenotazioni Palazzetto` / `[Palazzetto]`), firma in
+calce, nome del calendario ICS, nome del file `.ics` e **UID degli eventi ICS**
+(`richiesta-<id>@<sigla>.prenotazioni.cardanoskating`): gli id delle richieste
+ripartono da 1 in ogni database, e senza la sigla una società iscritta a
+entrambi i feed vedrebbe gli eventi sovrascriversi. Orari di apertura e durata
+degli slot sono uguali per tutte le strutture. La casella email è la stessa.
+
+Per aggiungere una terza struttura basta un nuovo blocco in `env` di
+`wrangler.jsonc` (con il proprio database) e gli script npm corrispondenti.
+
 ## Migrazioni
 
 Le migrazioni vivono in `migrations/` e vengono applicate in ordine di nome.
+Sono le stesse per tutte le istanze: ogni migrazione va applicata a **ogni**
+database.
 
 ```bash
 # creare una nuova migrazione (genera migrations/000N_nome.sql da compilare)
 npx wrangler d1 migrations create cardanoskating-prenotazioni nome_migrazione
 
-# applicare le migrazioni
+# applicare le migrazioni — palazzetto
 npm run migrate:local     # al database locale
 npm run migrate:remote    # al database di produzione (chiede conferma)
+
+# applicare le migrazioni — circuito stradale
+npm run migrate:local:circuito
+npm run migrate:remote:circuito
 ```
 
 ## Primo deploy (una tantum)
@@ -127,6 +172,29 @@ riconosce come società "di casa" e non le invia notifiche.
 Per i deploy successivi basta `npm run deploy` (e `npm run migrate:remote` se
 ci sono nuove migrazioni: applicale **prima** del deploy).
 
+### Istanza del circuito stradale
+
+Stessi passi, con il suffisso `:circuito` negli script npm e `--env circuito`
+nei comandi wrangler:
+
+```bash
+# 1. database: copia l'id in wrangler.jsonc, campo env.circuito.d1_databases[0].database_id
+npx wrangler d1 create cardanoskating-circuito
+
+# 2. secret: sono per ambiente, vanno caricati di nuovo
+npx wrangler secret put ADMIN_SECRET --env circuito
+npx wrangler secret put ADMIN_PASSWORD --env circuito
+npx wrangler secret put BREVO_API_KEY --env circuito
+
+# 3. schema e pubblicazione
+npm run migrate:remote:circuito
+npm run deploy:circuito
+```
+
+Poi, dal pannello `/admin` della nuova istanza, verifica la società di casa
+come sopra e ricrea le società che prenotano il circuito: ognuna riceve via
+email un link personale distinto da quello del palazzetto.
+
 ## Backup e ripristino del database
 
 ```bash
@@ -139,6 +207,9 @@ npx wrangler d1 export cardanoskating-prenotazioni --local --output backup-local
 # ripristino (su un DB vuoto appena creato)
 npx wrangler d1 execute cardanoskating-prenotazioni --remote --file backup-YYYYMMDD.sql
 ```
+
+Per l'istanza del circuito: `cardanoskating-circuito` come nome database e
+`--env circuito` in coda a ogni comando.
 
 Consiglio: fai un backup prima di ogni `migrate:remote`.
 
@@ -240,7 +311,7 @@ Consiglio: fai un backup prima di ogni `migrate:remote`.
   dell'intervallo mostrato).
 - **Calendario dell'area società** (`GET /api/societa/calendario`): stessa
   vista del pannello admin, con nome e colore della società su ogni fascia
-  prenotata, così ogni società vede chi occupa il palazzetto. Titolo
+  prenotata, così ogni società vede chi occupa la struttura. Titolo
   dell'attività e note restano riservati (non escono dall'API), le fasce
   altrui non sono cliccabili e le proprie richieste ancora in attesa sono
   evidenziate in giallo. Il rendering della griglia è condiviso con il
@@ -266,7 +337,8 @@ Consiglio: fai un backup prima di ogni `migrate:remote`.
   con una sola query.
 - **Calendario ICS**: ogni società ha un URL `/api/ics/<token>` da importare
   in Google Calendar (Impostazioni → Aggiungi calendario → Da URL) con le
-  proprie prenotazioni approvate, fuso `Europe/Rome`.
+  proprie prenotazioni approvate, fuso `Europe/Rome`. Un feed per struttura,
+  con UID distinti per struttura (vedi sopra).
 
 ## Note operative
 

@@ -1,10 +1,24 @@
 /**
- * Configurazione Cloudflare Workers — sistema prenotazioni palazzetto.
+ * Configurazione Cloudflare Workers — sistema prenotazioni.
  *
- * Secret richiesti (mai in questo file, mai in git):
+ * Lo stesso codice è pubblicato DUE volte, una per struttura prenotabile:
+ *   - livello base (nessun --env): palazzetto dello sport, Worker
+ *     "cardanoskating-prenotazioni" (l'istanza storica, invariata);
+ *   - "env.circuito": circuito stradale, Worker "cardanoskating-circuito".
+ * Le due istanze hanno database D1, secret e hostname distinti (i cookie di
+ * sessione hanno path "/" e il frontend usa percorsi assoluti: sullo stesso
+ * hostname si sloggerebbero a vicenda). Le chiavi "assets", "main" e
+ * "compatibility_date" sono ereditate dagli ambienti; "vars" e "d1_databases"
+ * NON lo sono e vanno ridichiarate per intero in ogni ambiente
+ * (developers.cloudflare.com/workers/wrangler/configuration/).
+ *
+ * Secret richiesti (mai in questo file, mai in git), da caricare PER OGNI
+ * istanza (per il circuito aggiungere --env circuito):
  *   wrangler secret put ADMIN_SECRET    # chiave HMAC per la firma dei cookie di sessione
  *   wrangler secret put ADMIN_PASSWORD  # password del pannello admin
- * Per lo sviluppo locale: copiare .dev.vars.example in .dev.vars e valorizzarlo.
+ *   wrangler secret put BREVO_API_KEY   # notifiche email (assente = invio disattivato)
+ * Per lo sviluppo locale: copiare .dev.vars.example in .dev.vars (palazzetto)
+ * e .dev.vars.circuito.example in .dev.vars.circuito (circuito) e valorizzarli.
  */
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
@@ -19,10 +33,13 @@
 		"directory": "./public",
 		"binding": "ASSETS"
 	},
-	// Indirizzi delle notifiche email (vedi src/notifiche.ts). La chiave API
-	// di Brevo è un secret: wrangler secret put BREVO_API_KEY — senza chiave
-	// configurata l'invio delle notifiche resta disattivato.
+	// NOME_STRUTTURA / SIGLA_STRUTTURA identificano la struttura prenotabile
+	// nei testi (titoli pagina, email, calendario ICS) e negli identificativi
+	// (UID ICS, prefisso oggetto email). Indirizzi delle notifiche email in
+	// src/notifiche.ts; la chiave API di Brevo è un secret (vedi sopra).
 	"vars": {
+		"NOME_STRUTTURA": "Palazzetto dello Sport",
+		"SIGLA_STRUTTURA": "palazzetto",
 		"EMAIL_MITTENTE": "prenotazioni@cardanoskating.it",
 		"EMAIL_ADMIN": "prenotazioni@cardanoskating.it"
 	},
@@ -35,5 +52,24 @@
 			"database_id": "367d3aa4-3be5-4b49-8ce9-98c2425f96b5",
 			"migrations_dir": "./migrations"
 		}
-	]
+	],
+	"env": {
+		"circuito": {
+			"name": "cardanoskating-circuito",
+			"vars": {
+				"NOME_STRUTTURA": "Circuito stradale",
+				"SIGLA_STRUTTURA": "circuito",
+				"EMAIL_MITTENTE": "prenotazioni@cardanoskating.it",
+				"EMAIL_ADMIN": "prenotazioni@cardanoskating.it"
+			},
+			"d1_databases": [
+				{
+					"binding": "DB",
+					"database_name": "cardanoskating-circuito",
+					"database_id": "d5509952-e73b-4d4d-bcf3-5bcae71016f3",
+					"migrations_dir": "./migrations"
+				}
+			]
+		}
+	}
 }

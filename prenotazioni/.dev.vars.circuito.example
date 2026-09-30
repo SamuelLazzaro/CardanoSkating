@@ -1,0 +1,10 @@
+# Copiare questo file in .dev.vars.circuito (ignorato da git) e valorizzarlo
+# per lo sviluppo locale dell'istanza circuito stradale (npm run dev:circuito).
+# Attenzione: quando esiste .dev.vars.circuito, wrangler NON carica anche
+# .dev.vars: ogni valore va ripetuto qui. In produzione usare
+# `wrangler secret put <NOME> --env circuito`.
+ADMIN_SECRET=stringa-casuale-lunga-almeno-32-caratteri
+ADMIN_PASSWORD=password-robusta-per-il-pannello-admin
+# Chiave API Brevo per le notifiche email: lasciare vuota (o rimuovere la
+# riga) per disattivare l'invio durante lo sviluppo locale.
+BREVO_API_KEY=

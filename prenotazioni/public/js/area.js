@@ -32,6 +32,7 @@ import {
   ottieniCalendarioSocietaMese,
   ottieniProfiloSocieta,
   ottieniRichiesteSocieta,
+  ottieniStruttura,
   richiediAnnullamento,
   richiediModifica,
 } from './api.js';
@@ -39,6 +40,7 @@ import {
   creaBadge,
   mostraMessaggio,
   mostraMessaggioConElenco,
+  mostraStruttura,
   preparaAperturaDettagli,
   preparaDialogo,
   preparaDialogoDettagli,
@@ -125,12 +127,29 @@ let g_modifica = null;
 
 /* ------------------------------------------------------------------ init */
 
+/**
+ * Facility of this instance for header and title. Best effort: without it
+ * the static header (owner only) stays. Fetched alongside the profile, since
+ * the two calls are independent.
+ * @returns {Promise<string>} facility name, '' if the lookup failed
+ */
+async function nomeStrutturaCorrente() {
+  try {
+    return (await ottieniStruttura()).nome;
+  } catch {
+    return '';
+  }
+}
+
 /** @returns {Promise<void>} */
 async function avvia() {
+  const nomeStrutturaInArrivo = nomeStrutturaCorrente();
   let profilo;
   try {
     profilo = await ottieniProfiloSocieta();
   } catch (errore) {
+    const nomeStruttura = await nomeStrutturaInArrivo;
+    if (nomeStruttura !== '') mostraStruttura(elemento('sottotitolo-societa'), nomeStruttura);
     elemento('vista-caricamento').hidden = true;
     if (errore.status === 401) {
       elemento('vista-negato').hidden = false;
@@ -142,7 +161,12 @@ async function avvia() {
   }
 
   g_societaId = profilo.societa.id;
-  elemento('sottotitolo-societa').textContent = profilo.societa.nome;
+  const nomeStruttura = await nomeStrutturaInArrivo;
+  if (nomeStruttura !== '') {
+    mostraStruttura(elemento('sottotitolo-societa'), nomeStruttura, profilo.societa.nome);
+  } else {
+    elemento('sottotitolo-societa').textContent = profilo.societa.nome;
+  }
   elemento('campo-link-ics').value = profilo.link_ics;
   elemento('bottone-esci').hidden = false;
 

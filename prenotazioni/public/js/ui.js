@@ -1,5 +1,5 @@
 /* ui.js — DOM manipulation helpers shared by the pages. No API calls here. */
-import { APERTURA_MIN, CHIUSURA_MIN, PASSO_MIN, TESTO_AMBITO, TESTO_STATO } from './constants.js';
+import { APERTURA_MIN, CHIUSURA_MIN, PASSO_MIN, RAGIONE_SOCIALE, TESTO_AMBITO, TESTO_STATO } from './constants.js';
 import { eUltimoInputTouch } from './tap-feedback.js';
 import { eColoreEsadecimale, etichettaGiorno, meseDellaData, oraTesto } from './utils.js';
 
@@ -21,6 +21,25 @@ const SELETTORE_CELLA = '.slot, .mese-giorno';
 
 /** @type {string} SVG namespace, required by createElementNS */
 const NS_SVG = 'http://www.w3.org/2000/svg';
+
+/**
+ * Writes the facility served by this instance (palazzetto / circuito
+ * stradale) into the page header and the document title. The HTML ships with
+ * the owner only, since the same static pages serve both instances; the name
+ * arrives from /api/struttura at load time. With a società name (area after
+ * login) the subtitle reads "<società> · <struttura>", otherwise
+ * "<struttura> · <owner>".
+ * @param {HTMLElement} sottotitolo - subtitle element under the page <h1>
+ * @param {string} nomeStruttura - facility name, e.g. 'Palazzetto dello Sport'
+ * @param {string} [nomeSocieta] - logged-in società, when known
+ * @returns {void}
+ */
+export function mostraStruttura(sottotitolo, nomeStruttura, nomeSocieta = '') {
+  const parti = nomeSocieta !== '' ? [nomeSocieta, nomeStruttura] : [nomeStruttura, RAGIONE_SOCIALE];
+  sottotitolo.textContent = parti.join(' · ');
+  const titoloPagina = document.querySelector('h1')?.textContent ?? '';
+  document.title = `${titoloPagina} — ${nomeStruttura} · ${RAGIONE_SOCIALE}`;
+}
 
 /**
  * Builds the weekly grid (hour column + 7 day columns, one row per half

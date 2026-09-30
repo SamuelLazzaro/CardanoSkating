@@ -3,7 +3,7 @@ import type { Bindings } from '../tipi';
 import { aggiungiGiorni, oraRoma } from '../slots';
 import { COOKIE_SOCIETA, creaSessione, DURATA_SOCIETA_S, hashToken, scriviCookieSessione } from '../auth';
 import { generaICS, type EventoICS } from '../ics';
-import { scriviAudit } from '../util';
+import { scriviAudit, strutturaDa } from '../util';
 
 // Formato accettato per i token nei link personali (UUID o esadecimale).
 const TOKEN_RE = /^[A-Za-z0-9-]{16,64}$/;
@@ -16,6 +16,17 @@ export const pubblico = new Hono<{ Bindings: Bindings }>();
  * personale. L'admin entra direttamente da /admin.
  */
 pubblico.get('/', (c) => c.redirect('/area', 302));
+
+/**
+ * Nome della struttura servita da questa istanza (palazzetto / circuito
+ * stradale), per titoli e testate delle pagine, che sono asset statici
+ * condivisi dalle due istanze. Pubblico perché serve anche prima del login;
+ * espone solo il nome e l'etichetta, mai dati del database.
+ */
+pubblico.get('/api/struttura', (c) => {
+  const { nome, etichetta } = strutturaDa(c.env);
+  return c.json({ nome, etichetta });
+});
 
 /**
  * Accesso società via link personale: se il token corrisponde a una società
@@ -64,8 +75,9 @@ pubblico.get('/api/ics/:token', async (c) => {
     .bind(societa.id, da)
     .all<EventoICS>();
 
-  return c.body(generaICS(societa.nome, results, new Date()), 200, {
+  const struttura = strutturaDa(c.env);
+  return c.body(generaICS(societa.nome, results, new Date(), struttura), 200, {
     'Content-Type': 'text/calendar; charset=utf-8',
-    'Content-Disposition': 'inline; filename="palazzetto.ics"',
+    'Content-Disposition': `inline; filename="${struttura.sigla}.ics"`,
   });
 });

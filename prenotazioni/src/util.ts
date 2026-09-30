@@ -1,5 +1,35 @@
 import type { Context } from 'hono';
+import type { Bindings } from './tipi';
 import { giornoSettimana } from './slots';
+
+/**
+ * Struttura prenotabile servita da questa istanza del Worker. Lo stesso
+ * codice è pubblicato una volta per struttura (palazzetto, circuito stradale)
+ * con vars diverse in wrangler.jsonc; qui i valori vengono normalizzati:
+ *  - nome: forma estesa per i testi rivolti alle persone ("Palazzetto dello
+ *    Sport");
+ *  - sigla: identificativo breve, solo minuscole/cifre, usato dove serve un
+ *    valore stabile e sicuro (UID degli eventi ICS, nome del file .ics);
+ *  - etichetta: la sigla con l'iniziale maiuscola, per i testi brevi
+ *    (prefisso oggetto email "[Palazzetto]", nome del calendario ICS).
+ */
+export type Struttura = { nome: string; sigla: string; etichetta: string };
+
+const NOME_STRUTTURA_PREDEFINITO = 'Palazzetto dello Sport';
+const SIGLA_STRUTTURA_PREDEFINITA = 'palazzetto';
+
+/**
+ * Legge la struttura dalle vars dell'istanza. In assenza (o con valori
+ * malformati) si ricade sul palazzetto, l'istanza storica: così sviluppo e
+ * test senza vars mantengono il comportamento originale.
+ */
+export function strutturaDa(env: Pick<Bindings, 'NOME_STRUTTURA' | 'SIGLA_STRUTTURA'>): Struttura {
+  const nome = testo(env.NOME_STRUTTURA, 60) ?? NOME_STRUTTURA_PREDEFINITO;
+  const siglaRicevuta = (env.SIGLA_STRUTTURA ?? '').trim().toLowerCase();
+  const sigla = /^[a-z0-9]{1,20}$/.test(siglaRicevuta) ? siglaRicevuta : SIGLA_STRUTTURA_PREDEFINITA;
+  const etichetta = sigla.charAt(0).toUpperCase() + sigla.slice(1);
+  return { nome, sigla, etichetta };
+}
 
 /**
  * Legge il corpo JSON della richiesta. Ritorna null (→ 400 nel chiamante)

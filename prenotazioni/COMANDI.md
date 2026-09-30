@@ -11,6 +11,14 @@ Per la spiegazione di come funziona il sistema vedi [README.md](README.md).
 > (il binding nel codice si chiama `DB`, ma nei comandi wrangler va usato
 > sempre il nome del database).
 
+> 🏟️ **Due istanze.** Il palazzetto è il livello base della configurazione;
+> il circuito stradale è l'ambiente wrangler `circuito` (Worker
+> `cardanoskating-circuito`, database **`cardanoskating-circuito`**). Ogni
+> comando di questa pagina vale per il palazzetto; per il circuito usare lo
+> script npm con suffisso `:circuito` oppure, nei comandi `npx wrangler`,
+> il nome database del circuito e `--env circuito` in coda. Vedi
+> [README → Due istanze](README.md#due-istanze-palazzetto-e-circuito-stradale).
+
 ---
 
 ## Riepilogo comandi npm
@@ -24,6 +32,10 @@ Per la spiegazione di come funziona il sistema vedi [README.md](README.md).
 | `npm run typecheck` | Controllo dei tipi TypeScript (`tsc --noEmit`) | Prima di ogni commit; sempre insieme ai test |
 | `npm run migrate:local` | Applica le migrazioni al database **locale** (`.wrangler/`) | Al primo setup e dopo ogni nuova migrazione, prima di `npm run dev` |
 | `npm run migrate:remote` | Applica le migrazioni al database di **produzione** (chiede conferma) | Solo quando c'è una nuova migrazione, **prima** del deploy |
+| `npm run dev:circuito` | Come `dev`, per l'istanza del circuito (secret da `.dev.vars.circuito`) | Sviluppo locale sul circuito |
+| `npm run deploy:circuito` | Come `deploy`, per il Worker `cardanoskating-circuito` | Dopo ogni modifica: le due istanze vanno pubblicate **entrambe** |
+| `npm run migrate:local:circuito` | Come `migrate:local`, sul database locale del circuito | Al primo setup e dopo ogni nuova migrazione |
+| `npm run migrate:remote:circuito` | Come `migrate:remote`, sul database di produzione del circuito | Ogni migrazione va applicata a **entrambi** i database |
 
 ---
 
@@ -35,9 +47,10 @@ Il caso più frequente: hai modificato codice in `src/` o frontend in `public/`
 e vuoi portare la modifica in produzione.
 
 ```bash
-npm test              # la suite deve essere verde
-npm run typecheck     # nessun errore di tipi
-npm run deploy        # pubblica il Worker su Cloudflare
+npm test                  # la suite deve essere verde
+npm run typecheck         # nessun errore di tipi
+npm run deploy            # pubblica il Worker del palazzetto
+npm run deploy:circuito   # pubblica il Worker del circuito (stesso codice)
 ```
 
 Se la modifica include una **nuova migrazione**, vedi l'operazione
@@ -87,6 +100,11 @@ npm test
 # 4. applicala in produzione, POI pubblica il codice che la usa
 npm run migrate:remote
 npm run deploy
+
+# 5. stessa cosa per l'istanza del circuito
+npm run migrate:local:circuito
+npm run migrate:remote:circuito
+npm run deploy:circuito
 ```
 
 L'ordine migrazione → deploy evita che il nuovo codice giri contro uno schema
@@ -148,6 +166,29 @@ società "Cardano Skating S.R.L. S.S.D." creata dal seed (l'email deve
 coincidere con `EMAIL_ADMIN` di `wrangler.jsonc`, altrimenti la società di
 casa riceve le notifiche come una società esterna).
 
+### Primo deploy dell'istanza del circuito stradale (una tantum)
+
+```bash
+# 1. crea il database e copia l'id in wrangler.jsonc
+#    (env.circuito.d1_databases[0].database_id). Un "Authentication error
+#    [code: 10000]" con token OAuth valido può essere transitorio: riprovare.
+npx wrangler d1 create cardanoskating-circuito
+
+# 2. secret: sono per ambiente, vanno caricati di nuovo
+npx wrangler secret put ADMIN_SECRET --env circuito
+npx wrangler secret put ADMIN_PASSWORD --env circuito
+npx wrangler secret put BREVO_API_KEY --env circuito
+
+# 3. schema del database e pubblicazione
+npm run migrate:remote:circuito
+npm run deploy:circuito
+```
+
+Poi verifica la società di casa come sopra e ricrea le società che prenotano
+il circuito: ognuna riceve un link personale distinto da quello del palazzetto.
+Per lo sviluppo locale: `cp .dev.vars.circuito.example .dev.vars.circuito`,
+`npm run migrate:local:circuito`, `npm run dev:circuito`.
+
 ### Ripartire da un database di produzione vuoto
 
 Da usare solo finché il sistema non è in uso reale (cancella TUTTI i dati).
@@ -177,6 +218,10 @@ seguito da `npx wrangler d1 create cardanoskating-prenotazioni` — ma il nuovo
 ```bash
 npx wrangler secret list                  # elenca i secret esistenti (solo i nomi)
 npx wrangler secret put ADMIN_PASSWORD    # crea o aggiorna (chiede il valore in input)
+
+# istanza del circuito: i secret sono separati
+npx wrangler secret list --env circuito
+npx wrangler secret put ADMIN_PASSWORD --env circuito
 ```
 
 Quando: al primo deploy e ogni volta che va ruotata la password admin o la

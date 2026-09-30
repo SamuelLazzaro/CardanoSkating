@@ -29,6 +29,16 @@ async function richiestaJson(url, opzioni = {}) {
 }
 
 /**
+ * Facility served by this instance (palazzetto / circuito stradale): the pages
+ * are shared static assets, so the name comes from the server at load time.
+ * Public endpoint, no session needed.
+ * @returns {Promise<{nome: string, etichetta: string}>}
+ */
+export function ottieniStruttura() {
+  return richiestaJson('/api/struttura');
+}
+
+/**
  * Calendar of the area società: every booked slot with the società that booked
  * it (name and color), no activity title nor notes.
  * @param {string} lunedi - Monday of the requested week, 'YYYY-MM-DD'

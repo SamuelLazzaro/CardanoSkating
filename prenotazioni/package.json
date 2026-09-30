@@ -10,7 +10,11 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "migrate:local": "wrangler d1 migrations apply cardanoskating-prenotazioni --local",
-    "migrate:remote": "wrangler d1 migrations apply cardanoskating-prenotazioni --remote"
+    "migrate:remote": "wrangler d1 migrations apply cardanoskating-prenotazioni --remote",
+    "dev:circuito": "wrangler dev --env circuito",
+    "deploy:circuito": "wrangler deploy --env circuito",
+    "migrate:local:circuito": "wrangler d1 migrations apply cardanoskating-circuito --local --env circuito",
+    "migrate:remote:circuito": "wrangler d1 migrations apply cardanoskating-circuito --remote --env circuito"
   },
   "dependencies": {
     "hono": "^4.6.0"
