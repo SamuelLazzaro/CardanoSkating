@@ -538,6 +538,11 @@ fieldset.campo {
     font-size: 0.92rem;
 }
 
+/* the report popup clears the list while loading: no stray bottom margin */
+.dettagli:empty {
+    display: none;
+}
+
 .dettagli dt {
     font-weight: 600;
     color: var(--testo-tenue);

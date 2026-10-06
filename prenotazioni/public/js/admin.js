@@ -7,7 +7,7 @@
  * report; Notifiche with the pending richieste/ricorrenze to approve/reject
  * (grouped requests decided together), counted by the bell badge; Società
  * with the società management (create, edit, suspend/reactivate,
- * personal-link regeneration).
+ * personal-link regeneration, monthly report emailed to the società).
  */
 import { avviaTapFeedback } from './tap-feedback.js';
 import { COLORE_PREDEFINITO, MIN_MOTIVAZIONE, PASSO_MIN, TITOLO_PREDEFINITO } from './constants.js';
@@ -18,9 +18,12 @@ import {
   eColoreEsadecimale,
   elencoGiorni,
   formattaSlotKey,
+  meseDellaData,
   numeroItaliano,
   oraTesto,
   raggruppaPrenotazioni,
+  spostaMese,
+  titoloMese,
 } from './utils.js';
 import {
   accediAdmin,
@@ -34,11 +37,13 @@ import {
   eliminaSocieta,
   esciAdmin,
   inviaLinkSocieta,
+  inviaReportSocieta,
   modificaPrenotazioneAdmin,
   ottieniCalendarioAdmin,
   ottieniCalendarioAdminMese,
   ottieniElencoSocieta,
   ottieniReport,
+  ottieniReportSocieta,
   ottieniRichiesteAdmin,
   ottieniRicorrenzeAdmin,
   ottieniStruttura,
@@ -109,6 +114,12 @@ let g_ripetizione = null;
 
 /** @type {ReturnType<typeof preparaDialogoDettagli>|null} details popup of a booking */
 let g_dettagli = null;
+
+/** @type {object|null} società whose monthly report popup is open */
+let g_societaReport = null;
+
+/** @type {{ore: number, importo: number, ultimo_invio: object|null}|null} figures shown in the report popup, null while loading or on error */
+let g_reportCorrente = null;
 
 /**
  * @type {Map<number, object>} bookings of the interval on screen, by richiesta
@@ -230,6 +241,18 @@ function preparaEventi() {
     vistaSettimana: elemento('cal-vista-settimana'),
     vistaMese: elemento('cal-vista-mese'),
   }, mostraCalendario);
+
+  // Monthly report popup of a società: opened from the row button (no fixed
+  // opener), closed by ✕, Esc or a click on the backdrop. The month picker
+  // stops at the previous month: the current one is not settled yet.
+  const dialogoReport = elemento('dialogo-report');
+  elemento('bottone-chiudi-report').addEventListener('click', () => dialogoReport.close());
+  dialogoReport.addEventListener('click', (evento) => {
+    if (evento.target === dialogoReport) dialogoReport.close();
+  });
+  elemento('rep-mese').max = spostaMese(meseDellaData(oggi), -1);
+  elemento('rep-mese').addEventListener('change', caricaReportSocieta);
+  elemento('form-report').addEventListener('submit', inviaReport);
 
   elemento('form-login').addEventListener('submit', accedi);
   elemento('bottone-esci').addEventListener('click', esci);
@@ -1023,6 +1046,9 @@ function renderSocieta(societa) {
     // The home società never receives email (same address as the admin), so
     // offering to send the link there would only produce a misleading "sent".
     if (!soc.di_casa) azioni.append(bottoneAzione('Invia link', 'btn', () => inviaLink(soc)));
+    // Same reason for the report: the home società would never get the email.
+    // Suspended società keep it: past months may still have hours to bill.
+    if (!soc.di_casa) azioni.append(bottoneAzione('Invia report', 'btn', () => apriReportSocieta(soc)));
     azioni.append(
       bottoneAzione('Modifica', 'btn', () => apriModificaSocieta(soc)),
       bottoneAzione('Rigenera link', 'btn', () => rigenera(soc)),
@@ -1084,6 +1110,120 @@ async function inviaLink(soc) {
     mostraMessaggio(elemento('esito-societa'), `Link personale di ${soc.nome} inviato via email a ${soc.email}.`, 'ok');
   } catch (errore) {
     mostraMessaggio(elemento('esito-societa'), errore.message, 'errore');
+  }
+}
+
+/* ------------------------------------------------------ report società */
+
+/**
+ * Opens the monthly report popup of a società on the previous month (the
+ * latest month allowed) and loads its figures.
+ * @param {object} soc - società row
+ * @returns {Promise<void>}
+ */
+async function apriReportSocieta(soc) {
+  g_societaReport = soc;
+  elemento('titolo-dialogo-report').textContent = `Invia report: ${soc.nome}`;
+  elemento('rep-mese').value = elemento('rep-mese').max;
+  elemento('rep-con-ore').checked = false;
+  mostraMessaggio(elemento('esito-form-report'), '');
+  elemento('dialogo-report').showModal();
+  await caricaReportSocieta();
+}
+
+/**
+ * @param {string} inviatoAt - UTC timestamp 'YYYY-MM-DD HH:MM:SS' from the DB
+ * @returns {string} Italian local date and time, e.g. "03/10/2026, 14:05"
+ */
+function dataOraItaliana(inviatoAt) {
+  const istante = new Date(`${inviatoAt.replace(' ', 'T')}Z`);
+  return istante.toLocaleString('it-IT', { timeZone: 'Europe/Rome', dateStyle: 'short', timeStyle: 'short' });
+}
+
+/**
+ * Loads ore and importo of the chosen month for the società of the popup
+ * and renders them. The send button is enabled only with hours > 0: the
+ * server refuses an empty report anyway, this just makes it visible first.
+ * @returns {Promise<void>}
+ */
+async function caricaReportSocieta() {
+  const mese = elemento('rep-mese').value;
+  const esito = elemento('esito-form-report');
+  const bottone = elemento('bottone-invia-report');
+  g_reportCorrente = null;
+  bottone.disabled = true;
+  if (!g_societaReport || !mese) return;
+  try {
+    g_reportCorrente = await ottieniReportSocieta(g_societaReport.id, mese);
+    renderReportSocieta(g_reportCorrente);
+    mostraMessaggio(esito, '');
+    bottone.disabled = g_reportCorrente.ore === 0;
+  } catch (errore) {
+    renderReportSocieta(null);
+    mostraMessaggio(esito, errore.message, 'errore');
+  }
+}
+
+/**
+ * @param {{mese: string, ore: number, importo: number, ultimo_invio: {inviato_at: string, con_ore: number}|null}|null} dati - figures, null to clear
+ * @returns {void}
+ */
+function renderReportSocieta(dati) {
+  const riepilogo = elemento('rep-riepilogo');
+  riepilogo.textContent = '';
+  const ultimoInvio = elemento('rep-ultimo-invio');
+  ultimoInvio.hidden = true;
+  if (!dati) return;
+  const righe = [
+    ['Mese', titoloMese(dati.mese)],
+    ['Ore prenotate', `${numeroItaliano(dati.ore, 1)} h`],
+    ['Totale da pagare', `${numeroItaliano(dati.importo, 2)} €`],
+  ];
+  for (const [etichetta, valore] of righe) {
+    const termine = document.createElement('dt');
+    termine.textContent = etichetta;
+    const descrizione = document.createElement('dd');
+    descrizione.textContent = valore;
+    riepilogo.append(termine, descrizione);
+  }
+  if (dati.ore === 0) {
+    ultimoInvio.textContent = 'Nessuna ora prenotata in questo mese: non c\'è nulla da inviare.';
+    ultimoInvio.hidden = false;
+  } else if (dati.ultimo_invio) {
+    const conOre = dati.ultimo_invio.con_ore ? ' (con le ore)' : '';
+    ultimoInvio.textContent = `Report già inviato il ${dataOraItaliana(dati.ultimo_invio.inviato_at)}${conOre}.`;
+    ultimoInvio.hidden = false;
+  }
+}
+
+/**
+ * Sends the report by email after asking for confirmation when the same
+ * month was already sent to this società.
+ * @param {SubmitEvent} evento - report form submit
+ * @returns {Promise<void>}
+ */
+async function inviaReport(evento) {
+  evento.preventDefault();
+  if (!g_societaReport || !g_reportCorrente) return;
+  const mese = elemento('rep-mese').value;
+  if (g_reportCorrente.ultimo_invio) {
+    const quando = dataOraItaliana(g_reportCorrente.ultimo_invio.inviato_at);
+    if (!confirm(`Il report di ${titoloMese(mese)} è già stato inviato a ${g_societaReport.nome} il ${quando}. Inviarlo di nuovo?`)) return;
+  }
+  const conOre = elemento('rep-con-ore').checked;
+  const bottone = elemento('bottone-invia-report');
+  const esito = elemento('esito-form-report');
+  bottone.disabled = true;
+  mostraMessaggio(esito, 'Invio in corso…');
+  try {
+    await inviaReportSocieta(g_societaReport.id, mese, conOre);
+    // Success closes the popup: the confirmation goes to the page-level
+    // status next to the società list, as for the other row actions.
+    elemento('dialogo-report').close();
+    mostraMessaggio(elemento('esito-societa'), `Report di ${titoloMese(mese)} inviato via email a ${g_societaReport.email}.`, 'ok');
+  } catch (errore) {
+    mostraMessaggio(esito, errore.message, 'errore');
+    bottone.disabled = false;
   }
 }
 

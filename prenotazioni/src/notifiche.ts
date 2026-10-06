@@ -318,19 +318,24 @@ async function eseguiInvio(env: Bindings, origine: string, notifica: Notifica): 
   }
 }
 
+/** Singola chiamata all'API Brevo: lancia se la rete o Brevo falliscono. */
+async function chiamaBrevo(env: Bindings, corpo: Record<string, unknown>): Promise<void> {
+  const risposta = await fetch(URL_API_BREVO, {
+    method: 'POST',
+    headers: { 'api-key': env.BREVO_API_KEY!, 'content-type': 'application/json', accept: 'application/json' },
+    body: JSON.stringify(corpo),
+    signal: AbortSignal.timeout(TIMEOUT_INVIO_MS),
+  });
+  if (!risposta.ok) throw new Error(`Brevo ha risposto ${risposta.status}`);
+}
+
 /**
- * Singola chiamata all'API Brevo, con gestione errori autonoma: il fallimento
+ * Chiamata a Brevo con gestione errori autonoma (best effort): il fallimento
  * di un invio non deve impedire quello successivo né propagarsi a waitUntil.
  */
 async function inviaEmailBrevo(env: Bindings, corpo: Record<string, unknown>, descrizioneAudit: string): Promise<void> {
   try {
-    const risposta = await fetch(URL_API_BREVO, {
-      method: 'POST',
-      headers: { 'api-key': env.BREVO_API_KEY!, 'content-type': 'application/json', accept: 'application/json' },
-      body: JSON.stringify(corpo),
-      signal: AbortSignal.timeout(TIMEOUT_INVIO_MS),
-    });
-    if (!risposta.ok) throw new Error(`Brevo ha risposto ${risposta.status}`);
+    await chiamaBrevo(env, corpo);
   } catch (errore) {
     // Nell'audit niente indirizzi email (minimizzazione): bastano oggetto
     // e nome società a capire quale notifica va rispedita a mano.
@@ -678,6 +683,65 @@ export function notificaLinkAccesso(c: ContestoNotifica, societa: SocietaDaNotif
     messaggio: `${testi.messaggio} ${AVVISO_LINK_PERSONALE}`,
     dettagli: [`Link personale: ${linkAccesso}`],
     societa,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Report mensile alla società (invio SINCRONO, su richiesta esplicita)
+// ---------------------------------------------------------------------------
+
+/** Cifre del report di un mese, già calcolate dal chiamante. */
+export type ReportMensile = { mese: string; ore: number; importo: number; conOre: boolean };
+
+/** 'YYYY-MM' → 'settembre 2026', per oggetto e testo dell'email. */
+export function nomeMese(mese: string): string {
+  const [anno, numeroMese] = mese.split('-').map(Number);
+  return new Intl.DateTimeFormat('it-IT', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(Date.UTC(anno, numeroMese - 1, 1)));
+}
+
+/** Numero con la virgola decimale, come si scrive in italiano. */
+function numeroItaliano(valore: number, decimali: number): string {
+  return valore.toFixed(decimali).replace('.', ',');
+}
+
+/**
+ * Contenuto dell'email di report (esportato per i test). Scelte del
+ * committente (2026-10-06): compare SOLO il totale in euro; le ore totali
+ * solo se richiesto (`conOre`); la tariffa oraria MAI, perché resta un dato
+ * riservato all'admin (vedi migrazione 0007).
+ */
+export function notificaReportMensile(societa: SocietaDaNotificare, report: ReportMensile, struttura: Struttura): Notifica {
+  const dettagli: string[] = [];
+  if (report.conOre) dettagli.push(`Ore prenotate: ${numeroItaliano(report.ore, 1)} h`);
+  dettagli.push(`Totale da pagare: ${numeroItaliano(report.importo, 2)} €`);
+  return {
+    oggetto: `Riepilogo prenotazioni — ${nomeMese(report.mese)}`,
+    messaggio: `di seguito il riepilogo delle prenotazioni di ${nomeMese(report.mese)} presso ${struttura.nome}. Per qualsiasi chiarimento è possibile rispondere a questa email.`,
+    dettagli,
+    societa,
+  };
+}
+
+/**
+ * Invia alla società il report del mese, con l'admin in copia (CC). A
+ * differenza delle notifiche sugli eventi NON è best effort: l'admin ha
+ * premuto un pulsante apposta e vuole sapere se l'email è partita, quindi
+ * l'invio è atteso e ogni problema (configurazione mancante, Brevo che
+ * risponde male, timeout) viene propagato come eccezione al chiamante, che
+ * la traduce in una risposta HTTP di errore. Nessuna scrittura nell'audit
+ * qui: è la route a registrare l'esito.
+ */
+export async function inviaReportMensile(env: Bindings, origine: string, societa: SocietaDaNotificare, report: ReportMensile): Promise<void> {
+  if (!env.BREVO_API_KEY || !env.EMAIL_MITTENTE || !env.EMAIL_ADMIN) throw new Error('Invio email non configurato su questa istanza');
+  const struttura = strutturaDa(env);
+  const notifica = notificaReportMensile(societa, report, struttura);
+  await chiamaBrevo(env, {
+    sender: { name: nomeMittente(struttura), email: env.EMAIL_MITTENTE },
+    to: [{ email: societa.email, name: societa.nome }],
+    cc: [{ email: env.EMAIL_ADMIN }],
+    replyTo: { email: env.EMAIL_ADMIN },
+    subject: `${prefissoOggetto(struttura)} ${notifica.oggetto}`,
+    textContent: corpoNotifica(notifica, origine, struttura),
   });
 }
 

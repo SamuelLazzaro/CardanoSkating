@@ -366,3 +366,26 @@ export function creaPrenotazioneDiretta(corpo) {
 export function ottieniReport(mese) {
   return richiestaJson(`/api/admin/report?mese=${mese}`);
 }
+
+/**
+ * Monthly figures of one società (past month only) plus the last email sent
+ * for that month, if any.
+ * @param {number} idSocieta
+ * @param {string} mese - 'YYYY-MM', strictly before the current month
+ * @returns {Promise<{mese: string, ore: number, importo: number, ultimo_invio: {inviato_at: string, con_ore: number}|null}>}
+ */
+export function ottieniReportSocieta(idSocieta, mese) {
+  return richiestaJson(`/api/admin/societa/${idSocieta}/report?mese=${mese}`);
+}
+
+/**
+ * Emails the società the amount due for the month (synchronous: resolves
+ * only once the provider has accepted the message).
+ * @param {number} idSocieta
+ * @param {string} mese - 'YYYY-MM', strictly before the current month
+ * @param {boolean} conOre - also include the total booked hours
+ * @returns {Promise<{ok: boolean, mese: string, ore: number, importo: number, con_ore: boolean, inviato_at: string|null}>}
+ */
+export function inviaReportSocieta(idSocieta, mese, conOre) {
+  return richiestaJson(`/api/admin/societa/${idSocieta}/report/invia`, { method: 'POST', body: JSON.stringify({ mese, con_ore: conOre }) });
+}

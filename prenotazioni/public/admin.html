@@ -284,6 +284,32 @@
         </div>
       </dialog>
 
+      <dialog id="dialogo-report" class="dialogo" aria-labelledby="titolo-dialogo-report">
+        <div class="dialogo-contenuto">
+          <div class="dialogo-testata">
+            <h2 id="titolo-dialogo-report">Invia report</h2>
+            <button type="button" class="btn btn-testo" id="bottone-chiudi-report" aria-label="Chiudi">✕</button>
+          </div>
+          <form id="form-report" class="modulo">
+            <div class="campo">
+              <label for="rep-mese">Mese</label>
+              <input type="month" id="rep-mese" required>
+              <p class="suggerimento">Solo mesi già conclusi: il mese corrente e quelli futuri non sono selezionabili.</p>
+            </div>
+            <dl class="dettagli" id="rep-riepilogo"></dl>
+            <p id="rep-ultimo-invio" class="testo-tenue" hidden></p>
+            <label class="etichetta-check">
+              <input type="checkbox" id="rep-con-ore">
+              Includi nell'email anche il totale delle ore prenotate
+            </label>
+            <div>
+              <button type="submit" class="btn btn-primario" id="bottone-invia-report">Invia report via email</button>
+            </div>
+          </form>
+          <p id="esito-form-report" class="stato" role="status" hidden></p>
+        </div>
+      </dialog>
+
       <dialog id="dialogo-dettagli" class="dialogo" aria-labelledby="titolo-dialogo-dettagli">
         <div class="dialogo-contenuto">
           <div class="dialogo-testata">

@@ -328,6 +328,18 @@ Consiglio: fai un backup prima di ogni `migrate:remote`.
   prenotazione in CSV per Excel italiano (BOM UTF-8, separatore `;`, numeri
   con la virgola, `Content-Disposition: attachment`). Le tariffe non
   compaiono mai nell'area società.
+- **Report mensile inviato alla società** (migrazione `0011`): nella riga di
+  ogni società (tranne quella di casa) il pulsante "Invia report" apre un
+  popup con il selettore del mese, limitato ai mesi già conclusi, che mostra
+  ore prenotate e totale da pagare (`GET /api/admin/societa/:id/report?mese=AAAA-MM`).
+  "Invia report via email" (`POST /api/admin/societa/:id/report/invia`) spedisce
+  alla società, con l'admin in copia, il solo totale in euro; con la casella
+  "Includi le ore" anche le ore totali. La tariffa oraria non compare mai.
+  L'invio è sincrono (l'esito di Brevo arriva nella risposta) e viene
+  rifiutato per il mese corrente o futuri, per la società di casa e per un
+  mese senza ore. Ogni invio riuscito è salvato in `report_inviati` con le
+  cifre spedite: il popup segnala "già inviato il ..." e chiede conferma
+  prima di rimandarlo.
 - **Vista settimanale o mensile**: nel pannello admin e nell'area società il
   calendario si commuta con l'interruttore "Settimana / Mese". La vista mensile
   disegna le settimane intere che contengono il mese (quindi anche i giorni di

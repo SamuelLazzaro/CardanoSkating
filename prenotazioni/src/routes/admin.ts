@@ -28,6 +28,7 @@ import {
 import { tentativoConsentito } from '../ratelimit';
 import { eConflittoSlot, trovaConflitti } from '../conflitti';
 import {
+  inviaReportMensile,
   notificaAnnullamentoApprovato,
   notificaAnnullataDaAdmin,
   notificaLinkAccesso,
@@ -1505,4 +1506,117 @@ admin.get('/report.csv', async (c) => {
     'Content-Type': 'text/csv; charset=utf-8',
     'Content-Disposition': `attachment; filename="report-${mese}.csv"`,
   });
+});
+
+// ---------------------------------------------------------------------------
+// Report mensile di una società inviato via email
+// ---------------------------------------------------------------------------
+
+/** Ultimo invio del report di un mese a una società, come mostrato nel popup. */
+type UltimoInvioReport = { inviato_at: string; con_ore: number };
+
+/** Cifre del mese per una società (stessa logica del report aggregato). */
+type CifreMese = { ore: number; importo: number };
+
+/**
+ * Valida il mese del report di una società: formato 'YYYY-MM' e strettamente
+ * precedente al mese corrente (ora italiana). Il mese corrente e quelli futuri
+ * sono rifiutati per scelta del committente: il totale non è ancora definitivo.
+ * Ritorna il messaggio d'errore, o null se il mese va bene.
+ */
+function erroreMeseReport(mese: string, istante: Date): string | null {
+  if (!isMeseValido(mese)) return 'Parametro mese non valido (formato atteso AAAA-MM)';
+  const meseCorrente = oraRoma(istante).data.slice(0, 7);
+  if (mese >= meseCorrente) return 'Il report si può inviare solo per un mese già concluso';
+  return null;
+}
+
+/**
+ * Ore e importo di una società in un mese: come nel report aggregato, le ore
+ * sono gli slot approvati / 2 e l'importo usa la tariffa CORRENTE della
+ * società (nessuno storico tariffe, scelta del committente). Senza slot nel
+ * mese la query aggregata ritorna comunque una riga con zeri.
+ */
+async function cifreMeseSocieta(db: D1Database, societaId: number, mese: string): Promise<CifreMese> {
+  const { da, a } = rangeMese(mese);
+  const riga = await db
+    .prepare(
+      `SELECT COUNT(p.id) / 2.0 AS ore,
+              COUNT(p.id) / 2.0 * (SELECT tariffa_oraria FROM societa WHERE id = ?1) AS importo
+       FROM prenotazioni p
+       WHERE p.societa_id = ?1 AND p.slot_key >= ?2 AND p.slot_key < ?3`,
+    )
+    .bind(societaId, da, a)
+    .first<CifreMese>();
+  return { ore: riga?.ore ?? 0, importo: riga?.importo ?? 0 };
+}
+
+async function ultimoInvioReport(db: D1Database, societaId: number, mese: string): Promise<UltimoInvioReport | null> {
+  return await db
+    .prepare('SELECT inviato_at, con_ore FROM report_inviati WHERE societa_id = ?1 AND mese = ?2 ORDER BY id DESC LIMIT 1')
+    .bind(societaId, mese)
+    .first<UltimoInvioReport>();
+}
+
+/**
+ * Anteprima del report di una società per un mese passato: ore, importo e
+ * l'eventuale ultimo invio (per avvisare l'admin prima di un reinvio). Le
+ * società eliminate restano leggibili: le loro ore passate vanno comunque
+ * contabilizzate.
+ */
+admin.get('/societa/:id/report', async (c) => {
+  const id = intero(c.req.param('id'));
+  if (id === null) return c.json({ errore: 'Identificativo non valido' }, 400);
+  const mese = c.req.query('mese') ?? '';
+  const erroreMese = erroreMeseReport(mese, new Date());
+  if (erroreMese) return c.json({ errore: erroreMese }, 400);
+  const soc = await c.env.DB.prepare('SELECT id FROM societa WHERE id = ?1').bind(id).first<{ id: number }>();
+  if (!soc) return c.json({ errore: 'Società non trovata' }, 404);
+  const cifre = await cifreMeseSocieta(c.env.DB, id, mese);
+  const ultimoInvio = await ultimoInvioReport(c.env.DB, id, mese);
+  return c.json({ mese, ore: cifre.ore, importo: cifre.importo, ultimo_invio: ultimoInvio });
+});
+
+/**
+ * Invia via email alla società il totale da pagare del mese (corpo JSON:
+ * `mese` 'YYYY-MM' passato, `con_ore` per includere anche le ore). Invio
+ * SINCRONO: la risposta arriva dopo l'esito di Brevo, così l'admin sa se
+ * l'email è davvero partita. Rifiuti (409): società di casa (non riceve
+ * email per progetto) e mese senza ore (niente da fatturare). Il reinvio è
+ * ammesso: la conferma la chiede il pannello, che conosce l'ultimo invio.
+ */
+admin.post('/societa/:id/report/invia', async (c) => {
+  const id = intero(c.req.param('id'));
+  if (id === null) return c.json({ errore: 'Identificativo non valido' }, 400);
+  const corpo = await leggiJson(c);
+  if (!corpo) return c.json({ errore: 'Corpo della richiesta non valido' }, 400);
+  const mese = typeof corpo.mese === 'string' ? corpo.mese.trim() : '';
+  const erroreMese = erroreMeseReport(mese, new Date());
+  if (erroreMese) return c.json({ errore: erroreMese }, 400);
+  const conOre = corpo.con_ore === true;
+
+  const soc = await c.env.DB.prepare('SELECT id, nome, email FROM societa WHERE id = ?1').bind(id).first<{ id: number; nome: string; email: string }>();
+  if (!soc) return c.json({ errore: 'Società non trovata' }, 404);
+  const eSocietaDiCasa = soc.id === SOCIETA_DI_CASA_ID || soc.email.toLowerCase() === (c.env.EMAIL_ADMIN ?? '').toLowerCase();
+  if (eSocietaDiCasa) return c.json({ errore: 'La società di casa non riceve email' }, 409);
+
+  const cifre = await cifreMeseSocieta(c.env.DB, id, mese);
+  if (cifre.ore === 0) return c.json({ errore: 'Nessuna ora prenotata nel mese scelto: nessun report da inviare' }, 409);
+
+  const origine = new URL(c.req.url).origin;
+  try {
+    await inviaReportMensile(c.env, origine, { nome: soc.nome, email: soc.email }, { mese, ore: cifre.ore, importo: cifre.importo, conOre });
+  } catch (errore) {
+    console.error('report: invio fallito', errore);
+    await scriviAudit(c.env.DB, 'report_fallito', `società ${id} (${soc.nome}): mese ${mese}`, 'admin');
+    const messaggio = errore instanceof Error ? errore.message : 'Invio fallito';
+    return c.json({ errore: `Email non inviata: ${messaggio}` }, 502);
+  }
+
+  const esito = await c.env.DB
+    .prepare('INSERT INTO report_inviati (societa_id, mese, ore, importo, con_ore) VALUES (?1, ?2, ?3, ?4, ?5) RETURNING inviato_at')
+    .bind(id, mese, cifre.ore, cifre.importo, conOre ? 1 : 0)
+    .first<{ inviato_at: string }>();
+  await scriviAudit(c.env.DB, 'report_inviato', `società ${id} (${soc.nome}): mese ${mese}, ${cifre.ore} h, ${cifre.importo.toFixed(2)} €${conOre ? ', con ore' : ''}`, 'admin');
+  return c.json({ ok: true, mese, ore: cifre.ore, importo: cifre.importo, con_ore: conOre, inviato_at: esito?.inviato_at ?? null });
 });
