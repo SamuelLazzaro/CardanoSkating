@@ -2,7 +2,6 @@ import { Hono } from 'hono';
 import type { Bindings } from './tipi';
 import { accesso } from './routes/accesso';
 import { atleti } from './routes/atleti';
-import { categorie } from './routes/categorie';
 import { articoli } from './routes/articoli';
 import { movimenti } from './routes/movimenti';
 import { riepilogo } from './routes/riepilogo';
@@ -25,7 +24,6 @@ app.get('/api/health', (c) => c.json({ ok: true }));
 
 // Ogni router riservato applica da sé il middleware di sessione (richiedeUtente).
 app.route('/api/atleti', atleti);
-app.route('/api/categorie', categorie);
 app.route('/api/articoli', articoli);
 app.route('/api/movimenti', movimenti);
 app.route('/api/riepilogo', riepilogo);

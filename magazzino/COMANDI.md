@@ -183,7 +183,7 @@ crede che le migrazioni siano già applicate.
 # 2. elimina tutte le tabelle (chiede conferma)
 npx wrangler d1 execute cardanoskating-magazzino --remote --command "DROP TABLE IF EXISTS movimenti; DROP TABLE IF EXISTS articoli; DROP TABLE IF EXISTS atleti; DROP TABLE IF EXISTS categorie; DROP TABLE IF EXISTS rate_limit; DROP TABLE IF EXISTS audit_log; DROP TABLE IF EXISTS d1_migrations;"
 
-# 3. ricrea lo schema (riapplica tutte le migrazioni, categorie di partenza comprese)
+# 3. ricrea lo schema (riapplica tutte le migrazioni)
 npm run migrate:remote
 
 # 4. pubblica il codice

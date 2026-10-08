@@ -1,13 +1,13 @@
 /*
  * vista-materiali.js — Materiali section: filterable items table, "Nuovo
- * materiale" popup, item card popup (details, QR code, register movement,
- * delete) and the categories panel.
+ * materiale" popup and item card popup (details, QR code, register movement,
+ * delete).
  */
 import { STATI_ARTICOLO } from './constants.js';
-import { creaArticolo, creaCategoria, eliminaArticolo, impostaCategoriaAttiva, ottieniArticolo, urlQrArticolo } from './api.js';
-import { articoloPerId, categorieAttive, g_stato } from './stato.js';
-import { badgeDisciplina, badgeStato, creaBadge, creaBottonePiccolo, creaBottoneTesto, creaRiga, mostraMessaggio, preparaDialogo, preparaFiltro, riempiDatalist, riempiDettagli, riempiSelect, riempiTabella } from './ui.js';
-import { euro, filtraArticoli, testoONull } from './utils.js';
+import { creaArticolo, eliminaArticolo, ottieniArticolo, urlQrArticolo } from './api.js';
+import { articoloPerId, g_stato } from './stato.js';
+import { badgeDisciplina, badgeStato, creaBottoneTesto, creaRiga, mostraMessaggio, preparaDialogo, preparaFiltro, riempiDettagli, riempiSelect, riempiTabella } from './ui.js';
+import { filtraArticoli, nomeArticolo, testoONull } from './utils.js';
 
 /** @type {(id: string) => HTMLElement} */
 const elemento = (id) => document.getElementById(id);
@@ -65,9 +65,6 @@ export function preparaMateriali({ alCambio, alMovimentoPerArticolo }) {
     g_alMovimentoPerArticolo(g_articoloAperto.id);
   });
   elemento('bottone-elimina-materiale').addEventListener('click', eliminaMaterialeAperto);
-
-  // categories panel
-  elemento('form-categoria').addEventListener('submit', aggiungiCategoria);
 }
 
 /**
@@ -79,20 +76,17 @@ export function impostaFiltroMateriali(disciplina) {
   g_filtro.imposta(disciplina);
 }
 
-/** @returns {void} re-renders table, categories and the category suggestions from g_stato */
+/** @returns {void} re-renders the table from g_stato */
 export function renderMateriali() {
   renderTabellaMateriali();
-  renderCategorie();
-  riempiDatalist(elemento('elenco-categorie'), categorieAttive().map((categoria) => categoria.nome));
 }
 
 /** @returns {void} */
 function renderTabellaMateriali() {
   const visibili = filtraArticoli(g_stato.articoli, g_filtroDisciplina, g_testoRicerca);
   const righe = visibili.map((articolo) => {
-    const codice = creaBottoneTesto(articolo.codice, () => apriSchedaMateriale(articolo.id));
-    const materiale = articolo.marca ? `${articolo.descrizione} · ${articolo.marca}` : articolo.descrizione;
-    return creaRiga([badgeDisciplina(articolo.disciplina), codice, materiale, articolo.taglia, articolo.quantita, articolo.disponibili, badgeStato(articolo.stato)], ['', '', '', '', 'cella-numero', 'cella-numero', '']);
+    const materiale = creaBottoneTesto(nomeArticolo(articolo), () => apriSchedaMateriale(articolo.id));
+    return creaRiga([badgeDisciplina(articolo.disciplina), materiale, articolo.taglia, articolo.quantita, articolo.disponibili, badgeStato(articolo.stato)], ['', '', '', 'cella-numero', 'cella-numero', '']);
   });
   riempiTabella(elemento('righe-materiali'), righe, elemento('vuoto-materiali'));
 }
@@ -113,7 +107,7 @@ async function salvaNuovoMateriale(evento) {
     elemento('nuovo-stato').value = 'Buono';
     elemento('dialogo-nuovo-materiale').close();
     await g_alCambio();
-    mostraMessaggio(elemento('esito-materiali'), `Materiale ${corpo.codice} inserito.`, 'ok');
+    mostraMessaggio(elemento('esito-materiali'), `Materiale ${nomeArticolo(corpo)} inserito.`, 'ok');
   } catch (errore) {
     mostraMessaggio(esito, errore.message, 'errore');
   } finally {
@@ -127,16 +121,11 @@ async function salvaNuovoMateriale(evento) {
  */
 function leggiFormNuovoMateriale() {
   const corpo = {};
-  corpo.codice = elemento('nuovo-codice').value.trim();
   corpo.disciplina = elemento('nuovo-disciplina').value;
-  corpo.categoria = elemento('nuovo-categoria').value.trim();
-  corpo.descrizione = elemento('nuovo-descrizione').value.trim();
-  corpo.marca = testoONull(elemento('nuovo-marca').value);
+  corpo.marca = elemento('nuovo-marca').value.trim();
   corpo.modello = testoONull(elemento('nuovo-modello').value);
   corpo.taglia = testoONull(elemento('nuovo-taglia').value);
-  corpo.seriale = testoONull(elemento('nuovo-seriale').value);
   corpo.quantita = Number(elemento('nuovo-quantita').value);
-  corpo.valore = Number(elemento('nuovo-valore').value || 0);
   corpo.stato = elemento('nuovo-stato').value;
   corpo.note = testoONull(elemento('nuovo-note').value);
   return corpo;
@@ -153,9 +142,9 @@ export async function apriSchedaMateriale(idArticolo) {
   try {
     const articolo = articoloPerId(idArticolo) ?? (await ottieniArticolo(idArticolo)).articolo;
     g_articoloAperto = articolo;
-    elemento('titolo-dialogo-materiale').textContent = articolo.descrizione;
-    elemento('sottotitolo-materiale').replaceChildren(badgeDisciplina(articolo.disciplina), document.createTextNode(` · ${articolo.codice} · ${articolo.categoria}`));
-    const coppie = [['Marca', articolo.marca], ['Modello', articolo.modello], ['Misura', articolo.taglia], ['Seriale', articolo.seriale], ['Quantità', articolo.quantita], ['Disponibili', articolo.disponibili], ['Stato', badgeStato(articolo.stato)], ['Valore', euro(articolo.valore ?? 0)], ['Note', articolo.note]];
+    elemento('titolo-dialogo-materiale').textContent = nomeArticolo(articolo);
+    elemento('sottotitolo-materiale').replaceChildren(badgeDisciplina(articolo.disciplina), document.createTextNode(` · #${articolo.id}`));
+    const coppie = [['Marca', articolo.marca], ['Modello', articolo.modello], ['Misura', articolo.taglia], ['Quantità', articolo.quantita], ['Disponibili', articolo.disponibili], ['Stato', badgeStato(articolo.stato)], ['Note', articolo.note]];
     riempiDettagli(elemento('dettagli-materiale'), coppie);
     elemento('qr-materiale').src = urlQrArticolo(articolo.id);
     mostraMessaggio(elemento('esito-scheda-materiale'), '');
@@ -169,61 +158,12 @@ export async function apriSchedaMateriale(idArticolo) {
 /** @returns {Promise<void>} */
 async function eliminaMaterialeAperto() {
   const esito = elemento('esito-scheda-materiale');
-  if (!window.confirm(`Eliminare il materiale ${g_articoloAperto.codice}?`)) return;
+  if (!window.confirm(`Eliminare il materiale ${nomeArticolo(g_articoloAperto)}?`)) return;
   try {
     await eliminaArticolo(g_articoloAperto.id);
     elemento('dialogo-materiale').close();
     await g_alCambio();
     mostraMessaggio(elemento('esito-materiali'), 'Materiale eliminato.', 'ok');
-  } catch (errore) {
-    mostraMessaggio(esito, errore.message, 'errore');
-  }
-}
-
-/* -------------------------------------------------------------- categorie */
-
-/** @returns {void} */
-function renderCategorie() {
-  const righe = g_stato.categorie.map((categoria) => {
-    const attiva = categoria.attiva === 1;
-    const nome = document.createElement('strong');
-    nome.textContent = categoria.nome;
-    const stato = creaBadge(attiva ? 'Attiva' : 'Disattivata', attiva ? 'badge-attivo' : 'badge-disattivato');
-    const azione = creaBottonePiccolo(attiva ? 'Disattiva' : 'Riattiva', () => cambiaStatoCategoria(categoria.id, !attiva), attiva ? 'btn-pericolo' : 'btn-ok');
-    return creaRiga([nome, stato, azione], ['', '', 'cella-azioni']);
-  });
-  riempiTabella(elemento('righe-categorie'), righe, elemento('vuoto-categorie'));
-}
-
-/**
- * @param {SubmitEvent} evento
- * @returns {Promise<void>}
- */
-async function aggiungiCategoria(evento) {
-  evento.preventDefault();
-  const campo = elemento('campo-nome-categoria');
-  const esito = elemento('esito-categorie');
-  try {
-    const creata = await creaCategoria(campo.value);
-    campo.value = '';
-    await g_alCambio();
-    mostraMessaggio(esito, `Categoria ${creata.nome} aggiunta.`, 'ok');
-  } catch (errore) {
-    mostraMessaggio(esito, errore.message, 'errore');
-  }
-}
-
-/**
- * @param {number} idCategoria
- * @param {boolean} attiva - new state
- * @returns {Promise<void>}
- */
-async function cambiaStatoCategoria(idCategoria, attiva) {
-  const esito = elemento('esito-categorie');
-  try {
-    await impostaCategoriaAttiva(idCategoria, attiva);
-    await g_alCambio();
-    mostraMessaggio(esito, '');
   } catch (errore) {
     mostraMessaggio(esito, errore.message, 'errore');
   }

@@ -8,7 +8,7 @@ import type { MovimentoStoricoRow } from './query';
 /** BOM UTF-8 scritto come escape: mai il carattere grezzo nel sorgente. */
 const BOM = '﻿';
 const SEPARATORE = ';';
-const INTESTAZIONE = ['ID', 'Data', 'Tipo', 'Disciplina', 'Quantità', 'Codice', 'Materiale', 'Taglia', 'Atleta', 'Stato', 'Note', 'Operatore'];
+const INTESTAZIONE = ['ID', 'Data', 'Tipo', 'Disciplina', 'Quantità', 'Marca', 'Modello', 'Taglia', 'Atleta', 'Stato', 'Note', 'Operatore'];
 
 /**
  * Racchiude un campo tra virgolette se contiene separatore, virgolette o a
@@ -29,7 +29,7 @@ export function dataItaliana(data: string): string {
 export function generaCsvMovimenti(righe: MovimentoStoricoRow[]): string {
   const linee = [INTESTAZIONE.map(campoCsv).join(SEPARATORE)];
   for (const riga of righe) {
-    const campi = [riga.id, dataItaliana(riga.data), riga.tipo, riga.disciplina, riga.quantita, riga.codice, riga.descrizione, riga.taglia, riga.atleta, riga.condizione, riga.note, riga.operatore];
+    const campi = [riga.id, dataItaliana(riga.data), riga.tipo, riga.disciplina, riga.quantita, riga.marca, riga.modello, riga.taglia, riga.atleta, riga.condizione, riga.note, riga.operatore];
     linee.push(campi.map(campoCsv).join(SEPARATORE));
   }
   return BOM + linee.join('\r\n') + '\r\n';

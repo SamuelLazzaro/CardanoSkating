@@ -15,7 +15,7 @@
 import { Hono, type Context } from 'hono';
 import type { ArticoloRow, Bindings, StatoArticolo, TipoMovimento, VariabiliUtente } from '../tipi';
 import { richiedeUtente } from '../auth';
-import { campiArticolo, codiceEsistente, MAX_NOTE, stmtInserisciArticolo } from '../articolo';
+import { campiArticolo, MAX_NOTE, nomeArticolo, stmtInserisciArticolo } from '../articolo';
 import { generaCsvMovimenti } from '../csv';
 import { conFirmaBooleana, POSSESSO_ATLETA, SELECT_MOVIMENTI, type MovimentoStoricoRow } from '../query';
 import { dataCivile, disciplina, interoPositivo, leggiJson, oggiRoma, patternRicerca, scriviAudit, statoArticolo, testoFacoltativo, tipoMovimento } from '../util';
@@ -30,14 +30,18 @@ const MAX_LUNGHEZZA_FIRMA = 300_000;
 /** Storico con filtri neutralizzabili: ?1 disciplina ('' = tutte), ?2 pattern LIKE ('' = nessuna ricerca), ?3 limite. */
 const SQL_STORICO = `${SELECT_MOVIMENTI}
   WHERE (?1 = '' OR a.disciplina = ?1)
-    AND (?2 = '' OR a.codice LIKE ?2 ESCAPE '\\' OR a.descrizione LIKE ?2 ESCAPE '\\')
+    AND (?2 = '' OR a.marca LIKE ?2 ESCAPE '\\' OR a.modello LIKE ?2 ESCAPE '\\')
   ORDER BY m.data DESC, m.id DESC LIMIT ?3`;
 
 const SQL_STORICO_COMPLETO = `${SELECT_MOVIMENTI} ORDER BY m.id`;
 
-/** Movimento di entrata legato all'articolo appena creato nello stesso batch, individuato dal codice (?1). */
+/**
+ * Movimento di entrata legato all'articolo appena creato nello stesso batch.
+ * Il batch è una transazione e gli id sono AUTOINCREMENT, quindi l'articolo
+ * inserito dall'istruzione precedente è quello con l'id più alto.
+ */
 const SQL_ENTRATA_NUOVO_ARTICOLO = `INSERT INTO movimenti (articolo_id, atleta_id, operatore, tipo, quantita, data, condizione, note, firma)
-  SELECT id, NULL, ?2, 'ENTRATA', ?3, ?4, ?5, ?6, NULL FROM articoli WHERE codice = ?1`;
+  SELECT MAX(id), NULL, ?1, 'ENTRATA', ?2, ?3, ?4, ?5, NULL FROM articoli`;
 
 const SQL_ENTRATA_ESISTENTE = 'UPDATE articoli SET quantita = quantita + ?2, disponibili = disponibili + ?2, stato = COALESCE(?3, stato) WHERE id = ?1';
 const SQL_CONSEGNA = 'UPDATE articoli SET disponibili = disponibili - ?2 WHERE id = ?1 AND disponibili >= ?2';
@@ -62,7 +66,7 @@ movimenti.use('*', richiedeUtente());
 
 /**
  * Storico, dal più recente: filtrabile per magazzino (?disciplina=) e testo
- * libero su codice e descrizione dell'articolo (?q=); ?limite= riduce le righe
+ * libero su marca e modello dell'articolo (?q=); ?limite= riduce le righe
  * (es. le ultime 10 per il riepilogo di un magazzino).
  */
 movimenti.get('/', async (c) => {
@@ -85,7 +89,7 @@ movimenti.get('/export.csv', async (c) => {
  * Registra un movimento. Corpo:
  *   tipo: 'ENTRATA' | 'CONSEGNA' | 'RESTITUZIONE'
  *   quantita (intero ≥ 1), data ('YYYY-MM-DD', default oggi), condizione?, note?
- *   articolo_id — oppure, solo per ENTRATA, nuovo_articolo: { codice, disciplina, categoria, descrizione, ... }
+ *   articolo_id — oppure, solo per ENTRATA, nuovo_articolo: { disciplina, marca, modello?, taglia?, note? }
  *   atleta_id — obbligatorio per CONSEGNA e RESTITUZIONE
  *   firma? — data URL PNG, solo per CONSEGNA e RESTITUZIONE
  */
@@ -167,13 +171,12 @@ async function entrataNuovoArticolo(c: Contesto, nuovoArticolo: unknown, dati: D
   const validazione = campiArticolo(nuovoArticolo as Record<string, unknown>);
   if ('errore' in validazione) return c.json({ errore: validazione.errore }, 400);
   const { campi } = validazione;
-  if (await codiceEsistente(c.env.DB, campi.codice)) return c.json({ errore: 'Esiste già un materiale con questo codice' }, 409);
   // La condizione indicata nel movimento è lo stato iniziale dell'articolo; senza, un articolo nuovo è 'Nuovo'.
   const statoIniziale = dati.condizione ?? campi.stato ?? 'Nuovo';
   const istruzioneArticolo = stmtInserisciArticolo(c.env.DB, campi, dati.quantita, statoIniziale);
-  const istruzioneMovimento = c.env.DB.prepare(SQL_ENTRATA_NUOVO_ARTICOLO).bind(campi.codice, dati.operatore, dati.quantita, dati.data, dati.condizione, dati.note);
+  const istruzioneMovimento = c.env.DB.prepare(SQL_ENTRATA_NUOVO_ARTICOLO).bind(dati.operatore, dati.quantita, dati.data, dati.condizione, dati.note);
   const risultati = await c.env.DB.batch([istruzioneArticolo, istruzioneMovimento]);
-  await scriviAudit(c.env.DB, 'entrata', `nuovo articolo ${campi.codice} (${campi.disciplina}) × ${dati.quantita}`, dati.operatore);
+  await scriviAudit(c.env.DB, 'entrata', `nuovo articolo #${risultati[0].meta.last_row_id} ${nomeArticolo(campi)} (${campi.disciplina}) × ${dati.quantita}`, dati.operatore);
   const articolo = { id: risultati[0].meta.last_row_id, disciplina: campi.disciplina };
   return rispostaMovimento(c, risultati[1].meta.last_row_id, articolo);
 }
@@ -183,7 +186,7 @@ async function entrataArticoloEsistente(c: Contesto, articolo: ArticoloRow, dati
   const istruzioneMovimento = stmtInserisciMovimento(c.env.DB, articolo.id, null, dati);
   const istruzioneArticolo = c.env.DB.prepare(SQL_ENTRATA_ESISTENTE).bind(articolo.id, dati.quantita, dati.condizione);
   const risultati = await c.env.DB.batch([istruzioneMovimento, istruzioneArticolo]);
-  await scriviAudit(c.env.DB, 'entrata', `${articolo.codice} × ${dati.quantita}`, dati.operatore);
+  await scriviAudit(c.env.DB, 'entrata', `#${articolo.id} ${nomeArticolo(articolo)} × ${dati.quantita}`, dati.operatore);
   return rispostaMovimento(c, risultati[0].meta.last_row_id, articolo);
 }
 
@@ -193,7 +196,7 @@ async function consegna(c: Contesto, articolo: ArticoloRow, atletaId: number, da
   const istruzioneArticolo = c.env.DB.prepare(SQL_CONSEGNA).bind(articolo.id, dati.quantita);
   const risultati = await c.env.DB.batch([istruzioneMovimento, istruzioneArticolo]);
   if (risultati[0].meta.changes === 0) return c.json({ errore: 'Quantità non disponibile in magazzino' }, 409);
-  await scriviAudit(c.env.DB, 'consegna', `${articolo.codice} × ${dati.quantita} ad atleta #${atletaId}`, dati.operatore);
+  await scriviAudit(c.env.DB, 'consegna', `#${articolo.id} ${nomeArticolo(articolo)} × ${dati.quantita} ad atleta #${atletaId}`, dati.operatore);
   return rispostaMovimento(c, risultati[0].meta.last_row_id, articolo);
 }
 
@@ -207,6 +210,6 @@ async function restituzione(c: Contesto, articolo: ArticoloRow, atletaId: number
   const istruzioneMovimento = stmtInserisciMovimento(c.env.DB, articolo.id, atletaId, dati, `${POSSESSO_ATLETA} >= ?5`);
   const risultati = await c.env.DB.batch([istruzioneArticolo, istruzioneMovimento]);
   if (risultati[1].meta.changes === 0) return c.json({ errore: 'Restituzione superiore al materiale assegnato' }, 409);
-  await scriviAudit(c.env.DB, 'restituzione', `${articolo.codice} × ${dati.quantita} da atleta #${atletaId}`, dati.operatore);
+  await scriviAudit(c.env.DB, 'restituzione', `#${articolo.id} ${nomeArticolo(articolo)} × ${dati.quantita} da atleta #${atletaId}`, dati.operatore);
   return rispostaMovimento(c, risultati[1].meta.last_row_id, articolo);
 }

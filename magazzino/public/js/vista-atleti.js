@@ -11,7 +11,7 @@ import { CATEGORIE_ATLETA } from './constants.js';
 import { creaAtleta, impostaAtletaAttivo, impostaCategoriaAtleta, ottieniAtleta } from './api.js';
 import { g_stato } from './stato.js';
 import { badgeTipoMovimento, creaBadge, creaBottonePiccolo, creaBottoneTesto, creaRiga, mostraMessaggio, preparaDialogo, riempiTabella } from './ui.js';
-import { dataItaliana, filtraEOrdinaAtleti, nomeConCategoria } from './utils.js';
+import { dataItaliana, filtraEOrdinaAtleti, nomeArticolo, nomeConCategoria } from './utils.js';
 
 /** @type {(id: string) => HTMLElement} */
 const elemento = (id) => document.getElementById(id);
@@ -163,7 +163,7 @@ async function apriSchedaAtleta(idAtleta) {
 }
 
 /**
- * @param {{codice: string, descrizione: string, taglia: string|null, stato: string, in_possesso: number}[]} assegnati
+ * @param {{marca: string, modello: string|null, taglia: string|null, stato: string, in_possesso: number}[]} assegnati
  * @returns {void}
  */
 function renderAssegnati(assegnati) {
@@ -174,7 +174,7 @@ function renderAssegnati(assegnati) {
     const info = document.createElement('div');
     info.className = 'riga-info';
     const titolo = document.createElement('strong');
-    titolo.textContent = `${articolo.codice} · ${articolo.descrizione}`;
+    titolo.textContent = nomeArticolo(articolo);
     const dettaglio = document.createElement('span');
     dettaglio.className = 'testo-tenue';
     dettaglio.textContent = `Quantità ${articolo.in_possesso} · ${articolo.taglia ?? '—'} · ${articolo.stato}`;
@@ -190,6 +190,6 @@ function renderAssegnati(assegnati) {
  * @returns {void}
  */
 function renderStoricoAtleta(storico) {
-  const righe = storico.map((movimento) => creaRiga([dataItaliana(movimento.data), badgeTipoMovimento(movimento.tipo), `${movimento.codice} · ${movimento.descrizione}`, movimento.quantita, movimento.condizione, movimento.firma_presente ? '✓' : '—'], ['', '', '', 'cella-numero', '', '']));
+  const righe = storico.map((movimento) => creaRiga([dataItaliana(movimento.data), badgeTipoMovimento(movimento.tipo), nomeArticolo(movimento), movimento.quantita, movimento.condizione, movimento.firma_presente ? '✓' : '—'], ['', '', '', 'cella-numero', '', '']));
   riempiTabella(elemento('righe-storico-atleta'), righe, elemento('vuoto-storico-atleta'));
 }

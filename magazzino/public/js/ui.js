@@ -57,21 +57,6 @@ export function riempiSelectConSegnaposto(selettore, segnaposto, opzioni) {
 }
 
 /**
- * Fills a <datalist> with the given values (suggestions for a free text input).
- * @param {HTMLDataListElement} elenco
- * @param {string[]} valori
- * @returns {void}
- */
-export function riempiDatalist(elenco, valori) {
-  elenco.replaceChildren();
-  for (const valore of valori) {
-    const opzione = document.createElement('option');
-    opzione.value = valore;
-    elenco.append(opzione);
-  }
-}
-
-/**
  * @param {string} testo - badge label
  * @param {string} classe - modifier class, e.g. 'badge-ghiaccio'
  * @returns {HTMLSpanElement}

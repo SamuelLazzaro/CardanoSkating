@@ -24,27 +24,16 @@ export type AtletaRow = {
   created_at: string;
 };
 
-export type CategoriaRow = {
-  id: number;
-  nome: string;
-  attiva: number;
-  created_at: string;
-};
-
 export type ArticoloRow = {
   id: number;
-  codice: string;
   disciplina: Disciplina;
-  categoria: string;
-  descrizione: string;
-  marca: string | null;
+  /** Nome visibile del materiale, con `modello`: "Marca · Modello". */
+  marca: string;
   modello: string | null;
   taglia: string | null;
-  seriale: string | null;
   quantita: number;
   disponibili: number;
   stato: StatoArticolo;
-  valore: number;
   note: string | null;
   created_at: string;
 };

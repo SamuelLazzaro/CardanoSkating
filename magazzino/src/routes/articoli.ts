@@ -6,7 +6,7 @@ import { Hono } from 'hono';
 import qrcode from 'qrcode-generator';
 import type { ArticoloRow, Bindings, VariabiliUtente } from '../tipi';
 import { richiedeUtente } from '../auth';
-import { campiArticolo, codiceEsistente, stmtInserisciArticolo } from '../articolo';
+import { campiArticolo, nomeArticolo, stmtInserisciArticolo } from '../articolo';
 import { disciplina, intero, interoPositivo, leggiJson, patternRicerca, scriviAudit } from '../util';
 
 /** Giacenza iniziale quando il corpo non indica la quantità (come nel gestionale originale). */
@@ -15,8 +15,8 @@ const QUANTITA_PREDEFINITA = 1;
 /** Elenco con filtri neutralizzabili: ?1 disciplina ('' = tutte), ?2 pattern LIKE ('' = nessuna ricerca). */
 const SQL_ELENCO_ARTICOLI = `SELECT * FROM articoli
   WHERE (?1 = '' OR disciplina = ?1)
-    AND (?2 = '' OR codice LIKE ?2 ESCAPE '\\' OR descrizione LIKE ?2 ESCAPE '\\' OR marca LIKE ?2 ESCAPE '\\' OR seriale LIKE ?2 ESCAPE '\\')
-  ORDER BY disciplina, categoria, descrizione, codice LIMIT 1000`;
+    AND (?2 = '' OR marca LIKE ?2 ESCAPE '\\' OR modello LIKE ?2 ESCAPE '\\')
+  ORDER BY disciplina, marca, modello, id LIMIT 1000`;
 
 /** Eliminazione condizionata: la riga sparisce solo se non ha movimenti. */
 const SQL_ELIMINA_SENZA_STORICO = 'DELETE FROM articoli WHERE id = ?1 AND NOT EXISTS (SELECT 1 FROM movimenti WHERE articolo_id = ?1)';
@@ -27,8 +27,8 @@ articoli.use('*', richiedeUtente());
 
 /**
  * Elenco articoli, filtrabile per magazzino (?disciplina=) e per testo libero
- * (?q= su codice, descrizione, marca e seriale). Un solo statement: i filtri
- * assenti vengono neutralizzati dai confronti con la stringa vuota.
+ * (?q= su marca e modello). Un solo statement: i filtri assenti vengono
+ * neutralizzati dai confronti con la stringa vuota.
  */
 articoli.get('/', async (c) => {
   const magazzino = disciplina(c.req.query('disciplina')) ?? '';
@@ -45,9 +45,8 @@ articoli.post('/', async (c) => {
   const quantita = corpo.quantita === undefined ? QUANTITA_PREDEFINITA : interoPositivo(corpo.quantita);
   if (quantita === null) return c.json({ errore: 'Quantità non valida' }, 400);
   const { campi } = validazione;
-  if (await codiceEsistente(c.env.DB, campi.codice)) return c.json({ errore: 'Codice materiale già esistente' }, 409);
   const esito = await stmtInserisciArticolo(c.env.DB, campi, quantita, campi.stato ?? 'Buono').run();
-  await scriviAudit(c.env.DB, 'articolo_creato', `#${esito.meta.last_row_id} ${campi.codice} (${campi.disciplina})`, c.get('utente'));
+  await scriviAudit(c.env.DB, 'articolo_creato', `#${esito.meta.last_row_id} ${nomeArticolo(campi)} (${campi.disciplina})`, c.get('utente'));
   return c.json({ id: esito.meta.last_row_id }, 201);
 });
 
@@ -67,11 +66,11 @@ articoli.get('/:id', async (c) => {
 articoli.delete('/:id', async (c) => {
   const id = intero(c.req.param('id'));
   if (id === null) return c.json({ errore: 'Materiale non trovato' }, 404);
-  const articolo = await c.env.DB.prepare('SELECT codice FROM articoli WHERE id = ?1').bind(id).first<{ codice: string }>();
+  const articolo = await c.env.DB.prepare('SELECT marca, modello FROM articoli WHERE id = ?1').bind(id).first<{ marca: string; modello: string | null }>();
   if (!articolo) return c.json({ errore: 'Materiale non trovato' }, 404);
   const esito = await c.env.DB.prepare(SQL_ELIMINA_SENZA_STORICO).bind(id).run();
   if (esito.meta.changes === 0) return c.json({ errore: 'Materiale con storico: impostalo come Fuori uso invece di eliminarlo' }, 409);
-  await scriviAudit(c.env.DB, 'articolo_eliminato', `#${id} ${articolo.codice}`, c.get('utente'));
+  await scriviAudit(c.env.DB, 'articolo_eliminato', `#${id} ${nomeArticolo(articolo)}`, c.get('utente'));
   return c.json({ ok: true });
 });
 

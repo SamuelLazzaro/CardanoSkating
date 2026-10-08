@@ -55,16 +55,6 @@ export function booleano(valore: unknown): boolean | null {
   return typeof valore === 'boolean' ? valore : null;
 }
 
-/**
- * Importo in euro (valore di un articolo): assente → 0; numero finito da 0 a
- * un milione, arrotondato ai centesimi; altrimenti null (→ 400).
- */
-export function importo(valore: unknown): number | null {
-  if (valore === undefined || valore === null) return 0;
-  if (typeof valore !== 'number' || !Number.isFinite(valore) || valore < 0 || valore > 1_000_000) return null;
-  return Math.round(valore * 100) / 100;
-}
-
 export const DISCIPLINE: readonly Disciplina[] = ['Ghiaccio', 'Corsa'];
 export const STATI_ARTICOLO: readonly StatoArticolo[] = ['Nuovo', 'Buono', 'Usurato', 'Da riparare', 'Fuori uso'];
 export const TIPI_MOVIMENTO: readonly TipoMovimento[] = ['ENTRATA', 'CONSEGNA', 'RESTITUZIONE'];

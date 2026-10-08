@@ -50,14 +50,14 @@ export async function creaAtleta(nome = 'Atleta Test', attivo = true, categoria:
 }
 
 /** Campi di un articolo di test; ogni proprietà è sovrascrivibile. */
-export type ArticoloTest = { codice: string; disciplina: string; categoria: string; descrizione: string; quantita: number; stato: string; taglia: string | null; marca: string | null; seriale: string | null };
+export type ArticoloTest = { disciplina: string; marca: string; modello: string | null; quantita: number; stato: string; taglia: string | null };
 
 /** Crea un articolo direttamente su DB con giacenza piena (disponibili = quantita). */
 export async function creaArticolo(campi: Partial<ArticoloTest> = {}): Promise<number> {
-  const predefiniti: ArticoloTest = { codice: `ART-${crypto.randomUUID().slice(0, 8)}`, disciplina: 'Corsa', categoria: 'Pattini', descrizione: 'Pattino test', quantita: 5, stato: 'Buono', taglia: null, marca: null, seriale: null };
+  const predefiniti: ArticoloTest = { disciplina: 'Corsa', marca: 'Marca test', modello: null, quantita: 5, stato: 'Buono', taglia: null };
   const a = { ...predefiniti, ...campi };
-  const sql = 'INSERT INTO articoli (codice, disciplina, categoria, descrizione, quantita, disponibili, stato, taglia, marca, seriale) VALUES (?1, ?2, ?3, ?4, ?5, ?5, ?6, ?7, ?8, ?9)';
-  const esito = await env.DB.prepare(sql).bind(a.codice, a.disciplina, a.categoria, a.descrizione, a.quantita, a.stato, a.taglia, a.marca, a.seriale).run();
+  const sql = 'INSERT INTO articoli (disciplina, marca, modello, quantita, disponibili, stato, taglia) VALUES (?1, ?2, ?3, ?4, ?4, ?5, ?6)';
+  const esito = await env.DB.prepare(sql).bind(a.disciplina, a.marca, a.modello, a.quantita, a.stato, a.taglia).run();
   return esito.meta.last_row_id;
 }
 

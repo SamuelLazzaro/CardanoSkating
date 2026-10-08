@@ -226,39 +226,18 @@
                 <button type="button" class="btn btn-piccolo btn-filtro" data-valore="Ghiaccio" aria-pressed="false">Ghiaccio</button>
                 <button type="button" class="btn btn-piccolo btn-filtro" data-valore="Corsa" aria-pressed="false">Corsa</button>
               </div>
-              <input type="search" id="ricerca-materiali" class="campo-ricerca" placeholder="Cerca codice, descrizione, marca o seriale" aria-label="Cerca materiale">
+              <input type="search" id="ricerca-materiali" class="campo-ricerca" placeholder="Cerca marca o modello" aria-label="Cerca materiale">
             </div>
             <p id="esito-materiali" class="stato" role="status" hidden></p>
             <div class="scorri-tabella">
               <table class="tabella" id="tabella-materiali">
                 <thead>
-                  <tr><th scope="col">Magazzino</th><th scope="col">Codice</th><th scope="col">Materiale</th><th scope="col">Misura</th><th scope="col" class="cella-numero">Totale</th><th scope="col" class="cella-numero">Disponibili</th><th scope="col">Stato</th></tr>
+                  <tr><th scope="col">Magazzino</th><th scope="col">Materiale</th><th scope="col">Misura</th><th scope="col" class="cella-numero">Totale</th><th scope="col" class="cella-numero">Disponibili</th><th scope="col">Stato</th></tr>
                 </thead>
                 <tbody id="righe-materiali"></tbody>
               </table>
             </div>
             <p id="vuoto-materiali" class="vuoto" hidden>Nessun materiale.</p>
-          </section>
-
-          <section class="pannello">
-            <div class="pannello-testata">
-              <h2>Categorie materiale</h2>
-              <form id="form-categoria" class="modulo-in-riga">
-                <input type="text" id="campo-nome-categoria" maxlength="80" placeholder="Es. Borse, Guanti…" aria-label="Nome categoria" required>
-                <button type="submit" class="btn btn-primario">Aggiungi</button>
-              </form>
-            </div>
-            <p class="testo-tenue">Categorie utilizzate nei due magazzini.</p>
-            <p id="esito-categorie" class="stato" role="status" hidden></p>
-            <div class="scorri-tabella">
-              <table class="tabella" id="tabella-categorie">
-                <thead>
-                  <tr><th scope="col">Categoria</th><th scope="col">Stato</th><th scope="col"></th></tr>
-                </thead>
-                <tbody id="righe-categorie"></tbody>
-              </table>
-            </div>
-            <p id="vuoto-categorie" class="vuoto" hidden>Nessuna categoria.</p>
           </section>
         </div>
 
@@ -268,7 +247,7 @@
             <div class="pannello-testata">
               <div>
                 <h2>Nuovo movimento</h2>
-                <p class="testo-tenue">Seleziona magazzino, categoria e materiale.</p>
+                <p class="testo-tenue">Seleziona magazzino e materiale.</p>
               </div>
             </div>
             <form id="form-movimento" class="modulo modulo-largo">
@@ -288,16 +267,12 @@
                     <option value="Corsa" selected>Pattinaggio corsa</option>
                   </select>
                 </div>
-                <div class="campo">
-                  <label for="mov-categoria">Categoria materiale</label>
-                  <select id="mov-categoria"></select>
-                </div>
               </div>
 
               <div class="campo" id="mov-blocco-articolo">
                 <label for="mov-articolo">Materiale</label>
                 <select id="mov-articolo" required></select>
-                <p id="mov-nessun-articolo" class="suggerimento avviso" hidden>Nessun articolo corrisponde al magazzino e alla categoria selezionati.</p>
+                <p id="mov-nessun-articolo" class="suggerimento avviso" hidden>Nessun articolo nel magazzino selezionato.</p>
               </div>
 
               <fieldset class="campo" id="mov-blocco-entrata" hidden>
@@ -312,37 +287,19 @@
                 <legend>Nuovo articolo</legend>
                 <div class="campo-riga">
                   <div class="campo">
-                    <label for="mov-nuovo-codice">Codice*</label>
-                    <input type="text" id="mov-nuovo-codice" maxlength="80">
-                  </div>
-                  <div class="campo campo-largo">
-                    <label for="mov-nuovo-descrizione">Descrizione*</label>
-                    <input type="text" id="mov-nuovo-descrizione" maxlength="200" placeholder="Es. Pattino Edea, Ruota Matter 110 mm…">
-                  </div>
-                </div>
-                <div class="campo-riga">
-                  <div class="campo">
-                    <label for="mov-nuovo-marca">Marca</label>
-                    <input type="text" id="mov-nuovo-marca" maxlength="120">
+                    <label for="mov-nuovo-marca">Marca*</label>
+                    <input type="text" id="mov-nuovo-marca" maxlength="120" placeholder="Es. Edea, Matter, Bont…">
                   </div>
                   <div class="campo">
                     <label for="mov-nuovo-modello">Modello</label>
-                    <input type="text" id="mov-nuovo-modello" maxlength="120">
+                    <input type="text" id="mov-nuovo-modello" maxlength="120" placeholder="Es. Ice Fly, Ruota 110 mm…">
                   </div>
                   <div class="campo">
                     <label for="mov-nuovo-taglia">Taglia / misura</label>
                     <input type="text" id="mov-nuovo-taglia" maxlength="120">
                   </div>
-                  <div class="campo">
-                    <label for="mov-nuovo-seriale">Seriale</label>
-                    <input type="text" id="mov-nuovo-seriale" maxlength="120">
-                  </div>
-                  <div class="campo">
-                    <label for="mov-nuovo-valore">Valore €</label>
-                    <input type="number" id="mov-nuovo-valore" min="0" step="0.01" value="0">
-                  </div>
                 </div>
-                <p class="suggerimento">Il nuovo articolo prende il magazzino e la categoria selezionati sopra.</p>
+                <p class="suggerimento">Il nuovo articolo prende il magazzino selezionato sopra.</p>
               </fieldset>
 
               <div class="campo-riga">
@@ -402,7 +359,7 @@
                 <button type="button" class="btn btn-piccolo btn-filtro" data-valore="Ghiaccio" aria-pressed="false">Ghiaccio</button>
                 <button type="button" class="btn btn-piccolo btn-filtro" data-valore="Corsa" aria-pressed="false">Corsa</button>
               </div>
-              <input type="search" id="ricerca-storico" class="campo-ricerca" placeholder="Cerca codice o materiale" aria-label="Cerca nello storico">
+              <input type="search" id="ricerca-storico" class="campo-ricerca" placeholder="Cerca marca o modello" aria-label="Cerca nello storico">
             </div>
             <div class="scorri-tabella">
               <table class="tabella" id="tabella-storico">
@@ -457,44 +414,22 @@
                 </select>
               </div>
               <div class="campo">
-                <label for="nuovo-codice">Codice*</label>
-                <input type="text" id="nuovo-codice" maxlength="80" required>
-              </div>
-              <div class="campo">
-                <label for="nuovo-categoria">Categoria*</label>
-                <input type="text" id="nuovo-categoria" maxlength="80" list="elenco-categorie" required>
-              </div>
-            </div>
-            <div class="campo">
-              <label for="nuovo-descrizione">Descrizione*</label>
-              <input type="text" id="nuovo-descrizione" maxlength="200" required>
-            </div>
-            <div class="campo-riga">
-              <div class="campo">
-                <label for="nuovo-marca">Marca</label>
-                <input type="text" id="nuovo-marca" maxlength="120">
+                <label for="nuovo-marca">Marca*</label>
+                <input type="text" id="nuovo-marca" maxlength="120" placeholder="Es. Edea, Matter, Bont…" required>
               </div>
               <div class="campo">
                 <label for="nuovo-modello">Modello</label>
-                <input type="text" id="nuovo-modello" maxlength="120">
+                <input type="text" id="nuovo-modello" maxlength="120" placeholder="Es. Ice Fly, Ruota 110 mm…">
               </div>
+            </div>
+            <div class="campo-riga">
               <div class="campo">
                 <label for="nuovo-taglia">Taglia / misura</label>
                 <input type="text" id="nuovo-taglia" maxlength="120">
               </div>
               <div class="campo">
-                <label for="nuovo-seriale">Seriale</label>
-                <input type="text" id="nuovo-seriale" maxlength="120">
-              </div>
-            </div>
-            <div class="campo-riga">
-              <div class="campo">
                 <label for="nuovo-quantita">Quantità</label>
                 <input type="number" id="nuovo-quantita" min="1" step="1" value="1">
-              </div>
-              <div class="campo">
-                <label for="nuovo-valore">Valore €</label>
-                <input type="number" id="nuovo-valore" min="0" step="0.01" value="0">
               </div>
               <div class="campo">
                 <label for="nuovo-stato">Stato</label>
@@ -537,8 +472,6 @@
           <p id="esito-scheda-materiale" class="stato" role="status" hidden></p>
         </div>
       </dialog>
-
-      <datalist id="elenco-categorie"></datalist>
     </main>
   </div>
 </body>

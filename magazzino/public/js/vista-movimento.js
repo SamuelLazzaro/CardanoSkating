@@ -1,12 +1,12 @@
 /*
- * vista-movimento.js — "Nuovo movimento" form: type, warehouse and category
- * narrow the item select; ENTRATA can add stock to an item or create a new
- * one; CONSEGNA and RESTITUZIONE need an athlete and may carry a signature.
+ * vista-movimento.js — "Nuovo movimento" form: type and warehouse narrow the
+ * item select; ENTRATA can add stock to an item or create a new one; CONSEGNA
+ * and RESTITUZIONE need an athlete and may carry a signature.
  */
 import { STATI_ARTICOLO } from './constants.js';
 import { registraMovimento } from './api.js';
 import { preparaFirma } from './firma.js';
-import { articoloPerId, atletiAttivi, categorieAttive, g_stato } from './stato.js';
+import { articoloPerId, atletiAttivi, g_stato } from './stato.js';
 import { mostraMessaggio, riempiSelectConSegnaposto } from './ui.js';
 import { etichettaArticolo, nomeConCategoria, oggiRoma, testoONull } from './utils.js';
 
@@ -32,7 +32,6 @@ export function preparaMovimento({ alRegistrato }) {
 
   elemento('mov-tipo').addEventListener('change', aggiornaModalita);
   elemento('mov-disciplina').addEventListener('change', filtraArticoli);
-  elemento('mov-categoria').addEventListener('change', filtraArticoli);
   for (const radio of document.querySelectorAll('input[name="modo-entrata"]')) radio.addEventListener('change', aggiornaModalita);
   elemento('form-movimento').addEventListener('submit', registra);
   aggiornaModalita();
@@ -40,8 +39,6 @@ export function preparaMovimento({ alRegistrato }) {
 
 /** @returns {void} refills the selects from g_stato keeping the current choices when still valid */
 export function renderMovimento() {
-  const categorie = categorieAttive().map((categoria) => ({ valore: categoria.nome, etichetta: categoria.nome }));
-  riempiSelectConSegnaposto(elemento('mov-categoria'), '— Tutte le categorie —', categorie);
   const atleti = atletiAttivi().map((atleta) => ({ valore: String(atleta.id), etichetta: nomeConCategoria(atleta) }));
   riempiSelectConSegnaposto(elemento('mov-atleta'), '— Seleziona atleta —', atleti);
   const selettoreArticoli = elemento('mov-articolo');
@@ -50,7 +47,6 @@ export function renderMovimento() {
   for (const articolo of g_stato.articoli) {
     const opzione = new Option(etichettaArticolo(articolo), String(articolo.id));
     opzione.dataset.disciplina = articolo.disciplina;
-    opzione.dataset.categoria = articolo.categoria;
     selettoreArticoli.append(opzione);
   }
   selettoreArticoli.value = scelta;
@@ -68,29 +64,26 @@ export function impostaMovimento({ disciplina, articoloId }) {
   const articolo = articoloId === undefined ? undefined : articoloPerId(articoloId);
   if (articolo) {
     elemento('mov-disciplina').value = articolo.disciplina;
-    elemento('mov-categoria').value = [...elemento('mov-categoria').options].some((opzione) => opzione.value === articolo.categoria) ? articolo.categoria : '';
     filtraArticoli();
     elemento('mov-articolo').value = String(articolo.id);
     return;
   }
   if (disciplina) elemento('mov-disciplina').value = disciplina;
-  elemento('mov-categoria').value = '';
   filtraArticoli();
   elemento('mov-articolo').value = '';
 }
 
 /**
- * Shows only the items of the chosen warehouse and category in the select,
- * dropping a selection that is no longer visible.
+ * Shows only the items of the chosen warehouse in the select, dropping a
+ * selection that is no longer visible.
  * @returns {void}
  */
 function filtraArticoli() {
   const disciplina = elemento('mov-disciplina').value;
-  const categoria = elemento('mov-categoria').value;
   const selettore = elemento('mov-articolo');
   let visibili = 0;
   for (const opzione of selettore.querySelectorAll('option[data-disciplina]')) {
-    const mostra = opzione.dataset.disciplina === disciplina && (categoria === '' || opzione.dataset.categoria === categoria);
+    const mostra = opzione.dataset.disciplina === disciplina;
     opzione.hidden = !mostra;
     opzione.disabled = !mostra;
     if (mostra) visibili++;
@@ -121,9 +114,7 @@ function aggiornaModalita() {
   elemento('mov-blocco-nuovo').hidden = !nuovo;
   elemento('mov-blocco-articolo').hidden = nuovo;
   elemento('mov-articolo').required = !nuovo;
-  elemento('mov-nuovo-codice').required = nuovo;
-  elemento('mov-nuovo-descrizione').required = nuovo;
-  elemento('mov-categoria').required = nuovo;
+  elemento('mov-nuovo-marca').required = nuovo;
   elemento('mov-atleta').required = !entrata;
 }
 
@@ -151,21 +142,16 @@ function corpoMovimento() {
 }
 
 /**
- * Reads the "Nuovo articolo" panel; warehouse and category come from the
- * selects above it.
+ * Reads the "Nuovo articolo" panel; the warehouse comes from the select
+ * above it.
  * @returns {object}
  */
 function leggiNuovoArticolo() {
   const nuovo = {};
-  nuovo.codice = elemento('mov-nuovo-codice').value.trim();
   nuovo.disciplina = elemento('mov-disciplina').value;
-  nuovo.categoria = elemento('mov-categoria').value;
-  nuovo.descrizione = elemento('mov-nuovo-descrizione').value.trim();
-  nuovo.marca = testoONull(elemento('mov-nuovo-marca').value);
+  nuovo.marca = elemento('mov-nuovo-marca').value.trim();
   nuovo.modello = testoONull(elemento('mov-nuovo-modello').value);
   nuovo.taglia = testoONull(elemento('mov-nuovo-taglia').value);
-  nuovo.seriale = testoONull(elemento('mov-nuovo-seriale').value);
-  nuovo.valore = Number(elemento('mov-nuovo-valore').value || 0);
   return nuovo;
 }
 
@@ -198,7 +184,6 @@ function azzeraForm() {
   elemento('mov-data').value = oggiRoma();
   elemento('mov-condizione').value = '';
   elemento('mov-note').value = '';
-  for (const id of ['mov-nuovo-codice', 'mov-nuovo-descrizione', 'mov-nuovo-marca', 'mov-nuovo-modello', 'mov-nuovo-taglia', 'mov-nuovo-seriale']) elemento(id).value = '';
-  elemento('mov-nuovo-valore').value = '0';
+  for (const id of ['mov-nuovo-marca', 'mov-nuovo-modello', 'mov-nuovo-taglia']) elemento(id).value = '';
   g_firma.azzera();
 }

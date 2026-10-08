@@ -13,12 +13,12 @@ const MAX_NOME = 160;
 const SELECT_ATLETA = 'SELECT id, nome, categoria, attivo, created_at FROM atleti';
 
 /** Articoli in mano a un atleta (?1): consegne meno restituzioni, solo se > 0. */
-const SQL_ASSEGNATI = `SELECT a.id, a.codice, a.descrizione, a.disciplina, a.taglia, a.stato,
+const SQL_ASSEGNATI = `SELECT a.id, a.marca, a.modello, a.disciplina, a.taglia, a.stato,
          SUM(CASE m.tipo WHEN 'CONSEGNA' THEN m.quantita WHEN 'RESTITUZIONE' THEN -m.quantita ELSE 0 END) AS in_possesso
   FROM movimenti m JOIN articoli a ON a.id = m.articolo_id
   WHERE m.atleta_id = ?1
   GROUP BY a.id HAVING in_possesso > 0
-  ORDER BY a.disciplina, a.descrizione`;
+  ORDER BY a.disciplina, a.marca, a.modello`;
 
 const SQL_STORICO_ATLETA = `${SELECT_MOVIMENTI} WHERE m.atleta_id = ?1 ORDER BY m.data DESC, m.id DESC LIMIT 500`;
 

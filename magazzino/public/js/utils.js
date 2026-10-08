@@ -19,25 +19,19 @@ export function oggiRoma(istante = new Date()) {
 }
 
 /**
- * @param {number} valore - number to format
- * @param {number} decimali - fixed decimal digits
- * @returns {string} Italian-style number (decimal comma), e.g. "12,50"
+ * Display name of an item: "Marca · Modello", or the brand alone. Works on
+ * every API object carrying marca and modello (items, history rows, items
+ * held by an athlete).
+ * @param {{marca: string, modello: string|null}} articolo
+ * @returns {string}
  */
-export function numeroItaliano(valore, decimali) {
-  return valore.toFixed(decimali).replace('.', ',');
-}
-
-/**
- * @param {number} valore - amount in euro
- * @returns {string} e.g. "12,50 €"
- */
-export function euro(valore) {
-  return `${numeroItaliano(valore, 2)} €`;
+export function nomeArticolo(articolo) {
+  return articolo.modello ? `${articolo.marca} · ${articolo.modello}` : articolo.marca;
 }
 
 /**
  * Case-insensitive "contains" on several text fields, the same rule the
- * server applies to ?q= (codice, descrizione, marca, seriale).
+ * server applies to ?q= (marca, modello).
  * @param {string} testoCercato - what the user typed
  * @param {(string|null|undefined)[]} campi - values to search in
  * @returns {boolean} true when at least one field contains the text
@@ -58,7 +52,7 @@ export function contieneTesto(testoCercato, campi) {
 export function filtraArticoli(articoli, disciplina, testoCercato) {
   return articoli.filter((articolo) => {
     const stessoMagazzino = disciplina === '' || articolo.disciplina === disciplina;
-    return stessoMagazzino && contieneTesto(testoCercato, [articolo.codice, articolo.descrizione, articolo.marca, articolo.seriale]);
+    return stessoMagazzino && contieneTesto(testoCercato, [articolo.marca, articolo.modello]);
   });
 }
 
@@ -66,13 +60,13 @@ export function filtraArticoli(articoli, disciplina, testoCercato) {
  * Filters the movement history like the server does for ?disciplina= and ?q=.
  * @param {object[]} movimenti - rows from the API
  * @param {string} disciplina - 'Ghiaccio' | 'Corsa' | ''
- * @param {string} testoCercato - free text on codice and descrizione
+ * @param {string} testoCercato - free text on marca and modello
  * @returns {object[]}
  */
 export function filtraMovimenti(movimenti, disciplina, testoCercato) {
   return movimenti.filter((movimento) => {
     const stessoMagazzino = disciplina === '' || movimento.disciplina === disciplina;
-    return stessoMagazzino && contieneTesto(testoCercato, [movimento.codice, movimento.descrizione]);
+    return stessoMagazzino && contieneTesto(testoCercato, [movimento.marca, movimento.modello]);
   });
 }
 
@@ -117,13 +111,13 @@ export function filtraEOrdinaAtleti(atleti, categorieScelte, ordine) {
 }
 
 /**
- * Label of an item in the movement form select: "Categoria · Codice ·
- * Descrizione · Taglia · disponibili N".
+ * Label of an item in the movement form select: "Marca · Modello · Taglia ·
+ * disponibili N".
  * @param {object} articolo
  * @returns {string}
  */
 export function etichettaArticolo(articolo) {
-  const parti = [articolo.categoria, articolo.codice, articolo.descrizione];
+  const parti = [nomeArticolo(articolo)];
   if (articolo.taglia) parti.push(articolo.taglia);
   parti.push(`disponibili ${articolo.disponibili}`);
   return parti.join(' · ');

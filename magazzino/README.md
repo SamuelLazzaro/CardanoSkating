@@ -1,8 +1,8 @@
 # Gestionale magazzino — Cardano Skating S.R.L. S.S.D.
 
 Gestionale del materiale della squadra, diviso nei due magazzini **Ghiaccio**
-e **Corsa**: articoli con codice, categoria, marca, taglia, seriale, giacenza e
-stato; atleti; movimenti di entrata, consegna e restituzione con firma su
+e **Corsa**: articoli con marca, modello, taglia, giacenza e stato; atleti;
+movimenti di entrata, consegna e restituzione con firma su
 touchscreen; scheda articolo con QR code; storico con export CSV.
 
 È la riscrittura, sullo stesso stack di [prenotazioni/](../prenotazioni), del
@@ -28,7 +28,7 @@ magazzino/
 │   ├── articolo.ts       # validazione dei dati anagrafici di un articolo
 │   ├── query.ts          # frammenti SQL condivisi (storico, possesso atleta)
 │   ├── csv.ts            # export CSV per Excel italiano
-│   └── routes/           # accesso, atleti, categorie, articoli, movimenti, riepilogo
+│   └── routes/           # accesso, atleti, articoli, movimenti, riepilogo
 ├── public/               # frontend statico (una sola pagina)
 │   ├── index.html
 │   ├── css/              # base / layout / components / main (@import)
@@ -161,12 +161,14 @@ Consiglio: fai un backup prima di ogni `migrate:remote`.
 - **Magazzini**: ogni articolo appartiene a `Ghiaccio` o `Corsa` (colonna
   `disciplina`). La Home mostra le due card con i numeri; entrando in un
   magazzino si vedono i suoi riquadri e le ultime dieci movimentazioni.
-- **Articoli**: `quantita` è il totale posseduto, `disponibili` la giacenza in
-  magazzino; la differenza è il materiale consegnato agli atleti. Lo stato è
-  uno tra `Nuovo`, `Buono`, `Usurato`, `Da riparare`, `Fuori uso`; gli ultimi
-  due contano come "da riparare" nei riquadri. La categoria è un testo che
-  riprende una riga della tabella `categorie` (le categorie disattivate non
-  compaiono più nei menu, gli articoli che le usano restano com'erano).
+- **Articoli**: un articolo è identificato dal suo `id` e mostrato come
+  "Marca · Modello" (la marca è obbligatoria, il modello no); non esistono
+  codice, categoria, descrizione, seriale né valore (tolti con la migrazione
+  0003, che ha eliminato anche la tabella `categorie`: la categoria resta solo
+  per gli atleti). `quantita` è il totale posseduto, `disponibili` la giacenza
+  in magazzino; la differenza è il materiale consegnato agli atleti. Lo stato
+  è uno tra `Nuovo`, `Buono`, `Usurato`, `Da riparare`, `Fuori uso`; gli
+  ultimi due contano come "da riparare" nei riquadri.
 - **Atleti**: ogni atleta ha nome e cognome in un unico campo e una
   categoria agonistica tra `G` (Giovanissimi), `E` (Esordienti), `R12`
   (Ragazzi 12), `R` (Ragazzi), `A` (Allievi), `J` (Junior), `S` (Senior) e
@@ -208,7 +210,7 @@ Consiglio: fai un backup prima di ogni `migrate:remote`.
 - **Ricerca**: il filtro testuale lato server usa `LIKE` con escape dei
   caratteri speciali e resta entro i 50 byte di pattern ammessi da D1; il
   frontend filtra la stessa lista già caricata, lato client, con la stessa
-  regola (codice, descrizione, marca, seriale).
+  regola (marca e modello).
 
 ## Note operative
 
@@ -223,7 +225,7 @@ Consiglio: fai un backup prima di ogni `migrate:remote`.
   entrambi.
 - **Rate limit login**: 10 tentativi per IP ogni 15 minuti (tabella
   `rate_limit` su D1).
-- **Audit**: login e login falliti, creazione di atleti/categorie/articoli,
+- **Audit**: login e login falliti, creazione di atleti/articoli,
   eliminazioni e movimenti sono registrati nella tabella `audit_log` con il
   nome dell'utente.
 - **Differenza dal Flask**: un'entrata su un articolo esistente con una
@@ -236,12 +238,10 @@ La prima versione replica le funzioni del gestionale originale. Restano da
 valutare, nell'ordine in cui sono emerse durante l'analisi:
 
 1. **Modifica di un articolo** dopo la creazione (oggi solo inserimento ed
-   eliminazione: un refuso nel codice o nella descrizione non si corregge).
+   eliminazione: un refuso nella marca o nel modello non si corregge).
 2. **Cancellazione o anonimizzazione di un atleta** (oggi solo
    attiva/disattiva; i nomi restano per sempre nello storico).
-3. **Categoria come chiave esterna** invece di testo libero, così rinominare
-   una categoria aggiorna gli articoli.
-4. **Informativa privacy** dedicata, come [prenotazioni/public/privacy.html](../prenotazioni/public/privacy.html):
+3. **Informativa privacy** dedicata, come [prenotazioni/public/privacy.html](../prenotazioni/public/privacy.html):
    nomi di atleti (verosimilmente minori) e firme autografe sono dati
    personali.
-5. **Firma visibile** nel dettaglio del movimento (oggi salvata ma mai mostrata).
+4. **Firma visibile** nel dettaglio del movimento (oggi salvata ma mai mostrata).

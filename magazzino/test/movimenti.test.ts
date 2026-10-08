@@ -31,19 +31,23 @@ describe('entrata', () => {
     expect((await giacenza(id)).stato).toBe('Nuovo');
   });
 
-  it('con nuovo_articolo crea l\'articolo con la quantità entrata e stato Nuovo', async () => {
+  it('con nuovo_articolo crea l\'articolo con la quantità entrata e stato Nuovo, legando il movimento al suo id', async () => {
     const cookie = await cookieUtente();
-    const nuovoArticolo = { codice: 'NEW-1', disciplina: 'Ghiaccio', categoria: 'Lame', descrizione: 'Lama MK', valore: 99 };
+    // un articolo preesistente: il movimento deve agganciarsi a quello nuovo, non a questo
+    const precedente = await creaArticolo({ marca: 'Precedente' });
+    const nuovoArticolo = { disciplina: 'Ghiaccio', marca: 'MK', modello: 'Gold Star' };
     const risposta = await postJson('/api/movimenti', cookie, { tipo: 'ENTRATA', nuovo_articolo: nuovoArticolo, quantita: 4, data: '2026-09-01' });
     expect(risposta.status).toBe(201);
     const { articolo_id, disciplina } = (await risposta.json()) as { articolo_id: number; disciplina: string };
     expect(disciplina).toBe('Ghiaccio');
+    expect(articolo_id).not.toBe(precedente);
     expect(await giacenza(articolo_id)).toEqual({ quantita: 4, disponibili: 4, stato: 'Nuovo' });
-    const movimento = await env.DB.prepare('SELECT tipo, quantita, data FROM movimenti WHERE articolo_id = ?1').bind(articolo_id).first();
-    expect(movimento).toEqual({ tipo: 'ENTRATA', quantita: 4, data: '2026-09-01' });
-    const doppione = await postJson('/api/movimenti', cookie, { tipo: 'ENTRATA', nuovo_articolo: nuovoArticolo, quantita: 1 });
-    expect(doppione.status).toBe(409);
-    const incompleto = await postJson('/api/movimenti', cookie, { tipo: 'ENTRATA', nuovo_articolo: { codice: 'NEW-2' }, quantita: 1 });
+    const movimento = await env.DB.prepare('SELECT articolo_id, tipo, quantita, data FROM movimenti').first();
+    expect(movimento).toEqual({ articolo_id, tipo: 'ENTRATA', quantita: 4, data: '2026-09-01' });
+    expect((await audit('entrata'))[0]?.dettaglio).toBe(`nuovo articolo #${articolo_id} MK Gold Star (Ghiaccio) × 4`);
+    // stessa marca e modello: non c'è più un codice univoco, è un secondo articolo
+    expect((await postJson('/api/movimenti', cookie, { tipo: 'ENTRATA', nuovo_articolo: nuovoArticolo, quantita: 1 })).status).toBe(201);
+    const incompleto = await postJson('/api/movimenti', cookie, { tipo: 'ENTRATA', nuovo_articolo: { disciplina: 'Ghiaccio' }, quantita: 1 });
     expect(incompleto.status).toBe(400);
   });
 
@@ -149,24 +153,25 @@ describe('restituzione', () => {
 describe('storico ed export', () => {
   it('lo storico è ordinato per data decrescente, filtrabile per magazzino, testo e limite', async () => {
     const cookie = await cookieUtente();
-    const corsa = await creaArticolo({ codice: 'C-9', disciplina: 'Corsa', descrizione: 'Ruote 100' });
-    const ghiaccio = await creaArticolo({ codice: 'G-9', disciplina: 'Ghiaccio', descrizione: 'Lame' });
+    const corsa = await creaArticolo({ disciplina: 'Corsa', marca: 'Matter', modello: 'Ruote 100' });
+    const ghiaccio = await creaArticolo({ disciplina: 'Ghiaccio', marca: 'MK', modello: 'Lame' });
     await postJson('/api/movimenti', cookie, { tipo: 'ENTRATA', articolo_id: corsa, quantita: 1, data: '2026-09-10' });
     await postJson('/api/movimenti', cookie, { tipo: 'ENTRATA', articolo_id: ghiaccio, quantita: 1, data: '2026-09-12' });
     await postJson('/api/movimenti', cookie, { tipo: 'ENTRATA', articolo_id: corsa, quantita: 2, data: '2026-09-11' });
-    const tutti = (await (await getConCookie('/api/movimenti', cookie)).json()) as { movimenti: { data: string; codice: string }[] };
+    const tutti = (await (await getConCookie('/api/movimenti', cookie)).json()) as { movimenti: { data: string; marca: string; modello: string }[] };
     expect(tutti.movimenti.map((m) => m.data)).toEqual(['2026-09-12', '2026-09-11', '2026-09-10']);
-    const soloCorsa = (await (await getConCookie('/api/movimenti?disciplina=Corsa', cookie)).json()) as { movimenti: { codice: string }[] };
-    expect(soloCorsa.movimenti.map((m) => m.codice)).toEqual(['C-9', 'C-9']);
-    const perTesto = (await (await getConCookie('/api/movimenti?q=lame', cookie)).json()) as { movimenti: { codice: string }[] };
-    expect(perTesto.movimenti.map((m) => m.codice)).toEqual(['G-9']);
+    expect(tutti.movimenti[0]).toMatchObject({ marca: 'MK', modello: 'Lame' });
+    const soloCorsa = (await (await getConCookie('/api/movimenti?disciplina=Corsa', cookie)).json()) as { movimenti: { marca: string }[] };
+    expect(soloCorsa.movimenti.map((m) => m.marca)).toEqual(['Matter', 'Matter']);
+    const perTesto = (await (await getConCookie('/api/movimenti?q=lame', cookie)).json()) as { movimenti: { marca: string }[] };
+    expect(perTesto.movimenti.map((m) => m.marca)).toEqual(['MK']);
     const ultimo = (await (await getConCookie('/api/movimenti?limite=1', cookie)).json()) as { movimenti: unknown[] };
     expect(ultimo.movimenti).toHaveLength(1);
   });
 
   it('il CSV ha BOM, separatore ";", date italiane e campi protetti', async () => {
     const cookie = await cookieUtente();
-    const id = await creaArticolo({ codice: 'CSV-1', descrizione: 'Body; "gara"', taglia: 'M' });
+    const id = await creaArticolo({ marca: 'Bont', modello: 'Body; "gara"', taglia: 'M' });
     const atleta = await creaAtleta('Elena Rossi');
     await postJson('/api/movimenti', cookie, { tipo: 'CONSEGNA', articolo_id: id, atleta_id: atleta, quantita: 1, data: '2026-03-05', note: 'riga uno\nriga due' });
     const risposta = await getConCookie('/api/movimenti/export.csv', cookie);
@@ -176,8 +181,8 @@ describe('storico ed export', () => {
     const testo = await risposta.text();
     expect(testo.charCodeAt(0)).toBe(0xfeff);
     const righe = testo.slice(1).split('\r\n').filter((r) => r !== '');
-    expect(righe[0]).toBe('ID;Data;Tipo;Disciplina;Quantità;Codice;Materiale;Taglia;Atleta;Stato;Note;Operatore');
-    expect(righe[1]).toBe(`1;05/03/2026;CONSEGNA;Corsa;1;CSV-1;"Body; ""gara""";M;Elena Rossi;;"riga uno\nriga due";${UTENTE_TEST}`);
+    expect(righe[0]).toBe('ID;Data;Tipo;Disciplina;Quantità;Marca;Modello;Taglia;Atleta;Stato;Note;Operatore');
+    expect(righe[1]).toBe(`1;05/03/2026;CONSEGNA;Corsa;1;Bont;"Body; ""gara""";M;Elena Rossi;;"riga uno\nriga due";${UTENTE_TEST}`);
   });
 
   it('campoCsv e dataItaliana', () => {

@@ -2,9 +2,9 @@
  * app.js — entry point of the gestionale. Shows the login form (user dropdown
  * plus password) until a session cookie is present, then loads the shared
  * state (js/stato.js) and wires the five sections behind the nav
- * (js/navigazione.js): Home with the two warehouses, Atleti, Materiali (with
- * the categories), Movimento and Storico. After every change one reload of
- * the state re-renders all the sections.
+ * (js/navigazione.js): Home with the two warehouses, Atleti, Materiali,
+ * Movimento and Storico. After every change one reload of the state
+ * re-renders all the sections.
  */
 import { avviaTapFeedback } from './tap-feedback.js';
 import { PARAMETRO_ARTICOLO } from './constants.js';

@@ -75,20 +75,20 @@ describe('atleti', () => {
   it('la scheda mostra il materiale in possesso (consegne meno restituzioni) e lo storico senza firma', async () => {
     const cookie = await cookieUtente();
     const atletaId = await creaAtleta('Giulia Verdi');
-    const pattini = await creaArticolo({ codice: 'PAT-1', descrizione: 'Pattini Edea', quantita: 3 });
-    const casco = await creaArticolo({ codice: 'CAS-1', descrizione: 'Casco', quantita: 2, disciplina: 'Ghiaccio' });
+    const pattini = await creaArticolo({ marca: 'Edea', modello: 'Pattini', quantita: 3 });
+    const casco = await creaArticolo({ marca: 'Casco', quantita: 2, disciplina: 'Ghiaccio' });
     const firma = `data:image/png;base64,${btoa('png')}`;
     expect((await postJson('/api/movimenti', cookie, { tipo: 'CONSEGNA', articolo_id: pattini, atleta_id: atletaId, quantita: 2, firma })).status).toBe(201);
     expect((await postJson('/api/movimenti', cookie, { tipo: 'CONSEGNA', articolo_id: casco, atleta_id: atletaId, quantita: 1 })).status).toBe(201);
     expect((await postJson('/api/movimenti', cookie, { tipo: 'RESTITUZIONE', articolo_id: casco, atleta_id: atletaId, quantita: 1 })).status).toBe(201);
     const risposta = await getConCookie(`/api/atleti/${atletaId}`, cookie);
     expect(risposta.status).toBe(200);
-    const scheda = (await risposta.json()) as { atleta: { nome: string; categoria: string | null }; assegnati: { codice: string; in_possesso: number }[]; storico: Record<string, unknown>[] };
+    const scheda = (await risposta.json()) as { atleta: { nome: string; categoria: string | null }; assegnati: { marca: string; in_possesso: number }[]; storico: Record<string, unknown>[] };
     expect(scheda.atleta).toMatchObject({ nome: 'Giulia Verdi', categoria: 'R' });
-    expect(scheda.assegnati).toEqual([expect.objectContaining({ codice: 'PAT-1', in_possesso: 2 })]);
+    expect(scheda.assegnati).toEqual([expect.objectContaining({ id: pattini, marca: 'Edea', modello: 'Pattini', in_possesso: 2 })]);
     expect(scheda.storico).toHaveLength(3);
     expect(scheda.storico.every((m) => !('firma' in m))).toBe(true);
-    const consegnaPattini = scheda.storico.find((m) => m.codice === 'PAT-1');
+    const consegnaPattini = scheda.storico.find((m) => m.articolo_id === pattini);
     expect(consegnaPattini).toMatchObject({ tipo: 'CONSEGNA', firma_presente: true, operatore: UTENTE_TEST });
   });
 

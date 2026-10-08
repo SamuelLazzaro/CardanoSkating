@@ -5,7 +5,7 @@
  */
 import { g_stato } from './stato.js';
 import { badgeDisciplina, badgeTipoMovimento, creaBottoneTesto, creaRiga, preparaFiltro, riempiTabella } from './ui.js';
-import { dataItaliana, filtraMovimenti } from './utils.js';
+import { dataItaliana, filtraMovimenti, nomeArticolo } from './utils.js';
 
 /** @type {(id: string) => HTMLElement} */
 const elemento = (id) => document.getElementById(id);
@@ -13,7 +13,7 @@ const elemento = (id) => document.getElementById(id);
 /** @type {string} warehouse filter: 'Ghiaccio' | 'Corsa' | '' (all) */
 let g_filtroDisciplina = '';
 
-/** @type {string} free text filter on codice and descrizione */
+/** @type {string} free text filter on marca and modello */
 let g_testoRicerca = '';
 
 /** @type {{imposta: (valore: string) => void}|null} segmented filter control */
@@ -51,7 +51,7 @@ export function impostaFiltroStorico(disciplina) {
 export function renderStorico() {
   const visibili = filtraMovimenti(g_stato.movimenti, g_filtroDisciplina, g_testoRicerca);
   const righe = visibili.map((movimento) => {
-    const materiale = creaBottoneTesto(`${movimento.codice} · ${movimento.descrizione}`, () => g_allaScheda(movimento.articolo_id));
+    const materiale = creaBottoneTesto(nomeArticolo(movimento), () => g_allaScheda(movimento.articolo_id));
     return creaRiga([dataItaliana(movimento.data), badgeDisciplina(movimento.disciplina), badgeTipoMovimento(movimento.tipo), materiale, movimento.atleta, movimento.quantita, movimento.operatore], ['', '', '', '', '', 'cella-numero', '']);
   });
   riempiTabella(elemento('righe-storico'), righe, elemento('vuoto-storico'));
