@@ -12,11 +12,11 @@ export const POSSESSO_ATLETA = `(SELECT COALESCE(SUM(CASE tipo WHEN 'CONSEGNA' T
 
 /**
  * Riga dello storico movimenti come esposta dalle API: dati del movimento più
- * marca/modello/disciplina dell'articolo e nome dell'atleta. La firma non
- * viene mai letta qui (può pesare decine di KB per riga): solo la sua presenza.
+ * categoria/marca/modello/disciplina dell'articolo e nome dell'atleta. La firma
+ * non viene mai letta qui (può pesare decine di KB per riga): solo la sua presenza.
  */
 export const SELECT_MOVIMENTI = `SELECT m.id, m.tipo, m.quantita, m.data, m.condizione, m.note, m.operatore, m.created_at,
-         m.articolo_id, a.marca, a.modello, a.disciplina, a.taglia,
+         m.articolo_id, a.categoria, a.marca, a.modello, a.disciplina, a.taglia,
          m.atleta_id, at.nome AS atleta,
          (m.firma IS NOT NULL) AS firma_presente
   FROM movimenti m
@@ -34,6 +34,7 @@ export type MovimentoStoricoRow = {
   operatore: string;
   created_at: string;
   articolo_id: number;
+  categoria: string;
   marca: string;
   modello: string | null;
   disciplina: Disciplina;

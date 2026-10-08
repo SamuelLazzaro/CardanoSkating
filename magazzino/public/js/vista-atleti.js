@@ -163,7 +163,7 @@ async function apriSchedaAtleta(idAtleta) {
 }
 
 /**
- * @param {{marca: string, modello: string|null, taglia: string|null, stato: string, in_possesso: number}[]} assegnati
+ * @param {{categoria: string, marca: string, modello: string|null, taglia: string|null, stato: string, in_possesso: number}[]} assegnati
  * @returns {void}
  */
 function renderAssegnati(assegnati) {
@@ -177,7 +177,7 @@ function renderAssegnati(assegnati) {
     titolo.textContent = nomeArticolo(articolo);
     const dettaglio = document.createElement('span');
     dettaglio.className = 'testo-tenue';
-    dettaglio.textContent = `Quantità ${articolo.in_possesso} · ${articolo.taglia ?? '—'} · ${articolo.stato}`;
+    dettaglio.textContent = `${articolo.categoria} · Quantità ${articolo.in_possesso} · ${articolo.taglia ?? '—'} · ${articolo.stato}`;
     info.append(titolo, dettaglio);
     voce.append(info);
     lista.append(voce);
@@ -190,6 +190,6 @@ function renderAssegnati(assegnati) {
  * @returns {void}
  */
 function renderStoricoAtleta(storico) {
-  const righe = storico.map((movimento) => creaRiga([dataItaliana(movimento.data), badgeTipoMovimento(movimento.tipo), nomeArticolo(movimento), movimento.quantita, movimento.condizione, movimento.firma_presente ? '✓' : '—'], ['', '', '', 'cella-numero', '', '']));
+  const righe = storico.map((movimento) => creaRiga([dataItaliana(movimento.data), badgeTipoMovimento(movimento.tipo), movimento.categoria, nomeArticolo(movimento), movimento.quantita, movimento.condizione, movimento.firma_presente ? '✓' : '—'], ['', '', '', '', 'cella-numero', '', '']));
   riempiTabella(elemento('righe-storico-atleta'), righe, elemento('vuoto-storico-atleta'));
 }

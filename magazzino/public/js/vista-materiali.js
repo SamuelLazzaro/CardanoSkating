@@ -91,7 +91,7 @@ function renderTabellaMateriali() {
   const visibili = filtraArticoli(g_stato.articoli, g_filtroDisciplina, g_testoRicerca);
   const righe = visibili.map((articolo) => {
     const materiale = creaBottoneTesto(nomeArticolo(articolo), () => apriSchedaMateriale(articolo.id));
-    return creaRiga([badgeDisciplina(articolo.disciplina), materiale, articolo.taglia, articolo.quantita, articolo.disponibili, badgeStato(articolo.stato)], ['', '', '', 'cella-numero', 'cella-numero', '']);
+    return creaRiga([badgeDisciplina(articolo.disciplina), articolo.categoria, materiale, articolo.taglia, articolo.quantita, articolo.disponibili, badgeStato(articolo.stato)], ['', '', '', '', 'cella-numero', 'cella-numero', '']);
   });
   riempiTabella(elemento('righe-materiali'), righe, elemento('vuoto-materiali'));
 }

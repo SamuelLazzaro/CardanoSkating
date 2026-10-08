@@ -162,7 +162,7 @@ describe('storico ed export', () => {
     await postJson('/api/movimenti', cookie, { tipo: 'ENTRATA', articolo_id: corsa, quantita: 2, data: '2026-09-11' });
     const tutti = (await (await getConCookie('/api/movimenti', cookie)).json()) as { movimenti: { data: string; marca: string; modello: string }[] };
     expect(tutti.movimenti.map((m) => m.data)).toEqual(['2026-09-12', '2026-09-11', '2026-09-10']);
-    expect(tutti.movimenti[0]).toMatchObject({ marca: 'MK', modello: 'Lame' });
+    expect(tutti.movimenti[0]).toMatchObject({ categoria: 'Pattini', marca: 'MK', modello: 'Lame' });
     const soloCorsa = (await (await getConCookie('/api/movimenti?disciplina=Corsa', cookie)).json()) as { movimenti: { marca: string }[] };
     expect(soloCorsa.movimenti.map((m) => m.marca)).toEqual(['Matter', 'Matter']);
     const perTesto = (await (await getConCookie('/api/movimenti?q=lame', cookie)).json()) as { movimenti: { marca: string }[] };
@@ -173,7 +173,7 @@ describe('storico ed export', () => {
 
   it('il CSV ha BOM, separatore ";", date italiane e campi protetti', async () => {
     const cookie = await cookieUtente();
-    const id = await creaArticolo({ marca: 'Bont', modello: 'Body; "gara"', taglia: 'M' });
+    const id = await creaArticolo({ categoria: 'Body gara', marca: 'Bont', modello: 'Body; "gara"', taglia: 'M' });
     const atleta = await creaAtleta('Elena Rossi');
     await postJson('/api/movimenti', cookie, { tipo: 'CONSEGNA', articolo_id: id, atleta_id: atleta, quantita: 1, data: '2026-03-05', note: 'riga uno\nriga due' });
     const risposta = await getConCookie('/api/movimenti/export.csv', cookie);
@@ -183,8 +183,8 @@ describe('storico ed export', () => {
     const testo = await risposta.text();
     expect(testo.charCodeAt(0)).toBe(0xfeff);
     const righe = testo.slice(1).split('\r\n').filter((r) => r !== '');
-    expect(righe[0]).toBe('ID;Data;Tipo;Disciplina;Quantità;Marca;Modello;Taglia;Atleta;Stato;Note;Operatore');
-    expect(righe[1]).toBe(`1;05/03/2026;CONSEGNA;Corsa;1;Bont;"Body; ""gara""";M;Elena Rossi;;"riga uno\nriga due";${UTENTE_TEST}`);
+    expect(righe[0]).toBe('ID;Data;Tipo;Disciplina;Categoria;Quantità;Marca;Modello;Taglia;Atleta;Stato;Note;Operatore');
+    expect(righe[1]).toBe(`1;05/03/2026;CONSEGNA;Corsa;Body gara;1;Bont;"Body; ""gara""";M;Elena Rossi;;"riga uno\nriga due";${UTENTE_TEST}`);
   });
 
   it('campoCsv e dataItaliana', () => {

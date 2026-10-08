@@ -84,6 +84,6 @@ function renderMagazzino() {
   elemento('mag-da-riparare').textContent = String(numeri.da_riparare);
 
   const recenti = g_stato.movimenti.filter((movimento) => movimento.disciplina === g_magazzinoAperto).slice(0, ULTIMI_MOVIMENTI);
-  const righe = recenti.map((movimento) => creaRiga([dataItaliana(movimento.data), badgeTipoMovimento(movimento.tipo), nomeArticolo(movimento), movimento.atleta, movimento.quantita], ['', '', '', '', 'cella-numero']));
+  const righe = recenti.map((movimento) => creaRiga([dataItaliana(movimento.data), badgeTipoMovimento(movimento.tipo), movimento.categoria, nomeArticolo(movimento), movimento.atleta, movimento.quantita], ['', '', '', '', '', 'cella-numero']));
   riempiTabella(elemento('righe-ultimi-movimenti'), righe, elemento('vuoto-ultimi-movimenti'));
 }

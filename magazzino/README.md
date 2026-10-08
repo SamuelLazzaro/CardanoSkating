@@ -208,7 +208,9 @@ Consiglio: fai un backup prima di ogni `migrate:remote`.
 - **Storico e CSV**: `GET /api/movimenti` restituisce gli ultimi 500 movimenti
   con filtri `?disciplina=`, `?q=`, `?limite=`; `GET /api/movimenti/export.csv`
   esporta tutto per Excel italiano (BOM UTF-8, separatore `;`, date
-  `DD/MM/YYYY`, campi con `;` o `"` protetti tra virgolette).
+  `DD/MM/YYYY`, campi con `;` o `"` protetti tra virgolette). Colonne: ID,
+  Data, Tipo, Disciplina, Categoria, Quantità, Marca, Modello, Taglia, Atleta,
+  Stato, Note, Operatore.
 - **Ricerca**: il filtro testuale lato server usa `LIKE` con escape dei
   caratteri speciali e resta entro i 50 byte di pattern ammessi da D1; il
   frontend filtra la stessa lista già caricata, lato client, con la stessa

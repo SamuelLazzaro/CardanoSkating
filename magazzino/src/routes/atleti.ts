@@ -13,7 +13,7 @@ const MAX_NOME = 160;
 const SELECT_ATLETA = 'SELECT id, nome, categoria, attivo, created_at FROM atleti';
 
 /** Articoli in mano a un atleta (?1): consegne meno restituzioni, solo se > 0. */
-const SQL_ASSEGNATI = `SELECT a.id, a.marca, a.modello, a.disciplina, a.taglia, a.stato,
+const SQL_ASSEGNATI = `SELECT a.id, a.categoria, a.marca, a.modello, a.disciplina, a.taglia, a.stato,
          SUM(CASE m.tipo WHEN 'CONSEGNA' THEN m.quantita WHEN 'RESTITUZIONE' THEN -m.quantita ELSE 0 END) AS in_possesso
   FROM movimenti m JOIN articoli a ON a.id = m.articolo_id
   WHERE m.atleta_id = ?1

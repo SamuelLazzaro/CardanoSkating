@@ -52,7 +52,7 @@ export function renderStorico() {
   const visibili = filtraMovimenti(g_stato.movimenti, g_filtroDisciplina, g_testoRicerca);
   const righe = visibili.map((movimento) => {
     const materiale = creaBottoneTesto(nomeArticolo(movimento), () => g_allaScheda(movimento.articolo_id));
-    return creaRiga([dataItaliana(movimento.data), badgeDisciplina(movimento.disciplina), badgeTipoMovimento(movimento.tipo), materiale, movimento.atleta, movimento.quantita, movimento.operatore], ['', '', '', '', '', 'cella-numero', '']);
+    return creaRiga([dataItaliana(movimento.data), badgeDisciplina(movimento.disciplina), badgeTipoMovimento(movimento.tipo), movimento.categoria, materiale, movimento.atleta, movimento.quantita, movimento.operatore], ['', '', '', '', '', '', 'cella-numero', '']);
   });
   riempiTabella(elemento('righe-storico'), righe, elemento('vuoto-storico'));
 }
