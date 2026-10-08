@@ -1,4 +1,5 @@
 /* utils.js — pure functions: input → output, no DOM, no state, no side effects. */
+import { CATEGORIE_ATLETA, ORDINE_ATLETI_CATEGORIA } from './constants.js';
 
 /**
  * @param {string} data - 'YYYY-MM-DD'
@@ -72,6 +73,46 @@ export function filtraMovimenti(movimenti, disciplina, testoCercato) {
   return movimenti.filter((movimento) => {
     const stessoMagazzino = disciplina === '' || movimento.disciplina === disciplina;
     return stessoMagazzino && contieneTesto(testoCercato, [movimento.codice, movimento.descrizione]);
+  });
+}
+
+/**
+ * "Nome Cognome (R12)"; athletes without a category (inserted before the
+ * category existed) show the bare name.
+ * @param {{nome: string, categoria: string|null}} atleta
+ * @returns {string}
+ */
+export function nomeConCategoria(atleta) {
+  return atleta.categoria ? `${atleta.nome} (${atleta.categoria})` : atleta.nome;
+}
+
+/**
+ * Position of a category code in CATEGORIE_ATLETA (youngest first); a
+ * missing category sorts after every real one.
+ * @param {string|null} categoria
+ * @returns {number}
+ */
+function posizioneCategoria(categoria) {
+  const indice = CATEGORIE_ATLETA.findIndex((voce) => voce.sigla === categoria);
+  return indice === -1 ? CATEGORIE_ATLETA.length : indice;
+}
+
+/**
+ * Athletes table rows: keeps only the selected categories (none selected =
+ * everyone) and sorts by name, or by category (G, E, R12, ..., M, then the
+ * athletes without a category) and name within the same category.
+ * @param {object[]} atleti - athletes from the API (served alphabetically)
+ * @param {string[]} categorieScelte - selected category codes, empty = no filter
+ * @param {string} ordine - ORDINE_ATLETI_NOME | ORDINE_ATLETI_CATEGORIA
+ * @returns {object[]} a new array; the input is not modified
+ */
+export function filtraEOrdinaAtleti(atleti, categorieScelte, ordine) {
+  const filtrati = atleti.filter((atleta) => categorieScelte.length === 0 || categorieScelte.includes(atleta.categoria));
+  const perNome = (a, b) => a.nome.localeCompare(b.nome, 'it');
+  if (ordine !== ORDINE_ATLETI_CATEGORIA) return filtrati.sort(perNome);
+  return filtrati.sort((a, b) => {
+    const differenzaCategoria = posizioneCategoria(a.categoria) - posizioneCategoria(b.categoria);
+    return differenzaCategoria !== 0 ? differenzaCategoria : perNome(a, b);
   });
 }
 

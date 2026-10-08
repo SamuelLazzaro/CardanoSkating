@@ -8,7 +8,7 @@ import { registraMovimento } from './api.js';
 import { preparaFirma } from './firma.js';
 import { articoloPerId, atletiAttivi, categorieAttive, g_stato } from './stato.js';
 import { mostraMessaggio, riempiSelectConSegnaposto } from './ui.js';
-import { etichettaArticolo, oggiRoma, testoONull } from './utils.js';
+import { etichettaArticolo, nomeConCategoria, oggiRoma, testoONull } from './utils.js';
 
 /** @type {(id: string) => HTMLElement} */
 const elemento = (id) => document.getElementById(id);
@@ -42,7 +42,7 @@ export function preparaMovimento({ alRegistrato }) {
 export function renderMovimento() {
   const categorie = categorieAttive().map((categoria) => ({ valore: categoria.nome, etichetta: categoria.nome }));
   riempiSelectConSegnaposto(elemento('mov-categoria'), '— Tutte le categorie —', categorie);
-  const atleti = atletiAttivi().map((atleta) => ({ valore: String(atleta.id), etichetta: atleta.nome }));
+  const atleti = atletiAttivi().map((atleta) => ({ valore: String(atleta.id), etichetta: nomeConCategoria(atleta) }));
   riempiSelectConSegnaposto(elemento('mov-atleta'), '— Seleziona atleta —', atleti);
   const selettoreArticoli = elemento('mov-articolo');
   const scelta = selettoreArticoli.value;

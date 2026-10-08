@@ -174,14 +174,30 @@
               <h2>Atleti</h2>
               <form id="form-atleta" class="modulo-in-riga">
                 <input type="text" id="campo-nome-atleta" maxlength="160" placeholder="Nome e cognome" aria-label="Nome e cognome" required>
+                <select id="campo-categoria-atleta" aria-label="Categoria" required></select>
                 <button type="submit" class="btn btn-primario">Aggiungi</button>
               </form>
             </div>
+            <div class="barra-filtri">
+              <label class="campo-con-etichetta" for="filtro-categorie-atleti">
+                <span>Categorie</span>
+                <select id="filtro-categorie-atleti" class="filtro-categorie" multiple size="8" aria-describedby="aiuto-filtro-categorie"></select>
+              </label>
+              <button type="button" class="btn btn-pericolo" id="bottone-reset-filtro-atleti" disabled>Reset filtro</button>
+              <label class="campo-con-etichetta" for="ordine-atleti">
+                <span>Ordina per</span>
+                <select id="ordine-atleti">
+                  <option value="nome">Nome</option>
+                  <option value="categoria">Categoria</option>
+                </select>
+              </label>
+            </div>
+            <p id="aiuto-filtro-categorie" class="suggerimento testo-tenue">Tieni premuto Ctrl (o Cmd) per selezionare più categorie.</p>
             <p id="esito-atleti" class="stato" role="status" hidden></p>
             <div class="scorri-tabella">
               <table class="tabella" id="tabella-atleti">
                 <thead>
-                  <tr><th scope="col">Nome</th><th scope="col">Stato</th><th scope="col"></th></tr>
+                  <tr><th scope="col">Nome</th><th scope="col">Categoria</th><th scope="col">Stato</th><th scope="col"></th></tr>
                 </thead>
                 <tbody id="righe-atleti"></tbody>
               </table>

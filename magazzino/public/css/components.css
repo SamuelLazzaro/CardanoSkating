@@ -546,6 +546,79 @@ fieldset.campo {
     outline-offset: 1px;
 }
 
+/* the category select next to the name input of the add-athlete form */
+.modulo-in-riga select {
+    font: inherit;
+    color: var(--testo);
+    background: var(--superficie);
+    border: 1px solid var(--bordo-forte);
+    border-radius: var(--raggio);
+    padding: 0.45rem 0.6rem;
+}
+
+.modulo-in-riga select:focus-visible {
+    outline: 2px solid var(--accento-scuro);
+    outline-offset: 1px;
+}
+
+/* ------------------------------------------------- atleti: filtro e ordine */
+
+/* a labelled control in a filter bar: caption above, control below */
+.campo-con-etichetta {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--testo);
+}
+
+.campo-con-etichetta select {
+    font: inherit;
+    font-weight: 400;
+    color: var(--testo);
+    background: var(--superficie);
+    border: 1px solid var(--bordo-forte);
+    border-radius: var(--raggio);
+    padding: 0.45rem 0.6rem;
+}
+
+.campo-con-etichetta select:focus-visible {
+    outline: 2px solid var(--accento-scuro);
+    outline-offset: 1px;
+}
+
+/* the multi-select shows all eight categories at once (size="8"), no inner
+   scrolling; wide enough for "R12 · Ragazzi 12" */
+.filtro-categorie {
+    min-width: 12rem;
+}
+
+/* the reset button sits on the bottom edge of the list, next to the last row */
+.barra-filtri .btn-pericolo {
+    align-self: flex-end;
+}
+
+/* inline category select in the athletes table: compact, same look as the small buttons */
+.select-categoria-riga {
+    font: inherit;
+    font-size: 0.85rem;
+    color: var(--testo);
+    background: var(--superficie);
+    border: 1px solid var(--bordo-forte);
+    border-radius: var(--raggio);
+    padding: 0.2rem 0.4rem;
+}
+
+.select-categoria-riga:focus-visible {
+    outline: 2px solid var(--accento-scuro);
+    outline-offset: 1px;
+}
+
+.tabella .cella-categoria {
+    white-space: nowrap;
+}
+
 /* forms with several fields per row (movement, new item) use the full panel */
 .modulo-largo {
     max-width: none;

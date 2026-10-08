@@ -12,10 +12,14 @@ export type Bindings = {
 export type Disciplina = 'Ghiaccio' | 'Corsa';
 export type StatoArticolo = 'Nuovo' | 'Buono' | 'Usurato' | 'Da riparare' | 'Fuori uso';
 export type TipoMovimento = 'ENTRATA' | 'CONSEGNA' | 'RESTITUZIONE';
+/** Sigle delle categorie agonistiche (vedi migrations/0002_categoria_atleti.sql). */
+export type CategoriaAtleta = 'G' | 'E' | 'R12' | 'R' | 'A' | 'J' | 'S' | 'M';
 
 export type AtletaRow = {
   id: number;
   nome: string;
+  /** NULL per gli atleti inseriti prima dell'introduzione della categoria. */
+  categoria: CategoriaAtleta | null;
   attivo: number;
   created_at: string;
 };

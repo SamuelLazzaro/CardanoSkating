@@ -43,9 +43,9 @@ export async function deleteConCookie(percorso: string, cookie: string): Promise
   return await app.request(percorso, { method: 'DELETE', headers: { Cookie: cookie } }, env);
 }
 
-/** Crea un atleta direttamente su DB (setup di test, bypassa le API). */
-export async function creaAtleta(nome = 'Atleta Test', attivo = true): Promise<number> {
-  const esito = await env.DB.prepare('INSERT INTO atleti (nome, attivo) VALUES (?1, ?2)').bind(nome, attivo ? 1 : 0).run();
+/** Crea un atleta direttamente su DB (setup di test, bypassa le API); categoria null = atleta "storico". */
+export async function creaAtleta(nome = 'Atleta Test', attivo = true, categoria: string | null = 'R'): Promise<number> {
+  const esito = await env.DB.prepare('INSERT INTO atleti (nome, attivo, categoria) VALUES (?1, ?2, ?3)').bind(nome, attivo ? 1 : 0, categoria).run();
   return esito.meta.last_row_id;
 }
 

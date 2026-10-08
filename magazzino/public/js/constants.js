@@ -18,6 +18,17 @@ export const TESTO_TIPO_MOVIMENTO = { ENTRATA: 'Entrata in magazzino', CONSEGNA:
 /** @type {Record<string, string>} short labels of the movement types, for tables and badges */
 export const TESTO_BREVE_TIPO = { ENTRATA: 'Entrata', CONSEGNA: 'Consegna', RESTITUZIONE: 'Restituzione' };
 
+/**
+ * Athlete categories, youngest first (mirrors the CHECK on atleti.categoria).
+ * The order of this array is the "by category" sort order of the Atleti table.
+ * @type {{sigla: string, nome: string}[]}
+ */
+export const CATEGORIE_ATLETA = [{ sigla: 'G', nome: 'Giovanissimi' }, { sigla: 'E', nome: 'Esordienti' }, { sigla: 'R12', nome: 'Ragazzi 12' }, { sigla: 'R', nome: 'Ragazzi' }, { sigla: 'A', nome: 'Allievi' }, { sigla: 'J', nome: 'Junior' }, { sigla: 'S', nome: 'Senior' }, { sigla: 'M', nome: 'Master' }];
+
+/** @type {string} sort keys of the Atleti table (values of the "Ordina per" select) */
+export const ORDINE_ATLETI_NOME = 'nome';
+export const ORDINE_ATLETI_CATEGORIA = 'categoria';
+
 /** @type {number} rows of the "ultime movimentazioni" table of a warehouse dashboard */
 export const ULTIMI_MOVIMENTI = 10;
 

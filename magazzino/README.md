@@ -167,6 +167,21 @@ Consiglio: fai un backup prima di ogni `migrate:remote`.
   due contano come "da riparare" nei riquadri. La categoria è un testo che
   riprende una riga della tabella `categorie` (le categorie disattivate non
   compaiono più nei menu, gli articoli che le usano restano com'erano).
+- **Atleti**: ogni atleta ha nome e cognome in un unico campo e una
+  categoria agonistica tra `G` (Giovanissimi), `E` (Esordienti), `R12`
+  (Ragazzi 12), `R` (Ragazzi), `A` (Allievi), `J` (Junior), `S` (Senior) e
+  `M` (Master). La lista è fissa nel codice (vincolo `CHECK` in
+  `migrations/0002_categoria_atleti.sql`, replicato in `src/util.ts` e
+  `public/js/constants.js`): per cambiarla serve una migrazione. Gli atleti
+  inseriti prima della migrazione 0002 hanno categoria `NULL` ("—" nella
+  tabella) e la ricevono dalla select nella loro riga, che salva al cambio
+  (`PATCH /api/atleti/:id` con `categoria`; lo stesso endpoint accetta
+  `attivo`). La sezione Atleti filtra per una o più categorie (select
+  multipla, pulsante rosso "Reset filtro" attivo solo con un filtro in corso)
+  e ordina per nome oppure per categoria, dalla più giovane alla più anziana
+  e poi per nome; filtro e ordine sono lato client e non sopravvivono al
+  ricaricamento della pagina. Nel form Movimento e nel titolo della scheda il
+  nome compare come "Nome Cognome (sigla)".
 - **Movimenti**: `ENTRATA` aumenta totale e giacenza (su un articolo esistente
   oppure creando un nuovo articolo dallo stesso form); `CONSEGNA` scala la
   giacenza e richiede un atleta attivo; `RESTITUZIONE` la ripristina e può

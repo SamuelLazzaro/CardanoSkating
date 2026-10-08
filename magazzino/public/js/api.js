@@ -72,17 +72,18 @@ export function ottieniRiepilogo() {
 
 /* ----------------------------------------------------------------- atleti */
 
-/** @returns {Promise<{atleti: {id: number, nome: string, attivo: number}[]}>} */
+/** @returns {Promise<{atleti: {id: number, nome: string, categoria: string|null, attivo: number}[]}>} */
 export function ottieniAtleti() {
   return richiestaJson('/api/atleti');
 }
 
 /**
  * @param {string} nome - name and surname
- * @returns {Promise<{id: number, nome: string, attivo: number}>}
+ * @param {string} categoria - category code (see CATEGORIE_ATLETA)
+ * @returns {Promise<{id: number, nome: string, categoria: string, attivo: number}>}
  */
-export function creaAtleta(nome) {
-  return richiestaJson('/api/atleti', { method: 'POST', body: JSON.stringify({ nome }) });
+export function creaAtleta(nome, categoria) {
+  return richiestaJson('/api/atleti', { method: 'POST', body: JSON.stringify({ nome, categoria }) });
 }
 
 /**
@@ -92,6 +93,15 @@ export function creaAtleta(nome) {
  */
 export function impostaAtletaAttivo(idAtleta, attivo) {
   return richiestaJson(`/api/atleti/${idAtleta}`, { method: 'PATCH', body: JSON.stringify({ attivo }) });
+}
+
+/**
+ * @param {number} idAtleta
+ * @param {string} categoria - category code (see CATEGORIE_ATLETA)
+ * @returns {Promise<{ok: boolean}>}
+ */
+export function impostaCategoriaAtleta(idAtleta, categoria) {
+  return richiestaJson(`/api/atleti/${idAtleta}`, { method: 'PATCH', body: JSON.stringify({ categoria }) });
 }
 
 /**

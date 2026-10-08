@@ -1,5 +1,5 @@
 import type { Context } from 'hono';
-import type { Disciplina, StatoArticolo, TipoMovimento } from './tipi';
+import type { CategoriaAtleta, Disciplina, StatoArticolo, TipoMovimento } from './tipi';
 
 /**
  * Legge il corpo JSON della richiesta. Ritorna null (→ 400 nel chiamante)
@@ -68,6 +68,8 @@ export function importo(valore: unknown): number | null {
 export const DISCIPLINE: readonly Disciplina[] = ['Ghiaccio', 'Corsa'];
 export const STATI_ARTICOLO: readonly StatoArticolo[] = ['Nuovo', 'Buono', 'Usurato', 'Da riparare', 'Fuori uso'];
 export const TIPI_MOVIMENTO: readonly TipoMovimento[] = ['ENTRATA', 'CONSEGNA', 'RESTITUZIONE'];
+/** Sigle delle categorie atleta, dalla più giovane alla più anziana (stesso ordine del CHECK). */
+export const CATEGORIE_ATLETA: readonly CategoriaAtleta[] = ['G', 'E', 'R12', 'R', 'A', 'J', 'S', 'M'];
 
 /** Stati che contano come "da riparare" nei riepiloghi (come nel gestionale originale). */
 export const STATI_DA_RIPARARE: readonly StatoArticolo[] = ['Da riparare', 'Fuori uso'];
@@ -82,6 +84,10 @@ export function statoArticolo(valore: unknown): StatoArticolo | null {
 
 export function tipoMovimento(valore: unknown): TipoMovimento | null {
   return TIPI_MOVIMENTO.find((nome) => nome === valore) ?? null;
+}
+
+export function categoriaAtleta(valore: unknown): CategoriaAtleta | null {
+  return CATEGORIE_ATLETA.find((sigla) => sigla === valore) ?? null;
 }
 
 /**
