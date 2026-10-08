@@ -113,9 +113,33 @@ export function ottieniAtleta(idAtleta) {
   return richiestaJson(`/api/atleti/${idAtleta}`);
 }
 
+/* -------------------------------------------------------------- categorie */
+
+/** @returns {Promise<{categorie: {id: number, nome: string, attiva: number}[]}>} */
+export function ottieniCategorie() {
+  return richiestaJson('/api/categorie');
+}
+
+/**
+ * @param {string} nome
+ * @returns {Promise<{id: number, nome: string, attiva: number}>}
+ */
+export function creaCategoria(nome) {
+  return richiestaJson('/api/categorie', { method: 'POST', body: JSON.stringify({ nome }) });
+}
+
+/**
+ * @param {number} idCategoria
+ * @param {boolean} attiva
+ * @returns {Promise<{ok: boolean}>}
+ */
+export function impostaCategoriaAttiva(idCategoria, attiva) {
+  return richiestaJson(`/api/categorie/${idCategoria}`, { method: 'PATCH', body: JSON.stringify({ attiva }) });
+}
+
 /* --------------------------------------------------------------- articoli */
 
-/** @returns {Promise<{articoli: object[]}>} every item, ordered by warehouse, brand, model */
+/** @returns {Promise<{articoli: object[]}>} every item, ordered by warehouse, category, brand, model */
 export function ottieniArticoli() {
   return richiestaJson('/api/articoli');
 }
@@ -129,7 +153,7 @@ export function ottieniArticolo(idArticolo) {
 }
 
 /**
- * @param {{disciplina: string, marca: string, modello?: string|null, taglia?: string|null, quantita?: number, stato?: string, note?: string|null}} corpo
+ * @param {{disciplina: string, categoria: string, marca: string, modello?: string|null, taglia?: string|null, quantita?: number, stato?: string, note?: string|null}} corpo
  * @returns {Promise<{id: number}>}
  */
 export function creaArticolo(corpo) {

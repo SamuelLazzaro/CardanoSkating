@@ -28,7 +28,7 @@ magazzino/
 │   ├── articolo.ts       # validazione dei dati anagrafici di un articolo
 │   ├── query.ts          # frammenti SQL condivisi (storico, possesso atleta)
 │   ├── csv.ts            # export CSV per Excel italiano
-│   └── routes/           # accesso, atleti, articoli, movimenti, riepilogo
+│   └── routes/           # accesso, atleti, categorie, articoli, movimenti, riepilogo
 ├── public/               # frontend statico (una sola pagina)
 │   ├── index.html
 │   ├── css/              # base / layout / components / main (@import)
@@ -163,12 +163,14 @@ Consiglio: fai un backup prima di ogni `migrate:remote`.
   magazzino si vedono i suoi riquadri e le ultime dieci movimentazioni.
 - **Articoli**: un articolo è identificato dal suo `id` e mostrato come
   "Marca · Modello" (la marca è obbligatoria, il modello no); non esistono
-  codice, categoria, descrizione, seriale né valore (tolti con la migrazione
-  0003, che ha eliminato anche la tabella `categorie`: la categoria resta solo
-  per gli atleti). `quantita` è il totale posseduto, `disponibili` la giacenza
-  in magazzino; la differenza è il materiale consegnato agli atleti. Lo stato
-  è uno tra `Nuovo`, `Buono`, `Usurato`, `Da riparare`, `Fuori uso`; gli
-  ultimi due contano come "da riparare" nei riquadri.
+  codice, descrizione, seriale né valore (tolti con la migrazione 0003).
+  La categoria è obbligatoria ed è un testo che riprende una riga della
+  tabella `categorie` (le categorie disattivate non compaiono più nei menu,
+  gli articoli che le usano restano com'erano). `quantita` è il totale
+  posseduto, `disponibili` la giacenza in magazzino; la differenza è il
+  materiale consegnato agli atleti. Lo stato è uno tra `Nuovo`, `Buono`,
+  `Usurato`, `Da riparare`, `Fuori uso`; gli ultimi due contano come "da
+  riparare" nei riquadri.
 - **Atleti**: ogni atleta ha nome e cognome in un unico campo e una
   categoria agonistica tra `G` (Giovanissimi), `E` (Esordienti), `R12`
   (Ragazzi 12), `R` (Ragazzi), `A` (Allievi), `J` (Junior), `S` (Senior) e
@@ -225,7 +227,7 @@ Consiglio: fai un backup prima di ogni `migrate:remote`.
   entrambi.
 - **Rate limit login**: 10 tentativi per IP ogni 15 minuti (tabella
   `rate_limit` su D1).
-- **Audit**: login e login falliti, creazione di atleti/articoli,
+- **Audit**: login e login falliti, creazione di atleti/categorie/articoli,
   eliminazioni e movimenti sono registrati nella tabella `audit_log` con il
   nome dell'utente.
 - **Differenza dal Flask**: un'entrata su un articolo esistente con una
@@ -241,7 +243,9 @@ valutare, nell'ordine in cui sono emerse durante l'analisi:
    eliminazione: un refuso nella marca o nel modello non si corregge).
 2. **Cancellazione o anonimizzazione di un atleta** (oggi solo
    attiva/disattiva; i nomi restano per sempre nello storico).
-3. **Informativa privacy** dedicata, come [prenotazioni/public/privacy.html](../prenotazioni/public/privacy.html):
+3. **Categoria come chiave esterna** invece di testo libero, così rinominare
+   una categoria aggiorna gli articoli.
+4. **Informativa privacy** dedicata, come [prenotazioni/public/privacy.html](../prenotazioni/public/privacy.html):
    nomi di atleti (verosimilmente minori) e firme autografe sono dati
    personali.
-4. **Firma visibile** nel dettaglio del movimento (oggi salvata ma mai mostrata).
+5. **Firma visibile** nel dettaglio del movimento (oggi salvata ma mai mostrata).

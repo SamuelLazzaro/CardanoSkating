@@ -1,12 +1,12 @@
 /*
  * vista-materiali.js — Materiali section: filterable items table, "Nuovo
- * materiale" popup and item card popup (details, QR code, register movement,
- * delete).
+ * materiale" popup, item card popup (details, QR code, register movement,
+ * delete) and the categories panel.
  */
 import { STATI_ARTICOLO } from './constants.js';
-import { creaArticolo, eliminaArticolo, ottieniArticolo, urlQrArticolo } from './api.js';
-import { articoloPerId, g_stato } from './stato.js';
-import { badgeDisciplina, badgeStato, creaBottoneTesto, creaRiga, mostraMessaggio, preparaDialogo, preparaFiltro, riempiDettagli, riempiSelect, riempiTabella } from './ui.js';
+import { creaArticolo, creaCategoria, eliminaArticolo, impostaCategoriaAttiva, ottieniArticolo, urlQrArticolo } from './api.js';
+import { articoloPerId, categorieAttive, g_stato } from './stato.js';
+import { badgeDisciplina, badgeStato, creaBadge, creaBottonePiccolo, creaBottoneTesto, creaRiga, mostraMessaggio, preparaDialogo, preparaFiltro, riempiDatalist, riempiDettagli, riempiSelect, riempiTabella } from './ui.js';
 import { filtraArticoli, nomeArticolo, testoONull } from './utils.js';
 
 /** @type {(id: string) => HTMLElement} */
@@ -65,6 +65,9 @@ export function preparaMateriali({ alCambio, alMovimentoPerArticolo }) {
     g_alMovimentoPerArticolo(g_articoloAperto.id);
   });
   elemento('bottone-elimina-materiale').addEventListener('click', eliminaMaterialeAperto);
+
+  // categories panel
+  elemento('form-categoria').addEventListener('submit', aggiungiCategoria);
 }
 
 /**
@@ -76,9 +79,11 @@ export function impostaFiltroMateriali(disciplina) {
   g_filtro.imposta(disciplina);
 }
 
-/** @returns {void} re-renders the table from g_stato */
+/** @returns {void} re-renders table, categories and the category suggestions from g_stato */
 export function renderMateriali() {
   renderTabellaMateriali();
+  renderCategorie();
+  riempiDatalist(elemento('elenco-categorie'), categorieAttive().map((categoria) => categoria.nome));
 }
 
 /** @returns {void} */
@@ -122,6 +127,7 @@ async function salvaNuovoMateriale(evento) {
 function leggiFormNuovoMateriale() {
   const corpo = {};
   corpo.disciplina = elemento('nuovo-disciplina').value;
+  corpo.categoria = elemento('nuovo-categoria').value.trim();
   corpo.marca = elemento('nuovo-marca').value.trim();
   corpo.modello = testoONull(elemento('nuovo-modello').value);
   corpo.taglia = testoONull(elemento('nuovo-taglia').value);
@@ -143,8 +149,8 @@ export async function apriSchedaMateriale(idArticolo) {
     const articolo = articoloPerId(idArticolo) ?? (await ottieniArticolo(idArticolo)).articolo;
     g_articoloAperto = articolo;
     elemento('titolo-dialogo-materiale').textContent = nomeArticolo(articolo);
-    elemento('sottotitolo-materiale').replaceChildren(badgeDisciplina(articolo.disciplina), document.createTextNode(` · #${articolo.id}`));
-    const coppie = [['Marca', articolo.marca], ['Modello', articolo.modello], ['Misura', articolo.taglia], ['Quantità', articolo.quantita], ['Disponibili', articolo.disponibili], ['Stato', badgeStato(articolo.stato)], ['Note', articolo.note]];
+    elemento('sottotitolo-materiale').replaceChildren(badgeDisciplina(articolo.disciplina), document.createTextNode(` · ${articolo.categoria} · #${articolo.id}`));
+    const coppie = [['Categoria', articolo.categoria], ['Marca', articolo.marca], ['Modello', articolo.modello], ['Misura', articolo.taglia], ['Quantità', articolo.quantita], ['Disponibili', articolo.disponibili], ['Stato', badgeStato(articolo.stato)], ['Note', articolo.note]];
     riempiDettagli(elemento('dettagli-materiale'), coppie);
     elemento('qr-materiale').src = urlQrArticolo(articolo.id);
     mostraMessaggio(elemento('esito-scheda-materiale'), '');
@@ -164,6 +170,55 @@ async function eliminaMaterialeAperto() {
     elemento('dialogo-materiale').close();
     await g_alCambio();
     mostraMessaggio(elemento('esito-materiali'), 'Materiale eliminato.', 'ok');
+  } catch (errore) {
+    mostraMessaggio(esito, errore.message, 'errore');
+  }
+}
+
+/* -------------------------------------------------------------- categorie */
+
+/** @returns {void} */
+function renderCategorie() {
+  const righe = g_stato.categorie.map((categoria) => {
+    const attiva = categoria.attiva === 1;
+    const nome = document.createElement('strong');
+    nome.textContent = categoria.nome;
+    const stato = creaBadge(attiva ? 'Attiva' : 'Disattivata', attiva ? 'badge-attivo' : 'badge-disattivato');
+    const azione = creaBottonePiccolo(attiva ? 'Disattiva' : 'Riattiva', () => cambiaStatoCategoria(categoria.id, !attiva), attiva ? 'btn-pericolo' : 'btn-ok');
+    return creaRiga([nome, stato, azione], ['', '', 'cella-azioni']);
+  });
+  riempiTabella(elemento('righe-categorie'), righe, elemento('vuoto-categorie'));
+}
+
+/**
+ * @param {SubmitEvent} evento
+ * @returns {Promise<void>}
+ */
+async function aggiungiCategoria(evento) {
+  evento.preventDefault();
+  const campo = elemento('campo-nome-categoria');
+  const esito = elemento('esito-categorie');
+  try {
+    const creata = await creaCategoria(campo.value);
+    campo.value = '';
+    await g_alCambio();
+    mostraMessaggio(esito, `Categoria ${creata.nome} aggiunta.`, 'ok');
+  } catch (errore) {
+    mostraMessaggio(esito, errore.message, 'errore');
+  }
+}
+
+/**
+ * @param {number} idCategoria
+ * @param {boolean} attiva - new state
+ * @returns {Promise<void>}
+ */
+async function cambiaStatoCategoria(idCategoria, attiva) {
+  const esito = elemento('esito-categorie');
+  try {
+    await impostaCategoriaAttiva(idCategoria, attiva);
+    await g_alCambio();
+    mostraMessaggio(esito, '');
   } catch (errore) {
     mostraMessaggio(esito, errore.message, 'errore');
   }

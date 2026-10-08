@@ -16,7 +16,7 @@ const QUANTITA_PREDEFINITA = 1;
 const SQL_ELENCO_ARTICOLI = `SELECT * FROM articoli
   WHERE (?1 = '' OR disciplina = ?1)
     AND (?2 = '' OR marca LIKE ?2 ESCAPE '\\' OR modello LIKE ?2 ESCAPE '\\')
-  ORDER BY disciplina, marca, modello, id LIMIT 1000`;
+  ORDER BY disciplina, categoria, marca, modello, id LIMIT 1000`;
 
 /** Eliminazione condizionata: la riga sparisce solo se non ha movimenti. */
 const SQL_ELIMINA_SENZA_STORICO = 'DELETE FROM articoli WHERE id = ?1 AND NOT EXISTS (SELECT 1 FROM movimenti WHERE articolo_id = ?1)';

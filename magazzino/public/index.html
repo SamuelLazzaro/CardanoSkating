@@ -239,6 +239,27 @@
             </div>
             <p id="vuoto-materiali" class="vuoto" hidden>Nessun materiale.</p>
           </section>
+
+          <section class="pannello">
+            <div class="pannello-testata">
+              <h2>Categorie materiale</h2>
+              <form id="form-categoria" class="modulo-in-riga">
+                <input type="text" id="campo-nome-categoria" maxlength="80" placeholder="Es. Borse, Guanti…" aria-label="Nome categoria" required>
+                <button type="submit" class="btn btn-primario">Aggiungi</button>
+              </form>
+            </div>
+            <p class="testo-tenue">Categorie utilizzate nei due magazzini.</p>
+            <p id="esito-categorie" class="stato" role="status" hidden></p>
+            <div class="scorri-tabella">
+              <table class="tabella" id="tabella-categorie">
+                <thead>
+                  <tr><th scope="col">Categoria</th><th scope="col">Stato</th><th scope="col"></th></tr>
+                </thead>
+                <tbody id="righe-categorie"></tbody>
+              </table>
+            </div>
+            <p id="vuoto-categorie" class="vuoto" hidden>Nessuna categoria.</p>
+          </section>
         </div>
 
         <!-- ======================================================= Movimento -->
@@ -247,7 +268,7 @@
             <div class="pannello-testata">
               <div>
                 <h2>Nuovo movimento</h2>
-                <p class="testo-tenue">Seleziona magazzino e materiale.</p>
+                <p class="testo-tenue">Seleziona magazzino, categoria e materiale.</p>
               </div>
             </div>
             <form id="form-movimento" class="modulo modulo-largo">
@@ -267,12 +288,16 @@
                     <option value="Corsa" selected>Pattinaggio corsa</option>
                   </select>
                 </div>
+                <div class="campo">
+                  <label for="mov-categoria">Categoria materiale</label>
+                  <select id="mov-categoria"></select>
+                </div>
               </div>
 
               <div class="campo" id="mov-blocco-articolo">
                 <label for="mov-articolo">Materiale</label>
                 <select id="mov-articolo" required></select>
-                <p id="mov-nessun-articolo" class="suggerimento avviso" hidden>Nessun articolo nel magazzino selezionato.</p>
+                <p id="mov-nessun-articolo" class="suggerimento avviso" hidden>Nessun articolo corrisponde al magazzino e alla categoria selezionati.</p>
               </div>
 
               <fieldset class="campo" id="mov-blocco-entrata" hidden>
@@ -299,7 +324,7 @@
                     <input type="text" id="mov-nuovo-taglia" maxlength="120">
                   </div>
                 </div>
-                <p class="suggerimento">Il nuovo articolo prende il magazzino selezionato sopra.</p>
+                <p class="suggerimento">Il nuovo articolo prende il magazzino e la categoria selezionati sopra.</p>
               </fieldset>
 
               <div class="campo-riga">
@@ -414,6 +439,12 @@
                 </select>
               </div>
               <div class="campo">
+                <label for="nuovo-categoria">Categoria*</label>
+                <input type="text" id="nuovo-categoria" maxlength="80" list="elenco-categorie" required>
+              </div>
+            </div>
+            <div class="campo-riga">
+              <div class="campo">
                 <label for="nuovo-marca">Marca*</label>
                 <input type="text" id="nuovo-marca" maxlength="120" placeholder="Es. Edea, Matter, Bont…" required>
               </div>
@@ -472,6 +503,8 @@
           <p id="esito-scheda-materiale" class="stato" role="status" hidden></p>
         </div>
       </dialog>
+
+      <datalist id="elenco-categorie"></datalist>
     </main>
   </div>
 </body>

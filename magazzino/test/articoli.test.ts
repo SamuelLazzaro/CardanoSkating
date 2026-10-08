@@ -8,7 +8,7 @@ import app from '../src/index';
 import { patternRicerca } from '../src/util';
 import { audit, cookieUtente, creaArticolo, creaAtleta, deleteConCookie, getConCookie, postJson, UTENTE_TEST } from './helpers';
 
-const NUOVO = { disciplina: 'Corsa', marca: 'Matter', modello: 'Ruota 110 mm', quantita: 8 };
+const NUOVO = { disciplina: 'Corsa', categoria: 'Ruote', marca: 'Matter', modello: 'Ruota 110 mm', quantita: 8 };
 
 describe('inserimento articoli', () => {
   it('crea un articolo con giacenza piena e stato Buono di default e lo registra in audit', async () => {
@@ -19,8 +19,8 @@ describe('inserimento articoli', () => {
     const scheda = await getConCookie(`/api/articoli/${id}`, cookie);
     expect(scheda.status).toBe(200);
     const { articolo } = (await scheda.json()) as { articolo: Record<string, unknown> };
-    expect(articolo).toMatchObject({ disciplina: 'Corsa', marca: 'Matter', modello: 'Ruota 110 mm', taglia: null, quantita: 8, disponibili: 8, stato: 'Buono', note: null });
-    for (const campoTolto of ['codice', 'categoria', 'descrizione', 'seriale', 'valore']) expect(articolo).not.toHaveProperty(campoTolto);
+    expect(articolo).toMatchObject({ disciplina: 'Corsa', categoria: 'Ruote', marca: 'Matter', modello: 'Ruota 110 mm', taglia: null, quantita: 8, disponibili: 8, stato: 'Buono', note: null });
+    for (const campoTolto of ['codice', 'descrizione', 'seriale', 'valore']) expect(articolo).not.toHaveProperty(campoTolto);
     expect((await audit('articolo_creato'))[0]).toEqual({ attore: UTENTE_TEST, dettaglio: `#${id} Matter Ruota 110 mm (Corsa)` });
   });
 
@@ -32,12 +32,14 @@ describe('inserimento articoli', () => {
     expect(articolo).toMatchObject({ quantita: 1, disponibili: 1, stato: 'Usurato', taglia: '42', note: 'seconda mano' });
   });
 
-  it('la marca è obbligatoria, il modello no', async () => {
+  it('categoria e marca sono obbligatorie, il modello no', async () => {
     const cookie = await cookieUtente();
+    expect((await postJson('/api/articoli', cookie, { ...NUOVO, categoria: '' })).status).toBe(400);
+    expect((await postJson('/api/articoli', cookie, { ...NUOVO, categoria: undefined })).status).toBe(400);
     expect((await postJson('/api/articoli', cookie, { ...NUOVO, marca: '' })).status).toBe(400);
     expect((await postJson('/api/articoli', cookie, { ...NUOVO, marca: undefined })).status).toBe(400);
     expect((await postJson('/api/articoli', cookie, { ...NUOVO, marca: 'x'.repeat(121) })).status).toBe(400);
-    const soloMarca = await postJson('/api/articoli', cookie, { disciplina: 'Ghiaccio', marca: 'Edea' });
+    const soloMarca = await postJson('/api/articoli', cookie, { disciplina: 'Ghiaccio', categoria: 'Pattini', marca: 'Edea' });
     expect(soloMarca.status).toBe(201);
     const { id } = (await soloMarca.json()) as { id: number };
     const { articolo } = (await (await getConCookie(`/api/articoli/${id}`, cookie)).json()) as { articolo: Record<string, unknown> };
@@ -57,14 +59,15 @@ describe('inserimento articoli', () => {
 });
 
 describe('elenco e ricerca', () => {
-  it('ordina per magazzino, marca e modello; filtra per magazzino e per testo libero su marca e modello', async () => {
+  it('ordina per magazzino, categoria, marca e modello; filtra per magazzino e per testo libero su marca e modello', async () => {
     const cookie = await cookieUtente();
-    await creaArticolo({ disciplina: 'Ghiaccio', marca: 'Wilson', modello: 'Gold Seal' });
-    await creaArticolo({ disciplina: 'Corsa', marca: 'Powerslide', modello: 'Telaio 3x110' });
-    await creaArticolo({ disciplina: 'Corsa', marca: 'Bont', modello: null });
+    await creaArticolo({ disciplina: 'Ghiaccio', categoria: 'Lame', marca: 'Wilson', modello: 'Gold Seal' });
+    await creaArticolo({ disciplina: 'Corsa', categoria: 'Pattini', marca: 'Powerslide', modello: 'Telaio 3x110' });
+    await creaArticolo({ disciplina: 'Corsa', categoria: 'Ruote', marca: 'Bont', modello: null });
     const nomi = (lista: { articoli: { marca: string }[] }) => lista.articoli.map((a) => a.marca);
     const tutti = (await (await getConCookie('/api/articoli', cookie)).json()) as { articoli: { marca: string }[] };
-    expect(nomi(tutti)).toEqual(['Bont', 'Powerslide', 'Wilson']);
+    // Corsa prima di Ghiaccio; dentro Corsa la categoria Pattini precede Ruote
+    expect(nomi(tutti)).toEqual(['Powerslide', 'Bont', 'Wilson']);
     const ghiaccio = (await (await getConCookie('/api/articoli?disciplina=Ghiaccio', cookie)).json()) as { articoli: { marca: string }[] };
     expect(nomi(ghiaccio)).toEqual(['Wilson']);
     const perMarca = (await (await getConCookie('/api/articoli?q=wilson', cookie)).json()) as { articoli: { marca: string }[] };
@@ -115,14 +118,5 @@ describe('QR code', () => {
     expect(svg).toContain('<path');
     expect((await getConCookie('/api/articoli/9999/qr.svg', cookie)).status).toBe(404);
     expect((await app.request(`/api/articoli/${id}/qr.svg`, {}, env)).status).toBe(401);
-  });
-});
-
-describe('categorie materiale', () => {
-  it('le API delle categorie non esistono più', async () => {
-    const cookie = await cookieUtente();
-    expect((await getConCookie('/api/categorie', cookie)).status).toBe(404);
-    const tabella = await env.DB.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'categorie'").first();
-    expect(tabella).toBeNull();
   });
 });

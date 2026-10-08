@@ -89,7 +89,7 @@ movimenti.get('/export.csv', async (c) => {
  * Registra un movimento. Corpo:
  *   tipo: 'ENTRATA' | 'CONSEGNA' | 'RESTITUZIONE'
  *   quantita (intero ≥ 1), data ('YYYY-MM-DD', default oggi), condizione?, note?
- *   articolo_id — oppure, solo per ENTRATA, nuovo_articolo: { disciplina, marca, modello?, taglia?, note? }
+ *   articolo_id — oppure, solo per ENTRATA, nuovo_articolo: { disciplina, categoria, marca, modello?, taglia?, note? }
  *   atleta_id — obbligatorio per CONSEGNA e RESTITUZIONE
  *   firma? — data URL PNG, solo per CONSEGNA e RESTITUZIONE
  */

@@ -35,19 +35,21 @@ describe('entrata', () => {
     const cookie = await cookieUtente();
     // un articolo preesistente: il movimento deve agganciarsi a quello nuovo, non a questo
     const precedente = await creaArticolo({ marca: 'Precedente' });
-    const nuovoArticolo = { disciplina: 'Ghiaccio', marca: 'MK', modello: 'Gold Star' };
+    const nuovoArticolo = { disciplina: 'Ghiaccio', categoria: 'Lame', marca: 'MK', modello: 'Gold Star' };
     const risposta = await postJson('/api/movimenti', cookie, { tipo: 'ENTRATA', nuovo_articolo: nuovoArticolo, quantita: 4, data: '2026-09-01' });
     expect(risposta.status).toBe(201);
     const { articolo_id, disciplina } = (await risposta.json()) as { articolo_id: number; disciplina: string };
     expect(disciplina).toBe('Ghiaccio');
     expect(articolo_id).not.toBe(precedente);
     expect(await giacenza(articolo_id)).toEqual({ quantita: 4, disponibili: 4, stato: 'Nuovo' });
+    const salvato = await env.DB.prepare('SELECT categoria FROM articoli WHERE id = ?1').bind(articolo_id).first();
+    expect(salvato).toEqual({ categoria: 'Lame' });
     const movimento = await env.DB.prepare('SELECT articolo_id, tipo, quantita, data FROM movimenti').first();
     expect(movimento).toEqual({ articolo_id, tipo: 'ENTRATA', quantita: 4, data: '2026-09-01' });
     expect((await audit('entrata'))[0]?.dettaglio).toBe(`nuovo articolo #${articolo_id} MK Gold Star (Ghiaccio) × 4`);
     // stessa marca e modello: non c'è più un codice univoco, è un secondo articolo
     expect((await postJson('/api/movimenti', cookie, { tipo: 'ENTRATA', nuovo_articolo: nuovoArticolo, quantita: 1 })).status).toBe(201);
-    const incompleto = await postJson('/api/movimenti', cookie, { tipo: 'ENTRATA', nuovo_articolo: { disciplina: 'Ghiaccio' }, quantita: 1 });
+    const incompleto = await postJson('/api/movimenti', cookie, { tipo: 'ENTRATA', nuovo_articolo: { disciplina: 'Ghiaccio', marca: 'MK' }, quantita: 1 });
     expect(incompleto.status).toBe(400);
   });
 

@@ -117,6 +117,13 @@ L'ordine migrazione → deploy evita che il nuovo codice giri contro uno schema
 vecchio. Le migrazioni sono applicate in ordine di nome file; wrangler tiene
 traccia di quelle già eseguite, quindi rilanciare i comandi è sicuro.
 
+Nota sulla 0004: gli articoli già presenti ricevono la categoria `Altro`
+(disattivata). Per assegnare quella giusta a un articolo, con il suo id:
+
+```bash
+npx wrangler d1 execute cardanoskating-magazzino --remote --command "UPDATE articoli SET categoria = 'Body' WHERE id = 1"
+```
+
 ### Backup del database
 
 ```bash

@@ -111,13 +111,13 @@ export function filtraEOrdinaAtleti(atleti, categorieScelte, ordine) {
 }
 
 /**
- * Label of an item in the movement form select: "Marca · Modello · Taglia ·
- * disponibili N".
+ * Label of an item in the movement form select: "Categoria · Marca · Modello
+ * · Taglia · disponibili N".
  * @param {object} articolo
  * @returns {string}
  */
 export function etichettaArticolo(articolo) {
-  const parti = [nomeArticolo(articolo)];
+  const parti = [articolo.categoria, nomeArticolo(articolo)];
   if (articolo.taglia) parti.push(articolo.taglia);
   parti.push(`disponibili ${articolo.disponibili}`);
   return parti.join(' · ');
