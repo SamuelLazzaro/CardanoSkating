@@ -60,12 +60,14 @@ import {
   coloreEsadecimale,
   emailValida,
   giorniRicorrenza,
+  importoScontato,
   intero,
   leggiJson,
   MAX_MOTIVAZIONE,
   MAX_TITOLO,
   MIN_MOTIVAZIONE,
   motivazioneDecisione,
+  scontoPercentuale,
   scriviAudit,
   SOCIETA_DI_CASA_ID,
   tariffaOraria,
@@ -940,7 +942,7 @@ admin.get('/societa', async (c) => {
   const origine = new URL(c.req.url).origin;
   const { results } = await c.env.DB
     .prepare(
-      `SELECT id, nome, referente, email, telefono, stato, colore, tariffa_oraria, token_accesso, created_at
+      `SELECT id, nome, referente, email, telefono, stato, colore, tariffa_oraria, sconto, token_accesso, created_at
        FROM societa WHERE eliminata_at IS NULL ORDER BY nome`,
     )
     .all<{ id: number; token_accesso: string } & Record<string, unknown>>();
@@ -980,11 +982,18 @@ admin.post('/societa', async (c) => {
   // deve essere indicato esplicitamente.
   const tariffa = tariffaOraria(corpo.tariffa_oraria);
   if (tariffa === null) return c.json({ errore: 'Tariffa oraria obbligatoria (numero tra 0 e 10000)' }, 400);
+  // Sconto facoltativo: senza indicazione la società paga la tariffa piena.
+  let sconto = 0;
+  if (corpo.sconto !== undefined) {
+    const scontoValidato = scontoPercentuale(corpo.sconto);
+    if (scontoValidato === null) return c.json({ errore: 'Sconto non valido (intero tra 0 e 100)' }, 400);
+    sconto = scontoValidato;
+  }
 
   const token = crypto.randomUUID();
   const esito = await c.env.DB
-    .prepare('INSERT INTO societa (nome, referente, email, telefono, colore, tariffa_oraria, token_accesso) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)')
-    .bind(nome, referente, email, telefono, colore, tariffa, token)
+    .prepare('INSERT INTO societa (nome, referente, email, telefono, colore, tariffa_oraria, sconto, token_accesso) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)')
+    .bind(nome, referente, email, telefono, colore, tariffa, sconto, token)
     .run();
   await scriviAudit(c.env.DB, 'societa_creata', `società ${esito.meta.last_row_id} (${nome})`, 'admin');
   const origine = new URL(c.req.url).origin;
@@ -995,8 +1004,8 @@ admin.post('/societa', async (c) => {
   return c.json({ id: esito.meta.last_row_id, nome, link_accesso: linkAccesso }, 201);
 });
 
-/** Aggiornamento anagrafica (nome, referente, email, telefono, colore) e
- *  tariffa oraria. */
+/** Aggiornamento anagrafica (nome, referente, email, telefono, colore),
+ *  tariffa oraria e sconto percentuale. */
 admin.patch('/societa/:id', async (c) => {
   const id = intero(c.req.param('id'));
   if (id === null) return c.json({ errore: 'Identificativo non valido' }, 400);
@@ -1043,6 +1052,12 @@ admin.patch('/societa/:id', async (c) => {
     if (tariffa === null) return c.json({ errore: 'Tariffa oraria non valida (numero tra 0 e 10000)' }, 400);
     assegnazioni.push('tariffa_oraria = ?');
     parametri.push(tariffa);
+  }
+  if (corpo.sconto !== undefined) {
+    const sconto = scontoPercentuale(corpo.sconto);
+    if (sconto === null) return c.json({ errore: 'Sconto non valido (intero tra 0 e 100)' }, 400);
+    assegnazioni.push('sconto = ?');
+    parametri.push(sconto);
   }
   if (assegnazioni.length === 0) return c.json({ errore: 'Nessun campo da aggiornare' }, 400);
 
@@ -1437,25 +1452,26 @@ function dataCsv(data: string): string {
 
 /**
  * Riepilogo mensile per società: ore prenotate (slot approvati / 2, e le
- * righe di prenotazioni esistono solo per richieste approvate), tariffa e
- * importo. UNA sola query aggregata (GROUP BY società) sul range
- * lessicografico del mese; la riga totale è calcolata qui dalle righe lette.
+ * righe di prenotazioni esistono solo per richieste approvate), tariffa,
+ * sconto e importo scontato. UNA sola query aggregata (GROUP BY società) sul
+ * range lessicografico del mese; l'importo è calcolato qui con la stessa
+ * funzione di CSV ed email, la riga totale dalle righe lette.
  */
 admin.get('/report', async (c) => {
   const mese = c.req.query('mese') ?? '';
   if (!isMeseValido(mese)) return c.json({ errore: 'Parametro mese non valido (formato atteso AAAA-MM)' }, 400);
   const { da, a } = rangeMese(mese);
-  const { results } = await c.env.DB
+  const { results: aggregati } = await c.env.DB
     .prepare(
-      `SELECT s.id AS societa_id, s.nome AS societa, s.tariffa_oraria,
-              COUNT(p.id) / 2.0 AS ore,
-              COUNT(p.id) / 2.0 * s.tariffa_oraria AS importo
+      `SELECT s.id AS societa_id, s.nome AS societa, s.tariffa_oraria, s.sconto,
+              COUNT(p.id) / 2.0 AS ore
        FROM prenotazioni p JOIN societa s ON s.id = p.societa_id
        WHERE p.slot_key >= ?1 AND p.slot_key < ?2
        GROUP BY s.id ORDER BY s.nome`,
     )
     .bind(da, a)
-    .all<{ societa_id: number; societa: string; tariffa_oraria: number; ore: number; importo: number }>();
+    .all<{ societa_id: number; societa: string; tariffa_oraria: number; sconto: number; ore: number }>();
+  const results = aggregati.map((riga) => ({ ...riga, importo: importoScontato(riga.ore, riga.tariffa_oraria, riga.sconto) }));
   const totale = results.reduce(
     (accumulo, riga) => ({ ore: accumulo.ore + riga.ore, importo: accumulo.importo + riga.importo }),
     { ore: 0, importo: 0 },
@@ -1476,8 +1492,7 @@ admin.get('/report.csv', async (c) => {
   const { results } = await c.env.DB
     .prepare(
       `SELECT r.data, s.nome AS societa, r.ora_inizio, r.ora_fine,
-              COUNT(p.id) / 2.0 AS ore, s.tariffa_oraria,
-              COUNT(p.id) / 2.0 * s.tariffa_oraria AS importo
+              COUNT(p.id) / 2.0 AS ore, s.tariffa_oraria, s.sconto
        FROM prenotazioni p
        JOIN richieste r ON r.id = p.richiesta_id
        JOIN societa s ON s.id = p.societa_id
@@ -1486,7 +1501,7 @@ admin.get('/report.csv', async (c) => {
        ORDER BY r.data, r.ora_inizio, s.nome`,
     )
     .bind(da, a)
-    .all<{ data: string; societa: string; ora_inizio: string; ora_fine: string; ore: number; tariffa_oraria: number; importo: number }>();
+    .all<{ data: string; societa: string; ora_inizio: string; ora_fine: string; ore: number; tariffa_oraria: number; sconto: number }>();
 
   const righe = results.map((riga) =>
     [
@@ -1496,10 +1511,11 @@ admin.get('/report.csv', async (c) => {
       riga.ora_fine,
       numeroCsv(riga.ore, 1),
       numeroCsv(riga.tariffa_oraria, 2),
-      numeroCsv(riga.importo, 2),
+      String(riga.sconto),
+      numeroCsv(importoScontato(riga.ore, riga.tariffa_oraria, riga.sconto), 2),
     ].join(';'),
   );
-  const intestazione = 'Data;Società;Inizio;Fine;Ore;Tariffa;Importo';
+  const intestazione = 'Data;Società;Inizio;Fine;Ore;Tariffa;Sconto %;Importo';
   // BOM UTF-8 iniziale: senza, Excel italiano legge male i caratteri accentati.
   const csv = `\ufeff${[intestazione, ...righe].join('\r\n')}\r\n`;
   return c.body(csv, 200, {
@@ -1533,22 +1549,25 @@ function erroreMeseReport(mese: string, istante: Date): string | null {
 
 /**
  * Ore e importo di una società in un mese: come nel report aggregato, le ore
- * sono gli slot approvati / 2 e l'importo usa la tariffa CORRENTE della
- * società (nessuno storico tariffe, scelta del committente). Senza slot nel
- * mese la query aggregata ritorna comunque una riga con zeri.
+ * sono gli slot approvati / 2 e l'importo usa tariffa e sconto CORRENTI della
+ * società (nessuno storico, scelta del committente). Senza slot nel mese la
+ * query aggregata ritorna comunque una riga con zero ore.
  */
 async function cifreMeseSocieta(db: D1Database, societaId: number, mese: string): Promise<CifreMese> {
   const { da, a } = rangeMese(mese);
   const riga = await db
     .prepare(
       `SELECT COUNT(p.id) / 2.0 AS ore,
-              COUNT(p.id) / 2.0 * (SELECT tariffa_oraria FROM societa WHERE id = ?1) AS importo
+              (SELECT tariffa_oraria FROM societa WHERE id = ?1) AS tariffa_oraria,
+              (SELECT sconto FROM societa WHERE id = ?1) AS sconto
        FROM prenotazioni p
        WHERE p.societa_id = ?1 AND p.slot_key >= ?2 AND p.slot_key < ?3`,
     )
     .bind(societaId, da, a)
-    .first<CifreMese>();
-  return { ore: riga?.ore ?? 0, importo: riga?.importo ?? 0 };
+    .first<{ ore: number; tariffa_oraria: number | null; sconto: number | null }>();
+  const ore = riga?.ore ?? 0;
+  const importo = importoScontato(ore, riga?.tariffa_oraria ?? 0, riga?.sconto ?? 0);
+  return { ore, importo };
 }
 
 async function ultimoInvioReport(db: D1Database, societaId: number, mese: string): Promise<UltimoInvioReport | null> {

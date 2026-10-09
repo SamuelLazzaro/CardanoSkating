@@ -952,7 +952,7 @@ async function caricaReport() {
 }
 
 /**
- * @param {{mese: string, righe: {societa: string, tariffa_oraria: number, ore: number, importo: number}[], totale: {ore: number, importo: number}}} dati
+ * @param {{mese: string, righe: {societa: string, tariffa_oraria: number, sconto: number, ore: number, importo: number}[], totale: {ore: number, importo: number}}} dati
  * @returns {void}
  */
 function renderReport(dati) {
@@ -964,6 +964,7 @@ function renderReport(dati) {
       cellaReport('td', riga.societa),
       cellaReport('td', numeroItaliano(riga.ore, 1), true),
       cellaReport('td', numeroItaliano(riga.tariffa_oraria, 2), true),
+      cellaReport('td', String(riga.sconto), true),
       cellaReport('td', numeroItaliano(riga.importo, 2), true),
     );
     corpoTabella.append(tr);
@@ -974,6 +975,7 @@ function renderReport(dati) {
   rigaTotale.append(
     cellaReport('th', 'Totale'),
     cellaReport('th', numeroItaliano(dati.totale.ore, 1), true),
+    cellaReport('th', ''),
     cellaReport('th', ''),
     cellaReport('th', numeroItaliano(dati.totale.importo, 2), true),
   );
@@ -1037,6 +1039,8 @@ function renderSocieta(societa) {
       soc.email,
       soc.telefono,
       `tariffa ${numeroItaliano(soc.tariffa_oraria, 2)} €/h`,
+      // A zero discount is the normal case, so it is not worth a mention.
+      soc.sconto > 0 ? `sconto ${soc.sconto}%` : '',
     ].filter(Boolean).join(' · ');
     riga.append(dettagli);
 
@@ -1243,6 +1247,7 @@ function impostaFormSocieta(soc) {
   elemento('soc-email').value = soc?.email ?? '';
   elemento('soc-telefono').value = soc?.telefono ?? '';
   elemento('soc-tariffa').value = soc ? String(soc.tariffa_oraria) : '';
+  elemento('soc-sconto').value = soc ? String(soc.sconto) : '0';
   elemento('soc-colore').value = eColoreEsadecimale(soc?.colore) ? soc.colore : COLORE_PREDEFINITO;
   // A stale error from a previous attempt must not greet the reopened dialog.
   mostraMessaggio(elemento('esito-form-societa'), '');
@@ -1271,6 +1276,8 @@ async function salvaSocieta(evento) {
     telefono: elemento('soc-telefono').value.trim(),
     colore: elemento('soc-colore').value,
     tariffa_oraria: Number(elemento('soc-tariffa').value),
+    // An emptied field means "no discount", not an invalid request.
+    sconto: Number(elemento('soc-sconto').value || 0),
   };
   try {
     // Success closes the popup: the confirmation goes to the page-level

@@ -49,6 +49,7 @@ export type SocietaRow = {
   stato: StatoSocieta;
   colore: string;
   tariffa_oraria: number;
+  sconto: number;
   token_accesso: string;
   created_at: string;
 };

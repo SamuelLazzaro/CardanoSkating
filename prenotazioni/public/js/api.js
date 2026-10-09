@@ -273,7 +273,7 @@ export function ottieniElencoSocieta() {
 }
 
 /**
- * @param {{nome: string, referente: string, email: string, tariffa_oraria: number, telefono?: string, colore?: string}} corpo
+ * @param {{nome: string, referente: string, email: string, tariffa_oraria: number, sconto?: number, telefono?: string, colore?: string}} corpo
  * @returns {Promise<{id: number, nome: string, link_accesso: string}>}
  */
 export function creaSocietaAdmin(corpo) {
@@ -282,7 +282,7 @@ export function creaSocietaAdmin(corpo) {
 
 /**
  * @param {number} idSocieta
- * @param {{nome?: string, referente?: string, email?: string, telefono?: string, colore?: string, tariffa_oraria?: number}} corpo
+ * @param {{nome?: string, referente?: string, email?: string, telefono?: string, colore?: string, tariffa_oraria?: number, sconto?: number}} corpo
  * @returns {Promise<{ok: boolean}>}
  */
 export function aggiornaSocietaAdmin(idSocieta, corpo) {
@@ -359,9 +359,9 @@ export function creaPrenotazioneDiretta(corpo) {
 }
 
 /**
- * Monthly report: booked hours, tariffa and importo per società.
+ * Monthly report: booked hours, tariffa, sconto and discounted importo per società.
  * @param {string} mese - 'YYYY-MM'
- * @returns {Promise<{mese: string, righe: {societa_id: number, societa: string, tariffa_oraria: number, ore: number, importo: number}[], totale: {ore: number, importo: number}}>}
+ * @returns {Promise<{mese: string, righe: {societa_id: number, societa: string, tariffa_oraria: number, sconto: number, ore: number, importo: number}[], totale: {ore: number, importo: number}}>}
  */
 export function ottieniReport(mese) {
   return richiestaJson(`/api/admin/report?mese=${mese}`);

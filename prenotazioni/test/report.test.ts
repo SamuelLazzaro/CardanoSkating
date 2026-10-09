@@ -15,7 +15,7 @@ import { cookieAdmin, cookieSocieta, creaSocietaConToken, getConCookie, postJson
 
 const MESE = '2031-03';
 
-type RigaReport = { societa_id: number; societa: string; tariffa_oraria: number; ore: number; importo: number };
+type RigaReport = { societa_id: number; societa: string; tariffa_oraria: number; sconto: number; ore: number; importo: number };
 type CorpoReport = { mese: string; righe: RigaReport[]; totale: { ore: number; importo: number } };
 
 async function patchSocieta(id: number, cookie: string, corpo: unknown): Promise<Response> {
@@ -26,10 +26,15 @@ async function patchSocieta(id: number, cookie: string, corpo: unknown): Promise
   );
 }
 
-/** Società + tariffa + prenotazioni dirette note nel mese osservato (e una fuori). */
+/**
+ * Società + tariffa + prenotazioni dirette note nel mese osservato (e una
+ * fuori). Alfa nasce senza sconto e lo riceve via PATCH (10%), Beta resta a
+ * tariffa piena: il report deve applicare lo sconto solo dove c'è.
+ */
 async function scenarioNoto(cookieAmm: string): Promise<{ idAlfa: number; idBeta: number }> {
   const alfa = await postJson('/api/admin/societa', cookieAmm, { nome: 'ASD Alfa', referente: 'A', email: 'alfa@example.com', tariffa_oraria: 20 });
   const { id: idAlfa } = (await alfa.json()) as { id: number };
+  expect((await patchSocieta(idAlfa, cookieAmm, { sconto: 10 })).status).toBe(200);
   // Beta nasce con una tariffa provvisoria poi corretta via PATCH: copre il
   // percorso di aggiornamento della tariffa usato dal dialogo di modifica.
   const beta = await postJson('/api/admin/societa', cookieAmm, { nome: 'ASD Beta', referente: 'B', email: 'beta@example.com', tariffa_oraria: 5 });
@@ -64,12 +69,39 @@ describe('tariffa oraria', () => {
     expect(riga?.tariffa_oraria).toBe(99);
   });
 
+  it('rifiuta sconti non interi o fuori da 0-100; senza sconto la società parte da 0', async () => {
+    const cookieAmm = await cookieAdmin();
+    for (const sconto of [-1, 101, 12.5, Number.NaN, '10']) {
+      expect((await patchSocieta(1, cookieAmm, { sconto })).status, `sconto ${sconto}`).toBe(400);
+    }
+    const senzaSconto = await postJson('/api/admin/societa', cookieAmm, {
+      nome: 'ASD Piena', referente: 'R', email: 'piena@example.com', tariffa_oraria: 10,
+    });
+    expect(senzaSconto.status).toBe(201);
+    const { id: idPiena } = (await senzaSconto.json()) as { id: number };
+    const rigaPiena = await env.DB.prepare('SELECT sconto FROM societa WHERE id = ?1').bind(idPiena).first<{ sconto: number }>();
+    expect(rigaPiena?.sconto).toBe(0);
+
+    const conSconto = await postJson('/api/admin/societa', cookieAmm, {
+      nome: 'ASD Scontata', referente: 'R', email: 'scontata@example.com', tariffa_oraria: 10, sconto: 100,
+    });
+    expect(conSconto.status).toBe(201);
+    const { id: idScontata } = (await conSconto.json()) as { id: number };
+    const rigaScontata = await env.DB.prepare('SELECT sconto FROM societa WHERE id = ?1').bind(idScontata).first<{ sconto: number }>();
+    expect(rigaScontata?.sconto).toBe(100);
+    // L'elenco admin espone lo sconto, così il pannello lo può mostrare.
+    const elenco = (await (await getConCookie('/api/admin/societa', cookieAmm)).json()) as { societa: { id: number; sconto: number }[] };
+    expect(elenco.societa.find((s) => s.id === idScontata)?.sconto).toBe(100);
+  });
+
   it('non compare mai nella risposta dell\'area società', async () => {
     const { token } = await creaSocietaConToken();
     const cookieSoc = await cookieSocieta(token);
     const profilo = await getConCookie('/api/societa/me', cookieSoc);
     expect(profilo.status).toBe(200);
-    expect(await profilo.text()).not.toContain('tariffa');
+    const testoProfilo = await profilo.text();
+    expect(testoProfilo).not.toContain('tariffa');
+    expect(testoProfilo).not.toContain('sconto');
   });
 });
 
@@ -91,11 +123,12 @@ describe('report mensile', () => {
 
     const alfa = corpo.righe.find((r) => r.societa_id === idAlfa);
     const beta = corpo.righe.find((r) => r.societa_id === idBeta);
-    expect(alfa).toMatchObject({ societa: 'ASD Alfa', tariffa_oraria: 20, ore: 4.5, importo: 90 });
-    expect(beta).toMatchObject({ societa: 'ASD Beta', tariffa_oraria: 12.5, ore: 1, importo: 12.5 });
+    // Alfa: 4,5 h x 20 €/h = 90 €, meno il 10% → 81 €. Beta: tariffa piena.
+    expect(alfa).toMatchObject({ societa: 'ASD Alfa', tariffa_oraria: 20, sconto: 10, ore: 4.5, importo: 81 });
+    expect(beta).toMatchObject({ societa: 'ASD Beta', tariffa_oraria: 12.5, sconto: 0, ore: 1, importo: 12.5 });
     // Solo le due società con prenotazioni nel mese; l'aprile di Alfa è fuori.
     expect(corpo.righe.length).toBe(2);
-    expect(corpo.totale).toEqual({ ore: 5.5, importo: 102.5 });
+    expect(corpo.totale).toEqual({ ore: 5.5, importo: 93.5 });
   });
 
   it('esporta il CSV per Excel italiano: BOM, ";", virgola decimale e attachment', async () => {
@@ -118,13 +151,14 @@ describe('report mensile', () => {
     const testo = await risposta.text();
     expect(testo.startsWith('\ufeff')).toBe(true);
     const righe = testo.slice(1).trimEnd().split('\r\n');
-    expect(righe[0]).toBe('Data;Società;Inizio;Fine;Ore;Tariffa;Importo');
-    // Una riga per prenotazione del mese (aprile escluso), in ordine di data.
+    expect(righe[0]).toBe('Data;Società;Inizio;Fine;Ore;Tariffa;Sconto %;Importo');
+    // Una riga per prenotazione del mese (aprile escluso), in ordine di data;
+    // l'importo di Alfa è già al netto del suo 10%.
     expect(righe.length).toBe(1 + 4);
-    expect(righe).toContain('10/03/2031;ASD Alfa;18:00;21:00;3,0;20,00;60,00');
-    expect(righe).toContain('17/03/2031;ASD Alfa;18:00;19:30;1,5;20,00;30,00');
-    expect(righe).toContain('11/03/2031;ASD Beta;10:00;11:00;1,0;12,50;12,50');
-    expect(righe).toContain('20/03/2031;"ASD; ""Strana""";09:00;09:30;0,5;0,00;0,00');
+    expect(righe).toContain('10/03/2031;ASD Alfa;18:00;21:00;3,0;20,00;10;54,00');
+    expect(righe).toContain('17/03/2031;ASD Alfa;18:00;19:30;1,5;20,00;10;27,00');
+    expect(righe).toContain('11/03/2031;ASD Beta;10:00;11:00;1,0;12,50;0;12,50');
+    expect(righe).toContain('20/03/2031;"ASD; ""Strana""";09:00;09:30;0,5;0,00;0;0,00');
     expect(testo).not.toContain('01/04/2031');
   });
 });

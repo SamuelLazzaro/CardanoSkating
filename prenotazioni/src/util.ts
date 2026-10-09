@@ -149,6 +149,26 @@ export function tariffaOraria(valore: unknown): number | null {
   return Math.round(valore * 100) / 100;
 }
 
+/**
+ * Valida lo sconto percentuale della società: intero tra 0 e 100.
+ * Ritorna null (→ 400 nel chiamante) se non valido.
+ */
+export function scontoPercentuale(valore: unknown): number | null {
+  if (typeof valore !== 'number' || !Number.isInteger(valore) || valore < 0 || valore > 100) return null;
+  return valore;
+}
+
+/**
+ * Importo da fatturare: ore x tariffa con lo sconto percentuale applicato,
+ * arrotondato ai centesimi SOLO alla fine, così report, CSV ed email
+ * calcolano la stessa cifra.
+ */
+export function importoScontato(ore: number, tariffaOraria: number, sconto: number): number {
+  const importoPieno = ore * tariffaOraria;
+  const fattoreSconto = 1 - sconto / 100;
+  return Math.round(importoPieno * fattoreSconto * 100) / 100;
+}
+
 export function emailValida(valore: string): boolean {
   return valore.length <= 200 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(valore);
 }

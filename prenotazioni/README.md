@@ -328,6 +328,14 @@ Consiglio: fai un backup prima di ogni `migrate:remote`.
   prenotazione in CSV per Excel italiano (BOM UTF-8, separatore `;`, numeri
   con la virgola, `Content-Disposition: attachment`). Le tariffe non
   compaiono mai nell'area società.
+- **Sconto percentuale** (migrazione `0012`): nel popup di creazione/modifica
+  della società l'admin può indicare uno sconto intero 0-100 (default 0),
+  applicato alla tariffa oraria: importo = ore × tariffa × (1 − sconto/100),
+  arrotondato ai centesimi solo alla fine. Lo sconto compare come colonna
+  "Sconto %" nella tabella del report mensile e nel CSV, e nella riga della
+  società quando è diverso da zero. Come la tariffa non ha storico: vale lo
+  sconto corrente anche per i mesi passati. Nell'email del report alla
+  società compare solo il totale già scontato, mai la percentuale.
 - **Report mensile inviato alla società** (migrazione `0011`): nella riga di
   ogni società (tranne quella di casa) il pulsante "Invia report" apre un
   popup con il selettore del mese, limitato ai mesi già conclusi, che mostra

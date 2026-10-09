@@ -62,8 +62,8 @@ function intercettaBrevo(status = 201): { corpo: () => Record<string, any> | nul
  * Società con tariffa nota e 1h30 (3 slot) già svolte nel mese passato, più
  * 1h nel mese successivo che NON deve entrare nel conteggio.
  */
-async function scenarioPassato(cookieAmm: string, tariffa = 20): Promise<number> {
-  const creazione = await postJson('/api/admin/societa', cookieAmm, { nome: 'ASD Storica', referente: 'S', email: 'storica@example.com', tariffa_oraria: tariffa });
+async function scenarioPassato(cookieAmm: string, tariffa = 20, sconto = 0): Promise<number> {
+  const creazione = await postJson('/api/admin/societa', cookieAmm, { nome: 'ASD Storica', referente: 'S', email: 'storica@example.com', tariffa_oraria: tariffa, sconto });
   expect(creazione.status).toBe(201);
   const { id } = (await creazione.json()) as { id: number };
   await inserisciPrenotazionePassata(id, '2025-06-10', ['1800', '1830', '1900']);
@@ -135,6 +135,15 @@ describe('anteprima del report di una società', () => {
     expect(corpo).toEqual({ mese: MESE_PASSATO, ore: 1.5, importo: 30, ultimo_invio: null });
   });
 
+  it('applica lo sconto della società all\'importo, arrotondando ai centesimi', async () => {
+    const cookieAmm = await cookieAdmin();
+    // 1,5 h x 20 €/h = 30 €; con sconto 15% → 25,50 €.
+    const id = await scenarioPassato(cookieAmm, 20, 15);
+    const corpo = (await (await getConCookie(`/api/admin/societa/${id}/report?mese=${MESE_PASSATO}`, cookieAmm)).json()) as CorpoReportSocieta;
+    expect(corpo.ore).toBe(1.5);
+    expect(corpo.importo).toBe(25.5);
+  });
+
   it('su un mese senza prenotazioni ritorna zeri', async () => {
     const cookieAmm = await cookieAdmin();
     const id = await scenarioPassato(cookieAmm);
@@ -194,6 +203,26 @@ describe('invio del report via email', () => {
     const riga = await env.DB.prepare('SELECT ore, importo, con_ore FROM report_inviati WHERE societa_id = ?1 AND mese = ?2').bind(id, MESE_PASSATO).first<{ ore: number; importo: number; con_ore: number }>();
     expect(riga).toEqual({ ore: 1.5, importo: 30, con_ore: 0 });
     expect(await conteggioAudit('report_inviato')).toBe(1);
+  });
+
+  it('con uno sconto l\'email riporta solo il totale scontato: né percentuale né importo pieno', async () => {
+    const cookieAmm = await cookieAdmin();
+    // 1,5 h x 20 €/h = 30 €; con sconto 15% → 25,50 €.
+    const id = await scenarioPassato(cookieAmm, 20, 15);
+    env.BREVO_API_KEY = CHIAVE_TEST;
+    const cattura = intercettaBrevo();
+
+    const risposta = await postJson(`/api/admin/societa/${id}/report/invia`, cookieAmm, { mese: MESE_PASSATO, con_ore: false });
+    expect(risposta.status).toBe(200);
+    expect(await risposta.json()).toMatchObject({ ok: true, importo: 25.5 });
+
+    const testoEmail = cattura.corpo()!.textContent;
+    expect(testoEmail).toContain('Totale da pagare: 25,50 €');
+    expect(testoEmail.toLowerCase()).not.toContain('sconto');
+    expect(testoEmail).not.toContain('15%');
+    expect(testoEmail).not.toContain('30,00');
+    const riga = await env.DB.prepare('SELECT importo FROM report_inviati WHERE societa_id = ?1 AND mese = ?2').bind(id, MESE_PASSATO).first<{ importo: number }>();
+    expect(riga?.importo).toBe(25.5);
   });
 
   it('con con_ore=true l\'email riporta anche le ore e il reinvio aggiunge una riga allo storico', async () => {
