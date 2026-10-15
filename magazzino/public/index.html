@@ -243,6 +243,23 @@
 
           <section class="pannello">
             <div class="pannello-testata">
+              <h2>Materiali eliminati</h2>
+            </div>
+            <p class="testo-tenue">Materiale "Fuori uso" tolto dall'elenco: i suoi movimenti restano nello storico e può essere ripristinato.</p>
+            <p id="esito-eliminati" class="stato" role="status" hidden></p>
+            <div class="scorri-tabella">
+              <table class="tabella" id="tabella-eliminati">
+                <thead>
+                  <tr><th scope="col">Magazzino</th><th scope="col">Categoria</th><th scope="col">Materiale</th><th scope="col">Misura</th><th scope="col" class="cella-numero">Totale</th><th scope="col">Eliminato il</th><th scope="col"></th></tr>
+                </thead>
+                <tbody id="righe-eliminati"></tbody>
+              </table>
+            </div>
+            <p id="vuoto-eliminati" class="vuoto" hidden>Nessun materiale eliminato.</p>
+          </section>
+
+          <section class="pannello">
+            <div class="pannello-testata">
               <h2>Categorie materiale</h2>
               <form id="form-categoria" class="modulo-in-riga">
                 <input type="text" id="campo-nome-categoria" maxlength="80" placeholder="Es. Borse, Guanti…" aria-label="Nome categoria" required>

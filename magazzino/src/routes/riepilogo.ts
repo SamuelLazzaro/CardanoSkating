@@ -21,7 +21,7 @@ const ELENCO_STATI_DA_RIPARARE = STATI_DA_RIPARARE.map((stato) => `'${stato}'`).
 
 const SQL_PER_DISCIPLINA = `SELECT disciplina, COALESCE(SUM(quantita), 0) AS articoli, COALESCE(SUM(disponibili), 0) AS disponibili,
          SUM(CASE WHEN stato IN (${ELENCO_STATI_DA_RIPARARE}) THEN 1 ELSE 0 END) AS da_riparare
-  FROM articoli GROUP BY disciplina`;
+  FROM articoli WHERE eliminato_at IS NULL GROUP BY disciplina`;
 
 riepilogo.get('/', async (c) => {
   const istruzionePerDisciplina = c.env.DB.prepare(SQL_PER_DISCIPLINA);

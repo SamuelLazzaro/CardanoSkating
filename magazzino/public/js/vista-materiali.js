@@ -1,13 +1,13 @@
 /*
  * vista-materiali.js — Materiali section: filterable items table, "Nuovo
  * materiale" popup, item card popup (details, QR code, register movement,
- * delete) and the categories panel.
+ * delete), the deleted items panel (restore) and the categories panel.
  */
 import { STATI_ARTICOLO } from './constants.js';
-import { creaArticolo, creaCategoria, eliminaArticolo, impostaCategoriaAttiva, ottieniArticolo, urlQrArticolo } from './api.js';
+import { creaArticolo, creaCategoria, eliminaArticolo, impostaCategoriaAttiva, ottieniArticolo, ripristinaArticolo, urlQrArticolo } from './api.js';
 import { articoloPerId, categorieAttive, g_stato } from './stato.js';
 import { badgeDisciplina, badgeStato, creaBadge, creaBottonePiccolo, creaBottoneTesto, creaRiga, mostraMessaggio, preparaDialogo, preparaFiltro, riempiDatalist, riempiDettagli, riempiSelect, riempiSelectConSegnaposto, riempiTabella } from './ui.js';
-import { filtraArticoli, nomeArticolo, testoONull } from './utils.js';
+import { dataItaliana, filtraArticoli, nomeArticolo, testoONull } from './utils.js';
 
 /** @type {(id: string) => HTMLElement} */
 const elemento = (id) => document.getElementById(id);
@@ -88,9 +88,10 @@ export function impostaFiltroMateriali(disciplina) {
   g_filtro.imposta(disciplina);
 }
 
-/** @returns {void} re-renders table, categories and the category suggestions from g_stato */
+/** @returns {void} re-renders table, deleted items, categories and the category suggestions from g_stato */
 export function renderMateriali() {
   renderTabellaMateriali();
+  renderEliminati();
   renderCategorie();
   riempiDatalist(elemento('elenco-categorie'), categorieAttive().map((categoria) => categoria.nome));
 }
@@ -179,6 +180,34 @@ async function eliminaMaterialeAperto() {
     elemento('dialogo-materiale').close();
     await g_alCambio();
     mostraMessaggio(elemento('esito-materiali'), 'Materiale eliminato.', 'ok');
+  } catch (errore) {
+    mostraMessaggio(esito, errore.message, 'errore');
+  }
+}
+
+/* -------------------------------------------------------------- eliminati */
+
+/** @returns {void} */
+function renderEliminati() {
+  const righe = g_stato.articoliEliminati.map((articolo) => {
+    // eliminato_at is 'YYYY-MM-DD HH:MM:SS' (UTC): the day is enough here
+    const giornoEliminazione = dataItaliana(articolo.eliminato_at.slice(0, 10));
+    const azione = creaBottonePiccolo('Ripristina', () => ripristinaMateriale(articolo), 'btn-ok');
+    return creaRiga([badgeDisciplina(articolo.disciplina), articolo.categoria, nomeArticolo(articolo), articolo.taglia, articolo.quantita, giornoEliminazione, azione], ['', '', '', '', 'cella-numero', '', 'cella-azioni']);
+  });
+  riempiTabella(elemento('righe-eliminati'), righe, elemento('vuoto-eliminati'));
+}
+
+/**
+ * @param {object} articolo - deleted item
+ * @returns {Promise<void>}
+ */
+async function ripristinaMateriale(articolo) {
+  const esito = elemento('esito-eliminati');
+  try {
+    await ripristinaArticolo(articolo.id);
+    await g_alCambio();
+    mostraMessaggio(esito, `Materiale ${nomeArticolo(articolo)} ripristinato.`, 'ok');
   } catch (errore) {
     mostraMessaggio(esito, errore.message, 'errore');
   }

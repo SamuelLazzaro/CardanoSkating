@@ -160,13 +160,28 @@ export function creaArticolo(corpo) {
   return richiestaJson('/api/articoli', { method: 'POST', body: JSON.stringify(corpo) });
 }
 
+/** @returns {Promise<{articoli: object[]}>} logically deleted items, most recent first (eliminato_at set) */
+export function ottieniArticoliEliminati() {
+  return richiestaJson('/api/articoli/eliminati');
+}
+
 /**
- * Allowed only for an item without movements (409 otherwise).
+ * Physical delete for an item without movements; logical delete (hidden,
+ * restorable) for a "Fuori uso" item fully back in stock. 409 otherwise.
  * @param {number} idArticolo
  * @returns {Promise<{ok: boolean}>}
  */
 export function eliminaArticolo(idArticolo) {
   return richiestaJson(`/api/articoli/${idArticolo}`, { method: 'DELETE' });
+}
+
+/**
+ * Brings a logically deleted item back into the lists.
+ * @param {number} idArticolo
+ * @returns {Promise<{ok: boolean}>}
+ */
+export function ripristinaArticolo(idArticolo) {
+  return richiestaJson(`/api/articoli/${idArticolo}/ripristina`, { method: 'POST' });
 }
 
 /**

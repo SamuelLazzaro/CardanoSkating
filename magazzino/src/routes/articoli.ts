@@ -1,6 +1,6 @@
 /**
  * Articoli (materiale): elenco con filtri, inserimento, scheda, eliminazione
- * e QR code della scheda.
+ * (fisica o logica) con ripristino e QR code della scheda.
  */
 import { Hono } from 'hono';
 import qrcode from 'qrcode-generator';
@@ -12,14 +12,27 @@ import { disciplina, intero, interoPositivo, leggiJson, patternRicerca, scriviAu
 /** Giacenza iniziale quando il corpo non indica la quantità (come nel gestionale originale). */
 const QUANTITA_PREDEFINITA = 1;
 
-/** Elenco con filtri neutralizzabili: ?1 disciplina ('' = tutte), ?2 pattern LIKE ('' = nessuna ricerca). */
+/** Elenco con filtri neutralizzabili: ?1 disciplina ('' = tutte), ?2 pattern LIKE ('' = nessuna ricerca). Esclude gli articoli eliminati. */
 const SQL_ELENCO_ARTICOLI = `SELECT * FROM articoli
-  WHERE (?1 = '' OR disciplina = ?1)
+  WHERE eliminato_at IS NULL
+    AND (?1 = '' OR disciplina = ?1)
     AND (?2 = '' OR marca LIKE ?2 ESCAPE '\\' OR modello LIKE ?2 ESCAPE '\\')
   ORDER BY disciplina, categoria, marca, modello, id LIMIT 1000`;
 
-/** Eliminazione condizionata: la riga sparisce solo se non ha movimenti. */
+/** Articoli eliminati logicamente, dal più recente. */
+const SQL_ELENCO_ELIMINATI = 'SELECT * FROM articoli WHERE eliminato_at IS NOT NULL ORDER BY eliminato_at DESC, id DESC LIMIT 1000';
+
+/** Eliminazione fisica condizionata: la riga sparisce solo se non ha movimenti. */
 const SQL_ELIMINA_SENZA_STORICO = 'DELETE FROM articoli WHERE id = ?1 AND NOT EXISTS (SELECT 1 FROM movimenti WHERE articolo_id = ?1)';
+
+/**
+ * Eliminazione logica: la stessa guardia già verificata in JS è ripetuta in
+ * SQL, così una consegna concorrente non può lasciare eliminato un articolo
+ * ancora in mano a un atleta.
+ */
+const SQL_ELIMINA_FUORI_USO = `UPDATE articoli SET eliminato_at = datetime('now') WHERE id = ?1 AND eliminato_at IS NULL AND stato = 'Fuori uso' AND disponibili = quantita`;
+
+const SQL_RIPRISTINA = 'UPDATE articoli SET eliminato_at = NULL WHERE id = ?1 AND eliminato_at IS NOT NULL';
 
 export const articoli = new Hono<{ Bindings: Bindings; Variables: VariabiliUtente }>();
 
@@ -50,6 +63,13 @@ articoli.post('/', async (c) => {
   return c.json({ id: esito.meta.last_row_id }, 201);
 });
 
+/** Lista "Materiali eliminati" (eliminazione logica), da cui si può ripristinare. Prima di /:id perché 'eliminati' non è un id. */
+articoli.get('/eliminati', async (c) => {
+  const { results } = await c.env.DB.prepare(SQL_ELENCO_ELIMINATI).all<ArticoloRow>();
+  return c.json({ articoli: results });
+});
+
+/** Scheda: risponde anche per un articolo eliminato (link dal QR o dallo storico), con `eliminato_at` valorizzato. */
 articoli.get('/:id', async (c) => {
   const id = intero(c.req.param('id'));
   if (id === null) return c.json({ errore: 'Materiale non trovato' }, 404);
@@ -59,18 +79,42 @@ articoli.get('/:id', async (c) => {
 });
 
 /**
- * Eliminazione fisica, ammessa solo per un articolo senza movimenti: con uno
- * storico va invece segnato come "Fuori uso" (regola del gestionale originale,
- * che così non perde mai la tracciabilità di chi ha avuto cosa).
+ * Eliminazione di un articolo, in due forme:
+ *  - senza movimenti: cancellazione fisica (come nel gestionale originale);
+ *  - con storico: ammessa solo se l'articolo è "Fuori uso" e nessun pezzo è
+ *    ancora in mano a un atleta (disponibili = quantita); è un'eliminazione
+ *    logica (eliminato_at), così lo storico non perde mai la tracciabilità
+ *    di chi ha avuto cosa e l'articolo resta ripristinabile.
+ * Negli altri casi 409 con il motivo.
  */
 articoli.delete('/:id', async (c) => {
   const id = intero(c.req.param('id'));
   if (id === null) return c.json({ errore: 'Materiale non trovato' }, 404);
-  const articolo = await c.env.DB.prepare('SELECT marca, modello FROM articoli WHERE id = ?1').bind(id).first<{ marca: string; modello: string | null }>();
+  const articolo = await c.env.DB.prepare('SELECT marca, modello, stato, quantita, disponibili, eliminato_at FROM articoli WHERE id = ?1').bind(id).first<Pick<ArticoloRow, 'marca' | 'modello' | 'stato' | 'quantita' | 'disponibili' | 'eliminato_at'>>();
   if (!articolo) return c.json({ errore: 'Materiale non trovato' }, 404);
-  const esito = await c.env.DB.prepare(SQL_ELIMINA_SENZA_STORICO).bind(id).run();
-  if (esito.meta.changes === 0) return c.json({ errore: 'Materiale con storico: impostalo come Fuori uso invece di eliminarlo' }, 409);
-  await scriviAudit(c.env.DB, 'articolo_eliminato', `#${id} ${nomeArticolo(articolo)}`, c.get('utente'));
+  if (articolo.eliminato_at !== null) return c.json({ errore: 'Materiale già eliminato' }, 409);
+  const esitoFisico = await c.env.DB.prepare(SQL_ELIMINA_SENZA_STORICO).bind(id).run();
+  if (esitoFisico.meta.changes > 0) {
+    await scriviAudit(c.env.DB, 'articolo_eliminato', `#${id} ${nomeArticolo(articolo)}`, c.get('utente'));
+    return c.json({ ok: true });
+  }
+  if (articolo.stato !== 'Fuori uso') return c.json({ errore: 'Materiale con storico: impostalo come Fuori uso prima di eliminarlo' }, 409);
+  if (articolo.disponibili < articolo.quantita) return c.json({ errore: 'Materiale ancora consegnato a un atleta: registra la restituzione prima di eliminarlo' }, 409);
+  const esitoLogico = await c.env.DB.prepare(SQL_ELIMINA_FUORI_USO).bind(id).run();
+  if (esitoLogico.meta.changes === 0) return c.json({ errore: 'Materiale modificato nel frattempo: ricarica e riprova' }, 409);
+  await scriviAudit(c.env.DB, 'articolo_eliminato', `#${id} ${nomeArticolo(articolo)} (con storico)`, c.get('utente'));
+  return c.json({ ok: true });
+});
+
+/** Ripristino di un articolo eliminato logicamente: torna negli elenchi con lo stato che aveva. */
+articoli.post('/:id/ripristina', async (c) => {
+  const id = intero(c.req.param('id'));
+  if (id === null) return c.json({ errore: 'Materiale non trovato' }, 404);
+  const articolo = await c.env.DB.prepare('SELECT marca, modello, eliminato_at FROM articoli WHERE id = ?1').bind(id).first<Pick<ArticoloRow, 'marca' | 'modello' | 'eliminato_at'>>();
+  if (!articolo) return c.json({ errore: 'Materiale non trovato' }, 404);
+  if (articolo.eliminato_at === null) return c.json({ errore: 'Materiale non eliminato' }, 409);
+  await c.env.DB.prepare(SQL_RIPRISTINA).bind(id).run();
+  await scriviAudit(c.env.DB, 'articolo_ripristinato', `#${id} ${nomeArticolo(articolo)}`, c.get('utente'));
   return c.json({ ok: true });
 });
 

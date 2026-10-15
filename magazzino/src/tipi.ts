@@ -44,6 +44,8 @@ export type ArticoloRow = {
   disponibili: number;
   stato: StatoArticolo;
   note: string | null;
+  /** Data dell'eliminazione logica (vedi migrations/0005); NULL = articolo in uso. */
+  eliminato_at: string | null;
   created_at: string;
 };
 

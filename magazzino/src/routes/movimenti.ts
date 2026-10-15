@@ -22,6 +22,9 @@ import { dataCivile, disciplina, interoPositivo, leggiJson, oggiRoma, patternRic
 
 const LIMITE_STORICO = 500;
 
+/** Un articolo eliminato logicamente non riceve movimenti: va prima ripristinato. */
+const ERRORE_ARTICOLO_ELIMINATO = 'Materiale eliminato: ripristinalo prima di registrare il movimento';
+
 /** Firma su touchscreen: data URL PNG prodotta da canvas.toDataURL('image/png'). */
 const FIRMA_RE = /^data:image\/png;base64,[A-Za-z0-9+/]+=*$/;
 /** Tetto prudenziale sulla lunghezza della firma (una firma reale pesa decine di KB). */
@@ -104,11 +107,13 @@ movimenti.post('/', async (c) => {
     if (corpo.nuovo_articolo !== undefined) return await entrataNuovoArticolo(c, corpo.nuovo_articolo, dati);
     const articolo = await caricaArticolo(c.env.DB, corpo.articolo_id);
     if (articolo === null) return c.json({ errore: 'Seleziona il materiale' }, 400);
+    if (articolo.eliminato_at !== null) return c.json({ errore: ERRORE_ARTICOLO_ELIMINATO }, 400);
     return await entrataArticoloEsistente(c, articolo, dati);
   }
 
   const articolo = await caricaArticolo(c.env.DB, corpo.articolo_id);
   if (articolo === null) return c.json({ errore: 'Seleziona il materiale' }, 400);
+  if (articolo.eliminato_at !== null) return c.json({ errore: ERRORE_ARTICOLO_ELIMINATO }, 400);
   const atletaId = interoPositivo(corpo.atleta_id);
   if (atletaId === null) return c.json({ errore: 'Seleziona un atleta' }, 400);
   const atleta = await c.env.DB.prepare('SELECT id, attivo FROM atleti WHERE id = ?1').bind(atletaId).first<{ id: number; attivo: number }>();

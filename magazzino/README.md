@@ -201,8 +201,15 @@ Consiglio: fai un backup prima di ogni `migrate:remote`.
   firma è salvata come PNG (data URL) nella riga del movimento. Come nel
   gestionale originale non viene mostrata: le liste espongono solo il flag
   `firma_presente` (✓ nella scheda atleta) e non leggono mai la colonna.
-- **Eliminazione articoli**: possibile solo senza movimenti; un articolo con
-  storico va impostato `Fuori uso`, così la tracciabilità non si perde.
+- **Eliminazione articoli**: senza movimenti la cancellazione è fisica. Un
+  articolo con storico si può eliminare solo se è `Fuori uso` e tutti i pezzi
+  sono rientrati (`disponibili = quantita`): è un'eliminazione logica
+  (colonna `eliminato_at`, migrazione 0005), così lo storico, le schede atleti
+  e il CSV continuano a mostrarne i movimenti. L'articolo sparisce da elenco e
+  riepilogo, non accetta movimenti e compare nel pannello "Materiali
+  eliminati" (`GET /api/articoli/eliminati`), da cui si ripristina con
+  `POST /api/articoli/:id/ripristina`. Negli altri casi `DELETE` risponde 409
+  con il motivo.
 - **QR code**: `GET /api/articoli/:id/qr.svg` genera nel Worker (libreria JS
   pura `qrcode-generator`, nessun servizio esterno) un QR che punta a
   `/?articolo=<id>`; aperto quel link, dopo il login la pagina mostra subito la
