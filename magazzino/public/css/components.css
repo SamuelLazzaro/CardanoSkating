@@ -507,8 +507,9 @@ fieldset.campo {
     font-weight: 600;
 }
 
-.campo-ricerca {
-    flex: 1 1 14rem;
+/* search field and single-choice select of a filter bar share one look */
+.campo-ricerca,
+.select-filtro {
     font: inherit;
     color: var(--testo);
     background: var(--superficie);
@@ -517,7 +518,12 @@ fieldset.campo {
     padding: 0.45rem 0.6rem;
 }
 
-.campo-ricerca:focus-visible {
+.campo-ricerca {
+    flex: 1 1 14rem;
+}
+
+.campo-ricerca:focus-visible,
+.select-filtro:focus-visible {
     outline: 2px solid var(--accento-scuro);
     outline-offset: 1px;
 }

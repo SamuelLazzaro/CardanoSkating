@@ -6,7 +6,7 @@
 import { STATI_ARTICOLO } from './constants.js';
 import { creaArticolo, creaCategoria, eliminaArticolo, impostaCategoriaAttiva, ottieniArticolo, urlQrArticolo } from './api.js';
 import { articoloPerId, categorieAttive, g_stato } from './stato.js';
-import { badgeDisciplina, badgeStato, creaBadge, creaBottonePiccolo, creaBottoneTesto, creaRiga, mostraMessaggio, preparaDialogo, preparaFiltro, riempiDatalist, riempiDettagli, riempiSelect, riempiTabella } from './ui.js';
+import { badgeDisciplina, badgeStato, creaBadge, creaBottonePiccolo, creaBottoneTesto, creaRiga, mostraMessaggio, preparaDialogo, preparaFiltro, riempiDatalist, riempiDettagli, riempiSelect, riempiSelectConSegnaposto, riempiTabella } from './ui.js';
 import { filtraArticoli, nomeArticolo, testoONull } from './utils.js';
 
 /** @type {(id: string) => HTMLElement} */
@@ -20,6 +20,9 @@ let g_alMovimentoPerArticolo = null;
 
 /** @type {string} warehouse filter of the table: 'Ghiaccio' | 'Corsa' | '' (all) */
 let g_filtroDisciplina = '';
+
+/** @type {string} state filter of the table: one of STATI_ARTICOLO or '' (all) */
+let g_filtroStato = '';
 
 /** @type {string} free text filter of the table */
 let g_testoRicerca = '';
@@ -40,6 +43,12 @@ export function preparaMateriali({ alCambio, alMovimentoPerArticolo }) {
 
   g_filtro = preparaFiltro(elemento('filtro-materiali'), (valore) => {
     g_filtroDisciplina = valore;
+    renderTabellaMateriali();
+  });
+  const selettoreStato = elemento('filtro-stato-materiali');
+  riempiSelectConSegnaposto(selettoreStato, 'Tutti gli stati', STATI_ARTICOLO.map((stato) => ({ valore: stato, etichetta: stato })));
+  selettoreStato.addEventListener('change', (evento) => {
+    g_filtroStato = evento.target.value;
     renderTabellaMateriali();
   });
   elemento('ricerca-materiali').addEventListener('input', (evento) => {
@@ -88,7 +97,7 @@ export function renderMateriali() {
 
 /** @returns {void} */
 function renderTabellaMateriali() {
-  const visibili = filtraArticoli(g_stato.articoli, g_filtroDisciplina, g_testoRicerca);
+  const visibili = filtraArticoli(g_stato.articoli, g_filtroDisciplina, g_filtroStato, g_testoRicerca);
   const righe = visibili.map((articolo) => {
     const materiale = creaBottoneTesto(nomeArticolo(articolo), () => apriSchedaMateriale(articolo.id));
     return creaRiga([badgeDisciplina(articolo.disciplina), articolo.categoria, materiale, articolo.taglia, articolo.quantita, articolo.disponibili, badgeStato(articolo.stato)], ['', '', '', '', 'cella-numero', 'cella-numero', '']);

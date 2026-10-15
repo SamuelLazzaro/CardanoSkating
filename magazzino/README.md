@@ -170,7 +170,9 @@ Consiglio: fai un backup prima di ogni `migrate:remote`.
   posseduto, `disponibili` la giacenza in magazzino; la differenza è il
   materiale consegnato agli atleti. Lo stato è uno tra `Nuovo`, `Buono`,
   `Usurato`, `Da riparare`, `Fuori uso`; gli ultimi due contano come "da
-  riparare" nei riquadri.
+  riparare" nei riquadri. La tabella Materiali filtra per magazzino, per
+  stato (select "Tutti gli stati") e per testo; i filtri sono lato client e
+  si combinano tra loro.
 - **Atleti**: ogni atleta ha nome e cognome in un unico campo e una
   categoria agonistica tra `G` (Giovanissimi), `E` (Esordienti), `R12`
   (Ragazzi 12), `R` (Ragazzi), `A` (Allievi), `J` (Junior), `S` (Senior) e

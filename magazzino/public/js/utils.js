@@ -43,16 +43,19 @@ export function contieneTesto(testoCercato, campi) {
 }
 
 /**
- * Filters the items of a warehouse: by discipline ('' = all) and free text.
+ * Filters the items of a warehouse: by discipline ('' = all), by state
+ * ('' = all) and free text.
  * @param {object[]} articoli - items from the API
  * @param {string} disciplina - 'Ghiaccio' | 'Corsa' | ''
+ * @param {string} stato - one of STATI_ARTICOLO or ''
  * @param {string} testoCercato - free text
  * @returns {object[]} the matching items, in the original order
  */
-export function filtraArticoli(articoli, disciplina, testoCercato) {
+export function filtraArticoli(articoli, disciplina, stato, testoCercato) {
   return articoli.filter((articolo) => {
     const stessoMagazzino = disciplina === '' || articolo.disciplina === disciplina;
-    return stessoMagazzino && contieneTesto(testoCercato, [articolo.marca, articolo.modello]);
+    const stessoStato = stato === '' || articolo.stato === stato;
+    return stessoMagazzino && stessoStato && contieneTesto(testoCercato, [articolo.marca, articolo.modello]);
   });
 }
 
