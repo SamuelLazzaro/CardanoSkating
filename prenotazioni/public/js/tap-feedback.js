@@ -23,8 +23,18 @@
  *
  * Hooking click (not touchstart) is deliberate: a touch that turns into a
  * scroll never produces a click, so scrolling fingers get no stray feedback.
+ *
+ * The module also tells the CSS which input is in use: KEYBOARD_INPUT_CLASS
+ * sits on <html> from the first key press until the next pointer press, and
+ * the focus styles of the actionable elements are scoped to it, so they show
+ * up only when the focus was reached with the keyboard. The browsers' own
+ * :focus-visible heuristic is not enough: WebKit matches it on any
+ * programmatic focus (including the focus a <dialog> takes when it opens and
+ * hands back when it closes) and Chrome keeps it on an element reached with
+ * Tab even after it is clicked, so a tap could leave a button looking
+ * hovered for good.
  */
-import { TAP_FEEDBACK_CLASS, TAP_FEEDBACK_MS, TAP_FEEDBACK_SELECTOR } from './constants.js';
+import { KEYBOARD_INPUT_CLASS, TAP_FEEDBACK_CLASS, TAP_FEEDBACK_MS, TAP_FEEDBACK_SELECTOR } from './constants.js';
 
 /** @type {boolean} true when the last pointer pressed down was a finger */
 let g_ultimoInputTouch = false;
@@ -115,11 +125,19 @@ export function eUltimoInputTouch() {
 export function avviaTapFeedback() {
   document.addEventListener('pointerdown', (eventoPuntatore) => {
     g_ultimoInputTouch = eventoPuntatore.pointerType === 'touch';
+    document.documentElement.classList.remove(KEYBOARD_INPUT_CLASS);
   }, { capture: true, passive: true });
 
   // engines without PointerEvent support only fire the touch events
   document.addEventListener('touchstart', () => {
     g_ultimoInputTouch = true;
+    document.documentElement.classList.remove(KEYBOARD_INPUT_CLASS);
+  }, { capture: true, passive: true });
+
+  // keydown fires before Tab moves the focus, so the newly focused element
+  // already gets the keyboard styles
+  document.addEventListener('keydown', () => {
+    document.documentElement.classList.add(KEYBOARD_INPUT_CLASS);
   }, { capture: true, passive: true });
 
   document.addEventListener('click', intercettaClick, true);

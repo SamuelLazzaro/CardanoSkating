@@ -120,6 +120,21 @@ a {
     transition: all var(--t-tap) !important;
 }
 
+/*
+ * Keyboard-only focus. js/tap-feedback.js keeps .is-keyboard-input on <html>
+ * from the first key press until the next pointer press, and every focus
+ * style of an actionable element (the .componente:focus-visible rules next to
+ * the hovers) is scoped to it. :focus-visible alone does not mean "keyboard":
+ * WebKit matches it on programmatic focus (e.g. the focus a <dialog> hands
+ * back to its opener on close) and Chrome keeps it after a click, so a tapped
+ * button could stay lit as if the tap feedback never ended. The rule below
+ * also drops the native outline of a pointer-reached focus; form fields are
+ * left alone, since typing into them is keyboard use.
+ */
+html:not(.is-keyboard-input) :is(a, button, [role="button"]):focus-visible {
+    outline: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
     * {
         transition: none !important;

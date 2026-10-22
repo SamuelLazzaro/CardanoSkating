@@ -6,8 +6,8 @@
 /* -------------------------------------------------------------- bottoni */
 
 .btn {
-    /* shared between :hover, :focus-visible and .is-tapped; the variants
-       below override these two properties instead of redeclaring rules.
+    /* shared between :hover, the keyboard :focus-visible and .is-tapped; the
+       variants below override these two properties instead of redeclaring rules.
        The active border uses the darker orange: the bright fill would sit
        below the 3:1 non-text contrast threshold on a white button */
     --btn-fondo-attivo: var(--accento-tinta);
@@ -34,7 +34,8 @@
     border-color: var(--btn-bordo-attivo);
 }
 
-.btn:focus-visible {
+/* keyboard focus only (see html.is-keyboard-input in base.css) */
+html.is-keyboard-input .btn:focus-visible {
     background: var(--btn-fondo-attivo);
     border-color: var(--btn-bordo-attivo);
 }
@@ -80,7 +81,7 @@
     color: var(--btn-testo-colore-attivo);
 }
 
-.btn-testo:focus-visible {
+html.is-keyboard-input .btn-testo:focus-visible {
     color: var(--btn-testo-colore-attivo);
 }
 
@@ -868,8 +869,8 @@ fieldset.campo {
     box-shadow: var(--cliccabile-barra-attiva);
 }
 
-.slot.cliccabile:focus-visible,
-.mese-voce.cliccabile:focus-visible {
+html.is-keyboard-input .slot.cliccabile:focus-visible,
+html.is-keyboard-input .mese-voce.cliccabile:focus-visible {
     box-shadow: var(--cliccabile-barra-attiva);
     outline: 2px solid var(--accento-scuro);
     outline-offset: -2px;
@@ -1021,9 +1022,9 @@ fieldset.campo {
 }
 
 /* touch twin of the :hover above (see .is-tapped in base.css), plus the
-   keyboard focus state */
+   keyboard focus state (see html.is-keyboard-input in base.css) */
 .mese-numero.is-tapped,
-.mese-numero:focus-visible {
+html.is-keyboard-input .mese-numero:focus-visible {
     background: var(--numero-fondo-attivo);
     color: var(--c-white);
 }
@@ -1140,7 +1141,7 @@ fieldset.campo {
     background: var(--aggiungi-fondo-attivo);
 }
 
-.btn-aggiungi-slot:focus-visible {
+html.is-keyboard-input .btn-aggiungi-slot:focus-visible {
     background: var(--aggiungi-fondo-attivo);
 }
 

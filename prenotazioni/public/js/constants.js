@@ -64,3 +64,6 @@ export const TAP_FEEDBACK_CLASS = 'is-tapped';
 
 /** @type {string} elements whose taps deserve the feedback */
 export const TAP_FEEDBACK_SELECTOR = 'a[href], button, [role="button"]';
+
+/** @type {string} class on <html> while the user drives the page with the keyboard; the CSS focus rules of the actionable elements are scoped to it */
+export const KEYBOARD_INPUT_CLASS = 'is-keyboard-input';
