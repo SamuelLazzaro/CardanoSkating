@@ -88,8 +88,8 @@
 
 .testata-nav a.is-tapped,
 .testata-nav button.is-tapped,
-.testata-nav a:focus-visible,
-.testata-nav button:focus-visible {
+html.is-keyboard-input .testata-nav a:focus-visible,
+html.is-keyboard-input .testata-nav button:focus-visible {
     background: white;
     color: var(--accento);
 }
@@ -164,7 +164,7 @@ body:has(.nav-sezioni:not([hidden])) {
 }
 
 .nav-voce.is-tapped,
-.nav-voce:focus-visible {
+html.is-keyboard-input .nav-voce:focus-visible {
     background: white;
     color: var(--accento);
 }
